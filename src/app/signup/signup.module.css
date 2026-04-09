@@ -1,0 +1,155 @@
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 3rem 1rem;
+  background: var(--background);
+  animation: fadeIn 0.5s ease-out;
+}
+
+.signupCard {
+  background: var(--card-bg);
+  width: 100%;
+  max-width: 640px;
+  padding: 3rem;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--card-border);
+}
+
+.header {
+  margin-bottom: 2.5rem;
+}
+
+.backLink {
+  display: inline-block;
+  font-size: 0.875rem;
+  color: var(--primary);
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.title {
+  font-size: 2rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.04em;
+}
+
+.subtitle {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sectionTitle {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--foreground);
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--primary-accent);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inputGroup label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.inputGroup input {
+  padding: 0.875rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 1rem;
+  transition: var(--transition);
+}
+
+.inputGroup input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px var(--primary-accent);
+}
+
+/* Full width for email in the grid */
+.inputGroup:first-child {
+  grid-column: span 2;
+}
+
+.divider {
+  height: 1px;
+  background: var(--card-border);
+}
+
+.errorMessage {
+  padding: 1rem;
+  background: #fef2f2;
+  border: 1px solid #fee2e2;
+  color: var(--danger);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+.submitBtn {
+  padding: 1.125rem;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 1.125rem;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.2);
+  transition: var(--transition);
+  margin-top: 1rem;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background: var(--primary-hover);
+  transform: translateY(-2px);
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .signupCard {
+    padding: 2rem;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .inputGroup:first-child {
+    grid-column: span 1;
+  }
+}
