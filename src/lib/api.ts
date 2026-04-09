@@ -179,6 +179,65 @@ export const changePassword = async (newPassword: string) => {
     await supabase
       .from('profiles')
       .update({ must_change_password: false })
-      .eq('id', user.id);
   }
+};
+
+export interface Company {
+  id: string;
+  name: string;
+  registration_number: string;
+  status: 'active' | 'suspended';
+  plan: 'free' | 'paid';
+  created_at: string;
+  user_count?: number;
+}
+
+export const getAllCompaniesWithStats = async (): Promise<Company[]> => {
+  const { data, error } = await supabase
+    .from('companies')
+    .select(`
+      *,
+      profiles:profiles(count)
+    `)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  
+  return (data || []).map((company: any) => ({
+    ...company,
+    user_count: company.profiles?.[0]?.count || 0
+  }));
+};
+
+export const updateCompanySettings = async (companyId: string, updates: Partial<Company>) => {
+  const { data, error } = await supabase
+    .from('companies')
+    .update(updates)
+    .eq('id', companyId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const fetchCompanyUsers = async (companyId: string): Promise<Profile[]> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('full_name');
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const adminResetPassword = async (userId: string, tempPassword: string) => {
+  // 실제 비밀번호 초기화는 관리자 권한이 있는 Edge Function을 통해 수행
+  const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+    body: { action: 'reset-password', userId, tempPassword },
+  });
+
+  if (error) throw error;
+  return data;
 };
