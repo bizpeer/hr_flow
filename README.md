@@ -13,3 +13,6 @@ npm run dev
 
 브라우저에서 [http://localhost:3000](http://localhost:3000)을 열어 결과를 확인하세요.
 
+---
+© 2026 Bizpeer Web System. All rights reserved.
+*Last Updated: 2026-04-09 11:09*
