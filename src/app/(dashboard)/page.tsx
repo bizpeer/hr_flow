@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 
@@ -12,8 +12,8 @@ const modules = [
 ];
 
 export default function DashboardPage() {
-  const [userName, setUserName] = useState('사용자');
-  const [companyName, setCompanyName] = useState('우리 회사');
+  const [userName] = useState('사용자');
+  const [companyName] = useState('우리 회사');
 
   return (
     <div className={styles.container}>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Profile, updateMemberRole, updateMemberProfile, getPayrollHistory, fetchSeveranceEstimate } from '@/lib/api';
+import { Profile, updateMemberRole, getPayrollHistory, fetchSeveranceEstimate, PayrollRecord } from '@/lib/api';
 import styles from './organization.module.css';
 
 export default function OrganizationPage() {
@@ -10,8 +10,12 @@ export default function OrganizationPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [activeTab, setActiveTab] = useState<'info' | 'payroll' | 'severance'>('info');
-  const [payrollHistory, setPayrollHistory] = useState<any[]>([]);
-  const [severance, setSeverance] = useState<any>(null);
+  const [payrollHistory, setPayrollHistory] = useState<PayrollRecord[]>([]);
+  const [severance, setSeverance] = useState<{
+    total_days: number;
+    avg_daily_wage: number;
+    severance_pay: number;
+  } | null>(null);
 
   const fetchMembers = async () => {
     setLoading(true);
