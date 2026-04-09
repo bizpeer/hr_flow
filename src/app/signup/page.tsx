@@ -171,7 +171,7 @@ export default function SignupPage() {
             className={styles.submitBtn}
             disabled={loading}
           >
-            {loading ? '가입 처리 중...' : '기업 회원가입 완료'}
+            {loading ? '가입 처리 중...' : '기업 회원가입'}
           </button>
         </form>
 

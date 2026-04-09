@@ -82,8 +82,8 @@ export default function LoginPage() {
         </form>
 
         <div className={styles.footer}>
-          계정이 없으신가요? 
-          <Link href="/signup" className={styles.link}>계정 신청하기</Link>
+          아직 회원이 아니신가요? 
+          <Link href="/signup" className={styles.link}>기업 회원가입</Link>
         </div>
       </div>
       
