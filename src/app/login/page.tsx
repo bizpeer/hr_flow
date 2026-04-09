@@ -26,7 +26,7 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      router.push('/');
+      router.push('/dashboard');
       router.refresh();
     } catch (err: unknown) {
       const error = err as Error;

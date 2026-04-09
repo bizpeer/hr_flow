@@ -5,10 +5,10 @@ import Link from 'next/link';
 import styles from './page.module.css';
 
 const modules = [
-  { id: 'expenses', title: '지출결의', icon: '💰', color: '#4d90fe', subtitle: '비용 신청 및 승인', href: '/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', color: '#34a853', subtitle: '조직도 및 정보 관리', href: '/hr' },
-  { id: 'leaves', title: '휴가관리', icon: '🏖️', color: '#fabb05', subtitle: '잔여일수 및 신청', href: '/leaves' },
-  { id: 'salary', title: '급여관리', icon: '📝', color: '#ea4335', subtitle: '급여대장 및 명세서', href: '/salary' },
+  { id: 'expenses', title: '지출결의', icon: '💰', color: '#4d90fe', subtitle: '비용 신청 및 승인', href: '/dashboard/expenses' },
+  { id: 'hr', title: '인사관리', icon: '👥', color: '#34a853', subtitle: '조직도 및 정보 관리', href: '/dashboard/hr' },
+  { id: 'leaves', title: '휴가관리', icon: '🏖️', color: '#fabb05', subtitle: '잔여일수 및 신청', href: '/dashboard/leaves' },
+  { id: 'salary', title: '급여관리', icon: '📝', color: '#ea4335', subtitle: '급여대장 및 명세서', href: '/dashboard/salary' },
 ];
 
 export default function DashboardPage() {
@@ -67,7 +67,7 @@ export default function DashboardPage() {
           <h2 className={styles.bannerTitle}>조직 관리 바로가기</h2>
           <p className={styles.bannerSubtitle}>직원을 관리하고 새로운 멤버를 초대하세요.</p>
         </div>
-        <Link href="/organization" className={styles.bannerBtn}>
+        <Link href="/dashboard/organization" className={styles.bannerBtn}>
           관리하기 ➔
         </Link>
       </section>

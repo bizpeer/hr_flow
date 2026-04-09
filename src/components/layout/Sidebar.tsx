@@ -7,11 +7,11 @@ import { supabase } from '@/lib/supabase';
 import styles from './Layout.module.css';
 
 const menuItems = [
-  { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/' },
-  { id: 'expenses', title: '지출결의', icon: '💰', href: '/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', href: '/hr' },
-  { id: 'leaves', title: '휴가관리', icon: '🏖️', href: '/leaves' },
-  { id: 'organization', title: '조직관리', icon: '🏢', href: '/organization' },
+  { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
+  { id: 'expenses', title: '지출결의', icon: '💰', href: '/dashboard/expenses' },
+  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/hr' },
+  { id: 'leaves', title: '휴가관리', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
 ];
 
 export default function Sidebar() {
