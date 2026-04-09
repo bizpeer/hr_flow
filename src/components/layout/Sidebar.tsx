@@ -1,20 +1,11 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import styles from './Layout.module.css';
-
-const menuItems = [
-  { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
-  { id: 'expenses', title: '지출결의', icon: '💰', href: '/dashboard/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/hr' },
-  { id: 'leaves', title: '휴가관리', icon: '🏖️', href: '/dashboard/leaves' },
-  { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
-];
-
-import { useEffect, useState } from 'react';
 
 const menuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
@@ -92,7 +83,7 @@ export default function Sidebar() {
 
       <div className={styles.sidebarFooter}>
         <div className={styles.userSection}>
-          <div className={styles.avatar}>{userData.name[0]}</div>
+          <div className={styles.avatar}>{userData.name?.[0] || 'U'}</div>
           <div className={styles.userInfo}>
             <p className={styles.userName}>{userData.name}</p>
             <p className={styles.userRole}>{userData.role}</p>
