@@ -26,7 +26,18 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      router.push('/dashboard');
+      // 사용자 프로필 확인
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('must_change_password, role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profile?.must_change_password) {
+        router.push('/dashboard/change-password');
+      } else {
+        router.push('/dashboard');
+      }
       router.refresh();
     } catch (err: unknown) {
       const error = err as Error;

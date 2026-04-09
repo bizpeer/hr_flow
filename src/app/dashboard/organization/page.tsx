@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Profile, updateMemberRole, getPayrollHistory, fetchSeveranceEstimate, PayrollRecord } from '@/lib/api';
+import { Profile, updateMemberRole, getPayrollHistory, fetchSeveranceEstimate, PayrollRecord, registerStaff } from '@/lib/api';
 import styles from './organization.module.css';
 
 export default function OrganizationPage() {
@@ -16,6 +16,15 @@ export default function OrganizationPage() {
     avg_daily_wage: number;
     severance_pay: number;
   } | null>(null);
+  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [newMember, setNewMember] = useState({
+    email: '',
+    fullName: '',
+    department: '',
+    position: '',
+  });
+  const [tempPassword, setTempPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const fetchMembers = async () => {
     setLoading(true);
@@ -52,12 +61,123 @@ export default function OrganizationPage() {
     }
   };
 
+  const handleRegisterMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsRegistering(true);
+    const generatedPw = Math.random().toString(36).slice(-10) + '!!';
+    
+    try {
+      // Get current admin's company_id
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+        
+      if (!profile) throw new Error('Company not found');
+
+      await registerStaff({
+        ...newMember,
+        tempPassword: generatedPw,
+        companyId: profile.company_id,
+      });
+
+      setTempPassword(generatedPw);
+      fetchMembers();
+    } catch (error) {
+      console.error('Registration failed:', error);
+      alert('직원 등록에 실패했습니다. (Edge Function이 설정되어 있는지 확인해주세요)');
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
         <h1 className={styles.title}>조직 및 멤버 관리</h1>
-        <button className={styles.addBtn}>+ 새 멤버 초대</button>
+        <button 
+          className={styles.addBtn}
+          onClick={() => {
+            setIsRegisterModalOpen(true);
+            setTempPassword('');
+            setNewMember({ email: '', fullName: '', department: '', position: '' });
+          }}
+        >
+          + 새 멤버 등록
+        </button>
       </div>
+
+      {isRegisterModalOpen && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <h2>신규 직원 등록</h2>
+            {!tempPassword ? (
+              <form onSubmit={handleRegisterMember}>
+                <div className={styles.inputGroup}>
+                  <label>이름</label>
+                  <input 
+                    type="text" 
+                    required 
+                    value={newMember.fullName}
+                    onChange={(e) => setNewMember({...newMember, fullName: e.target.value})}
+                    placeholder="성함 입력"
+                  />
+                </div>
+                <div className={styles.inputGroup}>
+                  <label>이메일</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={newMember.email}
+                    onChange={(e) => setNewMember({...newMember, email: e.target.value})}
+                    placeholder="example@company.com"
+                  />
+                </div>
+                <div className={styles.formRow}>
+                  <div className={styles.inputGroup}>
+                    <label>부서</label>
+                    <input 
+                      type="text" 
+                      value={newMember.department}
+                      onChange={(e) => setNewMember({...newMember, department: e.target.value})}
+                      placeholder="부서명"
+                    />
+                  </div>
+                  <div className={styles.inputGroup}>
+                    <label>직급</label>
+                    <input 
+                      type="text" 
+                      value={newMember.position}
+                      onChange={(e) => setNewMember({...newMember, position: e.target.value})}
+                      placeholder="직급명"
+                    />
+                  </div>
+                </div>
+                <div className={styles.modalActions}>
+                  <button type="button" onClick={() => setIsRegisterModalOpen(false)} className={styles.cancelBtn}>취소</button>
+                  <button type="submit" disabled={isRegistering} className={styles.submitBtn}>
+                    {isRegistering ? '등록 중...' : '등록 및 임시비밀번호 발급'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className={styles.successContent}>
+                <p className={styles.successMsg}>직원 등록이 완료되었습니다!</p>
+                <div className={styles.tempPwBox}>
+                  <label>임시 비밀번호</label>
+                  <div className={styles.pwValue}>{tempPassword}</div>
+                </div>
+                <p className={styles.notice}>직원이 첫 로그인 시 위 비밀번호를 사용하고 반드시 변경하도록 안내해 주세요.</p>
+                <button onClick={() => setIsRegisterModalOpen(false)} className={styles.closeBtn}>닫기</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className={styles.mainGrid}>
         <aside className={styles.memberList}>

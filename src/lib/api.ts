@@ -7,6 +7,7 @@ export interface Profile {
   company_id: string;
   department?: string;
   position?: string;
+  must_change_password?: boolean;
 }
 
 export interface Expense {
@@ -146,4 +147,38 @@ export const getProfile = async (userId: string): Promise<Profile> => {
 
   if (error) throw error;
   return data;
+};
+
+export const registerStaff = async (staffData: {
+  email: string;
+  fullName: string;
+  department: string;
+  position: string;
+  tempPassword: string;
+  companyId: string;
+}) => {
+  // Edge Function 호출
+  const { data, error } = await supabase.functions.invoke('register-staff', {
+    body: staffData,
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const changePassword = async (newPassword: string) => {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) throw error;
+
+  // 비밀번호 변경 성공 후 플래그 업데이트
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ must_change_password: false })
+      .eq('id', user.id);
+  }
 };
