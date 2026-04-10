@@ -35,11 +35,12 @@ export default function Sidebar() {
           .single();
         
         const isSystemAdmin = user.email === 'bizpeer@gmail.com';
+        const isSuperAdmin = profile?.role === 'super_admin' || profile?.role === 'ADMIN';
         
         setUserData({
           email: user.email,
-          name: profile?.full_name || '사용자',
-          role: isSystemAdmin ? 'System Admin' : (['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '') ? '기업 관리자' : '직원'),
+          name: profile?.full_name || user.email?.split('@')[0] || '사용자',
+          role: isSystemAdmin ? '시스템 관리자' : (isSuperAdmin ? '최고 관리자' : '직원'),
         });
       }
     };
@@ -88,6 +89,9 @@ export default function Sidebar() {
           <div className={styles.userInfo}>
             <p className={styles.userName}>{userData.name}</p>
             <p className={styles.userRole}>{userData.role}</p>
+            {userData.email && userData.email !== userData.name && (
+              <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '-0.2rem' }}>{userData.email}</p>
+            )}
           </div>
           <button className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
             🚪

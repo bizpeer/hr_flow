@@ -26,9 +26,6 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      // 진단용 알림
-      alert('로그인 성공! 대시보드로 이동을 시도합니다.');
-      
       try {
         // 1. Next.js router 이동 시도
         router.push('/dashboard/');
@@ -36,7 +33,6 @@ export default function LoginPage() {
         // 2. 강제 이동 백업 (Next.js 이동이 멈췄을 경우를 대비)
         setTimeout(() => {
           if (window.location.pathname.includes('/login')) {
-            alert('네비게이션 지연 감지. 강제 이동을 시도합니다.');
             window.location.replace('../dashboard/');
           }
         }, 2000);
@@ -46,7 +42,6 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       const error = err as Error;
-      alert('로그인 처리 중 오류 발생: ' + error.message);
       setError(error.message || '로그인은 성공했으나 화면 전환 중 오류가 발생했습니다.');
       setLoading(false);
     }
