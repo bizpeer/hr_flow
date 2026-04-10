@@ -26,8 +26,8 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      // 즉시 대시보드로 강제 이동 (Next.js 네비게이션 지연 방지)
-      window.location.href = '/dashboard';
+      // 즉시 대시보드로 이동 (router.push는 basePath를 자동으로 처리합니다)
+      router.push('/dashboard');
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || '로그인은 성공했으나 화면 전환 중 오류가 발생했습니다.');
