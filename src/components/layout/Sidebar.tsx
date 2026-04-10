@@ -38,7 +38,7 @@ export default function Sidebar() {
         setUserData({
           email: user.email,
           name: profile?.full_name || '사용자',
-          role: isSystemAdmin ? 'System Admin' : (profile?.role === 'admin' ? '기업 관리자' : '직원'),
+          role: isSystemAdmin ? 'System Admin' : (profile?.role === 'ADMIN' ? '기업 관리자' : '직원'),
         });
       }
     };

@@ -29,9 +29,21 @@ export default function OrganizationPage() {
   const fetchMembers = async () => {
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('company_id')
+        .eq('id', user.id)
+        .single();
+      
+      if (!profile) return;
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .eq('company_id', profile.company_id)
         .order('full_name');
       if (error) throw error;
       setMembers(data || []);
@@ -194,7 +206,7 @@ export default function OrganizationPage() {
                 <div className={styles.avatar}>{member.full_name[0]}</div>
                 <div className={styles.memberInfo}>
                   <p className={styles.memberName}>{member.full_name}</p>
-                  <p className={styles.memberRole}>{member.role === 'admin' ? '관리자' : '직원'}</p>
+                  <p className={styles.memberRole}>{member.role === 'ADMIN' ? '관리자' : '직원'}</p>
                 </div>
               </div>
             ))
@@ -250,8 +262,8 @@ export default function OrganizationPage() {
                         await updateMemberRole(selectedMember.id, e.target.value);
                         fetchMembers();
                       }}>
-                        <option value="member">직원 (Member)</option>
-                        <option value="admin">관리자 (Admin)</option>
+                        <option value="MEMBER">직원 (Member)</option>
+                        <option value="ADMIN">관리자 (Admin)</option>
                       </select>
                     </div>
                   </div>

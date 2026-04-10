@@ -59,7 +59,7 @@ export const enterpriseSignUp = async ({
         email: email,
         full_name: fullName,
         phone_number: phone,
-        role: 'super_admin',
+        role: 'ADMIN',
       },
     ]);
 
