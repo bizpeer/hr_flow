@@ -17,6 +17,8 @@ export const metadata: Metadata = {
   description: "효율적인 조직 및 인사 관리를 위한 스마트 솔루션",
 };
 
+import { AuthProvider } from "@/lib/authContext";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -24,7 +26,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko" className={`${geistSans.variable} ${geistMono.variable}`}>
-      <body>{children}</body>
+      <body>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </body>
     </html>
   );
 }

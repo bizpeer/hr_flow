@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/authContext';
 import { 
   Users, 
   Building, 
@@ -359,8 +359,8 @@ export default function OrganizationManagement() {
                  {!tempPassword ? (
                     <form onSubmit={handleRegister} className="space-y-8">
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <FormInput label="Full Name" value={regData.fullName} onChange={v => setRegData({...regData, fullName: v})} placeholder="Real name" />
-                          <FormInput label="Professional Email" value={regData.email} onChange={v => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
+                          <FormInput label="Full Name" value={regData.fullName} onChange={(v: string) => setRegData({...regData, fullName: v})} placeholder="Real name" />
+                          <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
                        </div>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div className="space-y-2">
@@ -375,7 +375,7 @@ export default function OrganizationManagement() {
                                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                              </select>
                           </div>
-                          <FormInput label="Assigned Position" value={regData.position} onChange={v => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
+                          <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
                        </div>
                        <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 space-y-4">
                           <div className="flex items-center gap-4">

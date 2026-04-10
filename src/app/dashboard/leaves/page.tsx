@@ -39,7 +39,7 @@ export default function LeavesPage() {
         end_date: endDate,
         type,
         reason,
-        status: 'pending',
+        status: 'PENDING',
         company_id: 'company-123',
         user_id: 'user-123',
       });
@@ -55,8 +55,8 @@ export default function LeavesPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'approved': return <span className={`${styles.badge} ${styles.approved}`}>승인됨</span>;
-      case 'rejected': return <span className={`${styles.badge} ${styles.rejected}`}>반려됨</span>;
+      case 'APPROVED': return <span className={`${styles.badge} ${styles.approved}`}>승인됨</span>;
+      case 'REJECTED': return <span className={`${styles.badge} ${styles.rejected}`}>반려됨</span>;
       default: return <span className={`${styles.badge} ${styles.pending}`}>대기중</span>;
     }
   };

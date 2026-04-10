@@ -6,7 +6,7 @@ import styles from './page.module.css';
 
 const modules = [
   { id: 'expenses', title: '지출결의', icon: '💰', color: '#4d90fe', subtitle: '비용 신청 및 승인', href: '/dashboard/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', color: '#34a853', subtitle: '조직도 및 정보 관리', href: '/dashboard/hr' },
+  { id: 'hr', title: '인사관리', icon: '👥', color: '#34a853', subtitle: '조직도 및 정보 관리', href: '/dashboard/organization' },
   { id: 'leaves', title: '휴가관리', icon: '🏖️', color: '#fabb05', subtitle: '잔여일수 및 신청', href: '/dashboard/leaves' },
   { id: 'salary', title: '급여관리', icon: '📝', color: '#ea4335', subtitle: '급여대장 및 명세서', href: '/dashboard/salary' },
 ];

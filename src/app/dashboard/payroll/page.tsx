@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/authContext';
 import { 
   Banknote, 
   Search, 
@@ -31,6 +31,7 @@ import {
   Division, 
   Team 
 } from '@/lib/api';
+import { format } from 'date-fns';
 import { calculateNetPay, MEAL_ALLOWANCE_DEFAULT, SalaryCalculationResult } from '@/lib/salaryUtils';
 
 export default function PayrollEngine() {
@@ -174,7 +175,7 @@ export default function PayrollEngine() {
           label="Division" 
           icon={<Building className="w-5 h-5" />} 
           value={selectedDivision} 
-          onChange={(val) => { setSelectedDivision(val); setSelectedTeam('ALL'); }}
+          onChange={(val: string) => { setSelectedDivision(val); setSelectedTeam('ALL'); }}
           options={[{ id: 'ALL', name: 'ALL DIVISIONS' }, ...divisions]}
           color="indigo"
         />
@@ -183,7 +184,7 @@ export default function PayrollEngine() {
           icon={<Filter className="w-5 h-5" />} 
           value={selectedTeam} 
           disabled={selectedDivision === 'ALL'}
-          onChange={setSelectedTeam}
+          onChange={(val: string) => setSelectedTeam(val)}
           options={[{ id: 'ALL', name: 'ALL TEAMS' }, ...teams.filter(t => t.division_id === selectedDivision)]}
           color="emerald"
         />

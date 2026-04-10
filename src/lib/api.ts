@@ -71,28 +71,6 @@ export interface PayrollRecord {
   status: string;
 }
 
-export const getExpenses = async (companyId: string): Promise<Expense[]> => {
-  const { data, error } = await supabase
-    .from('expenses')
-    .select('*, profiles(full_name)')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-};
-
-export const createExpense = async (expenseData: Partial<Expense>): Promise<Expense> => {
-  const { data, error } = await supabase
-    .from('expenses')
-    .insert([expenseData])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-};
-
 export const getLeaves = async (companyId: string): Promise<Leave[]> => {
   const { data, error } = await supabase
     .from('leaves')
@@ -115,18 +93,6 @@ export const createLeave = async (leaveData: Partial<Leave>): Promise<Leave> => 
   return data;
 };
 
-export const updateMemberRole = async (userId: string, newRole: string): Promise<Profile> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update({ role: newRole })
-    .eq('id', userId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-};
-
 export const getPayrollHistory = async (userId: string): Promise<PayrollRecord[]> => {
   const { data, error } = await supabase
     .from('payroll_records')
@@ -138,31 +104,12 @@ export const getPayrollHistory = async (userId: string): Promise<PayrollRecord[]
   return data || [];
 };
 
-export const fetchSeveranceEstimate = async (userId: string) => {
-  const { data, error } = await supabase
-    .rpc('calculate_severance', { p_user_id: userId });
-
-  if (error) throw error;
-  return data;
-};
-
 export const updateMemberProfile = async (userId: string, updates: Partial<Profile>): Promise<Profile> => {
   const { data, error } = await supabase
     .from('profiles')
     .update(updates)
     .eq('id', userId)
     .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-};
-
-export const getProfile = async (userId: string): Promise<Profile> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
     .single();
 
   if (error) throw error;
@@ -299,20 +246,3 @@ export const updateRequestStatus = async (
   return data;
 };
 
-export const getAllRequestStats = async (companyId: string) => {
-  const { data: expenses } = await supabase
-    .from('expense_requests')
-    .select('status, amount')
-    .eq('company_id', companyId);
-    
-  const { data: leaves } = await supabase
-    .from('leave_requests')
-    .select('status')
-    .eq('company_id', companyId);
-
-  return {
-    pendingExpenses: expenses?.filter(e => e.status === 'PENDING' || e.status === 'SUB_APPROVED').length || 0,
-    pendingLeaves: leaves?.filter(l => l.status === 'PENDING' || l.status === 'SUB_APPROVED').length || 0,
-    approvedAmount: expenses?.filter(e => e.status === 'APPROVED').reduce((sum, e) => sum + e.amount, 0) || 0
-  };
-};
