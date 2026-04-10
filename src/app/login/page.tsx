@@ -19,35 +19,18 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
       
-      // 사용자 프로필 확인 (오류가 발생해도 대시보드로 이동할 수 있도록 처리)
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('must_change_password, role')
-        .eq('id', data.user.id)
-        .single();
-
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.warn('Profile fetch warning:', profileError);
-      }
-
-      if (profile?.must_change_password) {
-        router.push('/dashboard/change-password');
-      } else {
-        router.push('/dashboard');
-      }
-      
-      // 로딩 상태를 여기서 명시적으로 끕니다 (이동 전 시각적 피드백)
-      setLoading(false);
+      // 즉시 대시보드로 강제 이동 (Next.js 네비게이션 지연 방지)
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       const error = err as Error;
-      setError(error.message || '로그인 중 오류가 발생했습니다.');
+      setError(error.message || '로그인은 성공했으나 화면 전환 중 오류가 발생했습니다.');
       setLoading(false);
     }
   };

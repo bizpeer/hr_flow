@@ -63,13 +63,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       
-      if (currentUser) {
-        await fetchProfile(currentUser.id);
-      } else {
-        setProfile(null);
+      try {
+        if (currentUser) {
+          await fetchProfile(currentUser.id);
+        } else {
+          setProfile(null);
+        }
+      } finally {
+        setLoading(false);
       }
-      
-      setLoading(false);
     });
 
     return () => {
