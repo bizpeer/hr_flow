@@ -60,6 +60,7 @@ export const enterpriseSignUp = async ({
         full_name: fullName,
         phone_number: phone,
         role: 'super_admin',
+        must_change_password: false,
       },
     ]);
 

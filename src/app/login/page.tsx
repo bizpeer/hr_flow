@@ -26,23 +26,28 @@ export default function LoginPage() {
 
       if (error) throw error;
       
-      // 사용자 프로필 확인
-      const { data: profile } = await supabase
+      // 사용자 프로필 확인 (오류가 발생해도 대시보드로 이동할 수 있도록 처리)
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('must_change_password, role')
         .eq('id', data.user.id)
         .single();
+
+      if (profileError && profileError.code !== 'PGRST116') {
+        console.warn('Profile fetch warning:', profileError);
+      }
 
       if (profile?.must_change_password) {
         router.push('/dashboard/change-password');
       } else {
         router.push('/dashboard');
       }
-      router.refresh();
+      
+      // 로딩 상태를 여기서 명시적으로 끕니다 (이동 전 시각적 피드백)
+      setLoading(false);
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || '로그인 중 오류가 발생했습니다.');
-    } finally {
       setLoading(false);
     }
   };
