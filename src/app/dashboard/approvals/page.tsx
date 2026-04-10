@@ -354,10 +354,10 @@ export default function ApprovalCenter() {
                       >
                         <Search className="w-4 h-4" />
                       </button>
-                      {(req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && profile?.role === 'ADMIN')) && (
+                      {(req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '')) ) && (
                         <div className="flex gap-2">
                           <button 
-                            onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', req.id, profile?.role === 'ADMIN' ? 'APPROVED' : 'SUB_APPROVED')}
+                            onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', req.id, ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED')}
                             className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
@@ -413,9 +413,9 @@ export default function ApprovalCenter() {
             </div>
             <div className="p-10 pt-4 bg-slate-50/50 flex gap-4">
               <button onClick={() => setSelectedRequest(null)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl uppercase text-[11px]">Close</button>
-              {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && profile?.role === 'ADMIN')) && (
+              {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || ''))) && (
                 <button 
-                  onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', selectedRequest.id, profile?.role === 'ADMIN' ? 'APPROVED' : 'SUB_APPROVED'); setSelectedRequest(null); }}
+                  onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', selectedRequest.id, ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED'); setSelectedRequest(null); }}
                   className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase text-[11px]"
                 >
                   Approve Document

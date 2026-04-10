@@ -237,7 +237,7 @@ export default function OrganizationManagement() {
                                   <div>
                                      <p className="text-sm font-black text-slate-900">{m.full_name}</p>
                                      <div className="flex items-center gap-2 mt-1">
-                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border transition-colors ${m.role === 'ADMIN' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>
+                                        <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border transition-colors ${['super_admin', 'admin', 'ADMIN'].includes(m.role) ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>
                                            {m.role}
                                         </span>
                                         <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
