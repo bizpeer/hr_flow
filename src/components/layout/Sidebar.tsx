@@ -9,9 +9,10 @@ import styles from './Layout.module.css';
 
 const menuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
+  { id: 'approvals', title: '결재 센터', icon: '🛡️', href: '/dashboard/approvals' },
   { id: 'expenses', title: '지출결의', icon: '💰', href: '/dashboard/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/hr' },
   { id: 'leaves', title: '휴가관리', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'payroll', title: '급여 관리', icon: '💵', href: '/dashboard/payroll' },
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
 ];
 

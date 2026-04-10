@@ -3,11 +3,31 @@ import { supabase } from './supabase';
 export interface Profile {
   id: string;
   full_name: string;
-  role: 'ADMIN' | 'MEMBER';
+  role: 'ADMIN' | 'MEMBER' | 'SUB_ADMIN';
   company_id: string;
   department?: string;
   position?: string;
   must_change_password?: boolean;
+  annual_salary?: number;
+  salary_type?: 'ANNUAL' | 'MONTHLY';
+  is_severance_included?: boolean;
+  dependents?: number;
+  children_under_20?: number;
+  non_taxable?: number;
+  team_id?: string;
+}
+
+export interface Division {
+  id: string;
+  name: string;
+  company_id: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  division_id: string;
+  company_id: string;
 }
 
 export interface Expense {
@@ -16,7 +36,7 @@ export interface Expense {
   amount: number;
   category: string;
   description: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
   user_id: string;
   company_id: string;
   profiles?: {
@@ -31,7 +51,7 @@ export interface Leave {
   end_date: string;
   type: string;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
   user_id: string;
   company_id: string;
   profiles?: {
@@ -240,4 +260,59 @@ export const adminResetPassword = async (userId: string, tempPassword: string) =
 
   if (error) throw error;
   return data;
+};
+
+export const getDivisions = async (companyId: string): Promise<Division[]> => {
+  const { data, error } = await supabase
+    .from('divisions')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('name');
+  if (error) throw error;
+  return data || [];
+};
+
+export const getTeams = async (companyId: string): Promise<Team[]> => {
+  const { data, error } = await supabase
+    .from('teams')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('name');
+  if (error) throw error;
+  return data || [];
+};
+
+export const updateRequestStatus = async (
+  type: 'expense' | 'leave',
+  id: string,
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED'
+) => {
+  const table = type === 'expense' ? 'expense_requests' : 'leave_requests';
+  const { data, error } = await supabase
+    .from(table)
+    .update({ status })
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+export const getAllRequestStats = async (companyId: string) => {
+  const { data: expenses } = await supabase
+    .from('expense_requests')
+    .select('status, amount')
+    .eq('company_id', companyId);
+    
+  const { data: leaves } = await supabase
+    .from('leave_requests')
+    .select('status')
+    .eq('company_id', companyId);
+
+  return {
+    pendingExpenses: expenses?.filter(e => e.status === 'PENDING' || e.status === 'SUB_APPROVED').length || 0,
+    pendingLeaves: leaves?.filter(l => l.status === 'PENDING' || l.status === 'SUB_APPROVED').length || 0,
+    approvedAmount: expenses?.filter(e => e.status === 'APPROVED').reduce((sum, e) => sum + e.amount, 0) || 0
+  };
 };
