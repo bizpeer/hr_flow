@@ -16,9 +16,12 @@ export default function DashboardLayout({
 
   useEffect(() => {
     const checkUser = async () => {
+      // alert('대시보드 레이아웃: 세션 확인 중...');
       const { data: { session } } = await supabase.auth.getSession();
+      // alert('대시보드 레이아웃: 세션 확인 결과 = ' + !!session);
+      
       if (!session) {
-        router.push('/login');
+        router.push('/login/');
       } else {
         setLoading(false);
       }

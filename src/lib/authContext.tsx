@@ -60,6 +60,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // 2. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // console.log('Auth state change:', event, session?.user?.email);
+      // alert('인증 상태 변경 감지: ' + event);
+      
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       
