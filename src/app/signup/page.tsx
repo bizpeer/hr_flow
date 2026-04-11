@@ -39,6 +39,14 @@ export default function SignupPage() {
     }
 
     try {
+      // 30초 타임아웃 타이머
+      const timeoutId = setTimeout(() => {
+        if (loading) {
+          setLoading(false);
+          setError('서버 응답이 너무 늦습니다. 인터넷 연결이나 잠시 후 다시 시도해 주세요.');
+        }
+      }, 30000);
+
       await enterpriseSignUp({
         email: formData.email,
         password: formData.password,
@@ -47,6 +55,8 @@ export default function SignupPage() {
         companyName: formData.companyName,
         registrationNumber: formData.registrationNumber,
       });
+      
+      clearTimeout(timeoutId);
       setIsSuccess(true);
       
       // 3초 후 로그인 페이지로 자동 이동
@@ -54,8 +64,13 @@ export default function SignupPage() {
         router.push('/login');
       }, 3000);
     } catch (err: unknown) {
+      console.error('Signup error:', err);
       const error = err as Error;
-      setError(error.message || '회원가입 중 오류가 발생했습니다.');
+      if (error.message?.includes('Database error saving profile')) {
+        setError('계정은 생성되었으나 프로필 정보 저장 중 오류가 발생했습니다. 로그인을 시도해 보세요.');
+      } else {
+        setError(error.message || '회원가입 중 오류가 발생했습니다.');
+      }
     } finally {
       setLoading(false);
     }

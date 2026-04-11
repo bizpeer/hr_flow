@@ -32,9 +32,9 @@ export const enterpriseSignUp = async ({
   if (authError) throw authError;
 
   const user = authData.user;
-  if (!user) throw new Error('유저를 생성할 수 없습니다.');
+  if (!user) throw new Error('계정 생성은 완료되었으나 유저 정보를 확인할 수 없습니다. 이메일 인증을 확인하거나 잠시 후 다시 시도해 주세요.');
 
-  // 2. Create Company
+  // 2. Create Company (Skip if already exists for this user - though owner_id should be unique or handled)
   const { data: companyData, error: companyError } = await supabase
     .from('companies')
     .insert([
@@ -47,24 +47,31 @@ export const enterpriseSignUp = async ({
     .select()
     .single();
 
-  if (companyError) throw companyError;
+  if (companyError) {
+    console.error('Company creation error:', companyError);
+    // Don't throw yet, check if profile exists
+  }
 
   // 3. Create Profile
-  const { error: profileError } = await supabase
-    .from('profiles')
-    .insert([
-      {
-        id: user.id,
-        company_id: companyData.id,
-        email: email,
-        full_name: fullName,
-        phone_number: phone,
-        role: 'super_admin',
-        must_change_password: false,
-      },
-    ]);
+  if (user && companyData) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert([
+        {
+          id: user.id,
+          company_id: companyData.id,
+          email: email,
+          full_name: fullName,
+          phone_number: phone,
+          role: 'super_admin',
+          must_change_password: false,
+        },
+      ]);
 
-  if (profileError) throw profileError;
+    if (profileError) throw profileError;
+  } else if (!companyData) {
+    throw new Error('회사 정보를 생성하지 못했습니다. 관리자에게 문의해 주세요.');
+  }
 
   return { user, company: companyData };
 };
