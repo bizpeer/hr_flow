@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           email: email,
           role: 'super_admin',
           company_id: '',
-          companies: { name: '시스템 그룹' }
+          companies: { name: '시스템관리자' }
         } as any);
         return;
       }

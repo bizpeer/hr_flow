@@ -34,7 +34,7 @@ export default function Sidebar() {
           isSuperAdmin ? '최고 관리자' : 
           isAdmin ? '기업 관리자' :
           isSubAdmin ? '보조 관리자' : '직원',
-    companyName: isSystemAdmin ? '시스템 관리' : 
+    companyName: isSystemAdmin ? '시스템관리자' : 
                 (profile as any)?.companies?.name || '회사 정보 없음',
   };
 
