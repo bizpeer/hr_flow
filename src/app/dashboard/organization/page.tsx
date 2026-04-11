@@ -55,7 +55,7 @@ export default function OrganizationManagement() {
   const [isOrgManagerOpen, setIsOrgManagerOpen] = useState(false);
 
   // Registration State
-  const [regData, setRegData] = useState({ email: '', fullName: '', teamId: '', position: '' });
+  const [regData, setRegData] = useState({ email: '', fullName: '', teamId: '', position: '', role: 'member' });
   const [tempPassword, setTempPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -94,7 +94,8 @@ export default function OrganizationManagement() {
         position: regData.position,
         department: teams.find(t => t.id === regData.teamId)?.name || '',
         tempPassword: generatedPw,
-        companyId: profile.company_id
+        companyId: profile.company_id,
+        role: regData.role
       });
       
       // Also update team_id manually since registerStaff might not handle it via Edge Function yet
@@ -365,20 +366,37 @@ export default function OrganizationManagement() {
                           <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
                        </div>
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <div className="space-y-2">
-                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Assignment</label>
-                             <select 
-                              value={regData.teamId} 
-                              onChange={e => setRegData({...regData, teamId: e.target.value})}
-                              className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
-                              required
-                             >
-                                <option value="">Select Team...</option>
-                                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                             </select>
-                          </div>
-                          <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
-                       </div>
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Assignment</label>
+                              <select 
+                               value={regData.teamId} 
+                               onChange={e => setRegData({...regData, teamId: e.target.value})}
+                               className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
+                               required
+                              >
+                                 <option value="">Select Team...</option>
+                                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                              </select>
+                           </div>
+                           <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Access Role</label>
+                              <select 
+                               value={regData.role} 
+                               onChange={e => setRegData({...regData, role: e.target.value})}
+                               className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
+                               required
+                              >
+                                 <option value="member">직원 (Member)</option>
+                                 <option value="sub_admin">보조 관리자 (Sub Admin)</option>
+                                 {profile?.role === 'super_admin' && (
+                                   <option value="admin">기업 관리자 (Admin)</option>
+                                 )}
+                              </select>
+                           </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                           <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
+                        </div>
                        <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 space-y-4">
                           <div className="flex items-center gap-4">
                              <ShieldCheck className="w-10 h-10 text-indigo-600" />

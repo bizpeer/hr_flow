@@ -23,16 +23,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, email?: string) => {
     try {
+      // 시스템 관리자 예외 처리
+      if (email === 'bizpeer@gmail.com') {
+        setProfile({
+          id: userId,
+          full_name: '시스템 관리자',
+          email: email,
+          role: 'super_admin',
+          company_id: '',
+          companies: { name: '시스템 그룹' }
+        } as any);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*, companies(name)')
         .eq('id', userId)
         .single();
       
-      if (error) throw error;
-      setProfile(data);
+      if (error) {
+        if (error.code === 'PGRST116') { // No rows found
+          setProfile(null);
+        } else {
+          throw error;
+        }
+      } else {
+        setProfile(data);
+      }
     } catch (error) {
       console.error('Error fetching profile:', error);
       setProfile(null);
@@ -41,24 +61,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user.id, user.email);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // 1. Initial Session Check
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
+        if (!mounted) return;
+
         const currentUser = session?.user ?? null;
         setUser(currentUser);
+        
         if (currentUser) {
-          await fetchProfile(currentUser.id);
+          await fetchProfile(currentUser.id, currentUser.email);
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
       } finally {
-        setLoading(false);
+        if (mounted) setLoading(false);
       }
     };
 
@@ -66,21 +91,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // 2. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       
-      try {
-        if (currentUser) {
-          await fetchProfile(currentUser.id);
-        } else {
-          setProfile(null);
-        }
-      } finally {
-        setLoading(false);
+      if (currentUser) {
+        await fetchProfile(currentUser.id, currentUser.email);
+      } else {
+        setProfile(null);
       }
+      
+      // onAuthStateChange에서 발생하는 이벤트를 통해 로딩 상태 해제
+      setLoading(false);
     });
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);

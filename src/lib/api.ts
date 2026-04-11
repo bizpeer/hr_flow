@@ -126,6 +126,7 @@ export const registerStaff = async (staffData: {
   position: string;
   tempPassword: string;
   companyId: string;
+  role: string;
 }) => {
   // Edge Function 호출
   const { data, error } = await supabase.functions.invoke('register-staff', {
