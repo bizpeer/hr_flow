@@ -229,16 +229,18 @@ export const adminResetPassword = async (userId: string, tempPassword: string) =
 };
 
 export const adminDeleteCompany = async (companyId: string, adminPassword?: string) => {
-  // 기업 삭제를 위해 관리자 권한 Edge Function 호출
-  const { data, error } = await supabase.functions.invoke('admin-manage-company', {
-    body: { action: 'delete-company', companyId, adminPassword },
-  });
+  // 1. 보안을 위해 클라이언트 사이드에서 직접 삭제 시도
+  // 주의: 이 작업을 위해선 SQL에서 'System Admin can delete companies' RLS 정책이 설정되어 있어야 합니다.
+  const { data, error } = await supabase
+    .from('companies')
+    .delete()
+    .eq('id', companyId)
+    .select();
 
-  if (error) throw error;
-  
-  // 만약 Edge Function이 지원되지 않을 경우의 직접 삭제 (CASCADE 설정 필요)
-  // const { error: dbError } = await supabase.from('companies').delete().eq('id', companyId);
-  // if (dbError) throw dbError;
+  if (error) {
+    console.error('Database delete failed:', error);
+    throw new Error('데이터베이스 삭제에 실패했습니다: ' + error.message);
+  }
 
   return data;
 };
