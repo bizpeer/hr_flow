@@ -120,7 +120,7 @@ export default function OrganizationManagement() {
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">Synchronizing Organization Data...</p>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px] animate-pulse">조직 정보를 동기화하고 있습니다...</p>
         </div>
       </div>
     );

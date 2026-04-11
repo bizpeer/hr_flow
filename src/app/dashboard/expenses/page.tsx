@@ -141,7 +141,7 @@ export default function ExpensesDashboard() {
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-emerald-100 border-t-emerald-600 rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">Analyzing Data...</p>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">지출 내역을 분석하고 있습니다...</p>
         </div>
       </div>
     );

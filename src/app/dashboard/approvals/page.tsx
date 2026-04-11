@@ -160,7 +160,7 @@ export default function ApprovalCenter() {
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">Loading Approval Center...</p>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">결재 센터 정보를 불러오는 중...</p>
         </div>
       </div>
     );
