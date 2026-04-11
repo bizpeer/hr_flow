@@ -35,12 +35,18 @@ export default function Sidebar() {
           .single();
         
         const isSystemAdmin = user.email === 'bizpeer@gmail.com';
-        const isSuperAdmin = profile?.role === 'super_admin' || profile?.role === 'ADMIN';
+        const role = profile?.role || 'member';
+        const isSuperAdmin = role === 'super_admin';
+        const isAdmin = role === 'admin';
+        const isSubAdmin = role === 'sub_admin';
         
         setUserData({
           email: user.email,
           name: profile?.full_name || user.email?.split('@')[0] || '사용자',
-          role: isSystemAdmin ? '시스템 관리자' : (isSuperAdmin ? '최고 관리자' : '직원'),
+          role: isSystemAdmin ? '시스템 관리자' : 
+                isSuperAdmin ? '최고 관리자' : 
+                isAdmin ? '기업 관리자' :
+                isSubAdmin ? '보조 관리자' : '직원',
         });
       }
     };

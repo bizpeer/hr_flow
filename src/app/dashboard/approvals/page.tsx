@@ -133,8 +133,8 @@ export default function ApprovalCenter() {
       // 4. Name Search
       const nameMatch = !searchQuery || req.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
-      // 5. SUB_ADMIN Security: Only show their own division
-      if (profile?.role === 'SUB_ADMIN') {
+      // 5. sub_admin Security: Only show their own division
+      if (profile?.role === 'sub_admin') {
         const subAdminTeam = teams.find(t => t.id === profile.team_id);
         if (userDivId !== subAdminTeam?.division_id) return false;
       }
@@ -354,10 +354,10 @@ export default function ApprovalCenter() {
                       >
                         <Search className="w-4 h-4" />
                       </button>
-                      {(req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '')) ) && (
+                      {(req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || '')) ) && (
                         <div className="flex gap-2">
                           <button 
-                            onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', req.id, ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED')}
+                            onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', req.id, ['super_admin', 'admin'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED')}
                             className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
@@ -413,9 +413,9 @@ export default function ApprovalCenter() {
             </div>
             <div className="p-10 pt-4 bg-slate-50/50 flex gap-4">
               <button onClick={() => setSelectedRequest(null)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl uppercase text-[11px]">Close</button>
-              {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || ''))) && (
+              {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || ''))) && (
                 <button 
-                  onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', selectedRequest.id, ['super_admin', 'admin', 'ADMIN'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED'); setSelectedRequest(null); }}
+                  onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', selectedRequest.id, ['super_admin', 'admin'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED'); setSelectedRequest(null); }}
                   className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase text-[11px]"
                 >
                   Approve Document

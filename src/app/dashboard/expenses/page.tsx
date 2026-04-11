@@ -109,7 +109,7 @@ export default function ExpensesDashboard() {
     const dateMatch = e.date >= startDate && e.date <= endDate;
     
     // Non-admin can only see their own
-    const ownershipMatch = (profile?.role === 'ADMIN' || profile?.role === 'SUB_ADMIN') || e.user_id === profile?.id;
+    const ownershipMatch = (['super_admin', 'admin', 'sub_admin'].includes(profile?.role || '')) || e.user_id === profile?.id;
     
     return dateMatch && (nameMatch || descMatch) && ownershipMatch;
   });
@@ -133,6 +133,8 @@ export default function ExpensesDashboard() {
     link.download = `지출내역_${format(new Date(), 'yyyyMMdd')}.csv`;
     link.click();
   };
+
+  const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(profile?.role || '');
 
   if (loading) {
     return (
@@ -183,7 +185,7 @@ export default function ExpensesDashboard() {
       </div>
 
       {/* Analytics (Admin Only) */}
-      {(profile?.role === 'ADMIN' || profile?.role === 'SUB_ADMIN') && (
+      {isManagement && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
            <div className="lg:col-span-2 bg-slate-900 rounded-[3.5rem] p-10 md:p-14 shadow-2xl relative overflow-hidden group border-none">
               <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 rounded-full -mr-48 -mt-48 blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
