@@ -28,17 +28,17 @@ export default function LoginPage() {
       
       try {
         // 1. Next.js router 이동 시도
-        router.push('/dashboard/');
+        router.push('/dashboard');
         
         // 2. 강제 이동 백업 (Next.js 이동이 멈췄을 경우를 대비)
         setTimeout(() => {
           if (window.location.pathname.includes('/login')) {
-            window.location.replace('../dashboard/');
+            window.location.replace('/dashboard');
           }
         }, 2000);
       } catch (navError) {
         console.error('Navigation error:', navError);
-        window.location.replace('../dashboard/');
+        window.location.replace('/dashboard');
       }
     } catch (err: unknown) {
       const error = err as Error;

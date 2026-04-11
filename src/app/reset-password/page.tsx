@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
       setSuccess(true);
       // 3초 후 로그인 페이지로 이동
       setTimeout(() => {
-        router.push('/login/');
+        router.push('/login');
       }, 3000);
     } catch (err: any) {
       setError(err.message || '비밀번호 변경 중 오류가 발생했습니다.');

@@ -28,7 +28,7 @@ export default function Home() {
         // 복구 모드가 아닐 때만 대시보드로 이동
         const currentHash = window.location.hash;
         if (!currentHash.includes('type=recovery')) {
-          router.push('/dashboard/');
+          router.push('/dashboard');
         }
       }
     });
@@ -37,7 +37,7 @@ export default function Home() {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session && !window.location.hash.includes('type=recovery')) {
-        router.push('/dashboard/');
+        router.push('/dashboard');
       }
     };
     checkSession();
