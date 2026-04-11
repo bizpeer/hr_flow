@@ -16,6 +16,13 @@ const menuItems = [
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
 ];
 
+const systemMenuItems = [
+  { id: 'system-dashboard', title: '시스템 현황', icon: '📊', href: '/dashboard/system' },
+  { id: 'companies', title: '기업 관리', icon: '🏢', href: '/dashboard/system' },
+  { id: 'all-users', title: '전체 사용자', icon: '👥', href: '/dashboard/system' },
+  { id: 'settings', title: '시스템 설정', icon: '⚙️', href: '/dashboard/system' },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -52,7 +59,7 @@ export default function Sidebar() {
       </div>
 
       <nav className={styles.nav}>
-        {menuItems.map((item) => (
+        {(isSystemAdmin ? systemMenuItems : menuItems).map((item) => (
           <Link 
             key={item.id} 
             href={item.href}
@@ -62,16 +69,6 @@ export default function Sidebar() {
             <span className={styles.title}>{item.title}</span>
           </Link>
         ))}
-        {isSystemAdmin && (
-          <Link 
-            href="/dashboard/system" 
-            className={`${styles.navItem} ${pathname === '/dashboard/system' ? styles.active : ''}`}
-            style={{ marginTop: 'auto', borderTop: '1px solid var(--card-border)', paddingTop: '1rem' }}
-          >
-            <span className={styles.icon}>⚙️</span>
-            <span className={styles.title}>시스템 설정</span>
-          </Link>
-        )}
       </nav>
 
       <div className={styles.sidebarFooter}>

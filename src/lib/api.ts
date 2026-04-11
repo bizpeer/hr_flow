@@ -164,19 +164,34 @@ export interface Company {
 }
 
 export const getAllCompaniesWithStats = async (): Promise<Company[]> => {
-  const { data, error } = await supabase
+  // 1. 기업 목록 가져오기
+  const { data: companies, error: companyError } = await supabase
     .from('companies')
-    .select(`
-      *,
-      profiles:profiles(count)
-    `)
+    .select('*')
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  
-  return (data || []).map((company: any) => ({
+  if (companyError) throw companyError;
+  if (!companies) return [];
+
+  // 2. 각 기업별 사용자 수 가져오기 (조인 방식 대신 명시적 쿼리로 안정성 확보)
+  const { data: profileStats, error: profilesError } = await supabase
+    .from('profiles')
+    .select('company_id');
+
+  if (profilesError) {
+    console.error('Failed to fetch profile stats:', profilesError);
+    return companies.map(c => ({ ...c, user_count: 0 }));
+  }
+
+  // 기업별 카운트 계산
+  const countMap = (profileStats || []).reduce((acc: any, curr: any) => {
+    acc[curr.company_id] = (acc[curr.company_id] || 0) + 1;
+    return acc;
+  }, {});
+
+  return companies.map(company => ({
     ...company,
-    user_count: company.profiles?.[0]?.count || 0
+    user_count: countMap[company.id] || 0
   }));
 };
 
