@@ -23,7 +23,7 @@ const systemMenuItems = [
   { id: 'settings', title: '시스템 설정', icon: '⚙️', href: '/dashboard/system' },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile } = useAuth();
@@ -52,40 +52,51 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        <div className={styles.logoIcon}>OM</div>
-        <span className={styles.logoText}>OrgMgt</span>
-      </div>
-
-      <nav className={styles.nav}>
-        {(isSystemAdmin ? systemMenuItems : menuItems).map((item) => (
-          <Link 
-            key={item.id} 
-            href={item.href}
-            className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
-          >
-            <span className={styles.icon}>{item.icon}</span>
-            <span className={styles.title}>{item.title}</span>
-          </Link>
-        ))}
-      </nav>
-
-      <div className={styles.sidebarFooter}>
-        <div className={styles.userSection}>
-          <div className={styles.avatar}>{userData.name?.[0] || 'U'}</div>
-          <div className={styles.userInfo}>
-            <p className={styles.userName}>{userData.companyName}</p>
-            <p className={styles.userRole}>{userData.name}</p>
-            {userData.email && (
-              <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '-0.2rem' }}>{userData.email}</p>
-            )}
-          </div>
-          <button className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
-            🚪
-          </button>
+    <>
+      {/* Mobile Overlay */}
+      <div 
+        className={`${styles.overlay} ${isOpen ? styles.show : ''}`} 
+        onClick={onClose}
+      />
+      
+      <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
+        <div className={styles.logo}>
+          <div className={styles.logoIcon}>OM</div>
+          <span className={styles.logoText}>OrgMgt</span>
+          {isOpen && (
+            <button onClick={onClose} style={{ marginLeft: 'auto', fontSize: '1.2rem' }} className="lg:hidden">
+              ✕
+            </button>
+          )}
         </div>
-      </div>
-    </aside>
+
+        <nav className={styles.nav}>
+          {(isSystemAdmin ? systemMenuItems : menuItems).map((item) => (
+            <Link 
+              key={item.id} 
+              href={item.href}
+              className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
+              onClick={onClose}
+            >
+              <span className={styles.icon}>{item.icon}</span>
+              <span className={styles.title}>{item.title}</span>
+            </Link>
+          ))}
+        </nav>
+
+        <div className={styles.sidebarFooter}>
+          <div className={styles.userSection}>
+            <div className={styles.avatar}>{userData.name?.[0] || 'U'}</div>
+            <div className={styles.userInfo}>
+              <p className={styles.userName}>{userData.companyName}</p>
+              <p className={styles.userRole}>{userData.name}</p>
+            </div>
+            <button className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
+              🚪
+            </button>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
