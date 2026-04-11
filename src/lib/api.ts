@@ -228,6 +228,21 @@ export const adminResetPassword = async (userId: string, tempPassword: string) =
   return data;
 };
 
+export const adminDeleteCompany = async (companyId: string, adminPassword?: string) => {
+  // 기업 삭제를 위해 관리자 권한 Edge Function 호출
+  const { data, error } = await supabase.functions.invoke('admin-manage-company', {
+    body: { action: 'delete-company', companyId, adminPassword },
+  });
+
+  if (error) throw error;
+  
+  // 만약 Edge Function이 지원되지 않을 경우의 직접 삭제 (CASCADE 설정 필요)
+  // const { error: dbError } = await supabase.from('companies').delete().eq('id', companyId);
+  // if (dbError) throw dbError;
+
+  return data;
+};
+
 export const getDivisions = async (companyId: string): Promise<Division[]> => {
   const { data, error } = await supabase
     .from('divisions')

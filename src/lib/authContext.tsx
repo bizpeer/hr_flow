@@ -89,6 +89,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initAuth();
 
+    // 3. Safety Timeout (로딩이 너무 오래 걸릴 경우 강제 해제)
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth initialization timed out, forcing loading to false');
+        setLoading(false);
+      }
+    }, 5000);
+
     // 2. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
@@ -104,11 +112,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       // onAuthStateChange에서 발생하는 이벤트를 통해 로딩 상태 해제
       setLoading(false);
+      clearTimeout(timeoutId);
     });
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      clearTimeout(timeoutId);
     };
   }, []);
 

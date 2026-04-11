@@ -19,6 +19,9 @@ export default function SystemAdminPage() {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null);
   const [companyUsers, setCompanyUsers] = useState<Profile[]>([]);
+  const [deleteConfirmCompany, setDeleteConfirmCompany] = useState<Company | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -92,6 +95,46 @@ export default function SystemAdminPage() {
     }
   };
 
+  const handleDeleteCompany = async () => {
+    if (!deleteConfirmCompany) return;
+    if (!adminPassword) {
+      alert('관리자 비밀번호를 입력해 주세요.');
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      // 1. 비밀번호 확인 (재로그인 시도)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('인증 정보가 없습니다.');
+
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: user.email!,
+        password: adminPassword,
+      });
+
+      if (authError) {
+        alert('비밀번호가 일치하지 않습니다.');
+        setIsDeleting(false);
+        return;
+      }
+
+      // 2. 삭제 API 호출
+      const { adminDeleteCompany } = await import('@/lib/api');
+      await adminDeleteCompany(deleteConfirmCompany.id);
+      
+      alert('기업 및 모든 연관 데이터가 성공적으로 삭제되었습니다.');
+      setDeleteConfirmCompany(null);
+      setAdminPassword('');
+      loadData();
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+      alert('삭제 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (!isAuthorized) return null;
 
   return (
@@ -161,6 +204,13 @@ export default function SystemAdminPage() {
                   <button onClick={() => handleShowUsers(company)} className={styles.actionBtn}>
                     유저 관리 👤
                   </button>
+                  <button 
+                    onClick={() => setDeleteConfirmCompany(company)} 
+                    className={`${styles.actionBtn} ${styles.btnDanger}`}
+                    title="기업 데이터 완전 삭제"
+                  >
+                    삭제 🗑️
+                  </button>
                 </td>
               </tr>
             ))}
@@ -192,6 +242,54 @@ export default function SystemAdminPage() {
                 </div>
               ))}
               {companyUsers.length === 0 && <p>등록된 사용자가 없습니다.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 기업 삭제 확인 모달 */}
+      {deleteConfirmCompany && (
+        <div className={styles.modalOverlay} onClick={() => !isDeleting && setDeleteConfirmCompany(null)}>
+          <div className={`${styles.modal} ${styles.dangerModal}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className="text-red-600">⚠️ 기업 데이터 영구 삭제</h2>
+              <button onClick={() => setDeleteConfirmCompany(null)} disabled={isDeleting}>❌</button>
+            </div>
+            
+            <div className={styles.modalBody}>
+              <p className={styles.warningText}>
+                <strong>[{deleteConfirmCompany.name}]</strong> 기업과 관련된 모든 데이터(부서, 팀, 직원 계정, 결재 내역, 급여 기록)가 <strong>영구적으로 삭제</strong>됩니다.
+                이 작업은 되돌릴 수 없습니다.
+              </p>
+              
+              <div className={styles.confirmSection}>
+                <label className={styles.label}>최종 확인을 위해 시스템 관리자 비밀번호를 입력하세요:</label>
+                <input 
+                  type="password"
+                  className={styles.input}
+                  value={adminPassword}
+                  onChange={e => setAdminPassword(e.target.value)}
+                  placeholder="시스템 관리자 비밀번호"
+                  disabled={isDeleting}
+                />
+              </div>
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button 
+                onClick={() => setDeleteConfirmCompany(null)} 
+                className={styles.cancelBtn}
+                disabled={isDeleting}
+              >
+                취소
+              </button>
+              <button 
+                onClick={handleDeleteCompany} 
+                className={styles.deleteBtn}
+                disabled={isDeleting || !adminPassword}
+              >
+                {isDeleting ? '삭제 중...' : '데이터 완전 삭제 수행'}
+              </button>
             </div>
           </div>
         </div>
