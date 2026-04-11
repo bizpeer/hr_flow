@@ -18,6 +18,7 @@ export default function SignupPage() {
   });
   
   const [loading, setLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
 
@@ -46,9 +47,12 @@ export default function SignupPage() {
         companyName: formData.companyName,
         registrationNumber: formData.registrationNumber,
       });
-
-      alert('회원가입이 완료되었습니다! 로그인해 주세요.');
-      router.push('/login');
+      setIsSuccess(true);
+      
+      // 3초 후 로그인 페이지로 자동 이동
+      setTimeout(() => {
+        router.push('/login');
+      }, 3000);
     } catch (err: unknown) {
       const error = err as Error;
       setError(error.message || '회원가입 중 오류가 발생했습니다.');
@@ -66,119 +70,139 @@ export default function SignupPage() {
           <p className={styles.subtitle}>조직 관리를 위한 기업 계정을 생성하세요.</p>
         </div>
 
-        <form onSubmit={handleSignup} className={styles.form}>
-          <h2 className={styles.sectionTitle}>관리자 정보</h2>
-          
-          <div className={styles.inputGroup}>
-            <label className={styles.label}>이메일</label>
-            <input 
-              name="email"
-              type="email" 
-              className={styles.input}
-              placeholder="admin@company.com"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
+        {isSuccess ? (
+          <div className={styles.successView}>
+            <div className={styles.successIcon}>✓</div>
+            <h1 className={styles.title}>가입을 환영합니다!</h1>
+            <p className={styles.subtitle}>
+              회원가입이 성공적으로 완료되었습니다.<br />
+              잠시 후 로그인 페이지로 이동합니다.
+            </p>
+            <button 
+              onClick={() => router.push('/login')} 
+              className={styles.submitBtn}
+              style={{ marginTop: '2rem' }}
+            >
+              지금 로그인하기
+            </button>
           </div>
-
-          <div className={styles.row}>
+        ) : (
+          <form onSubmit={handleSignup} className={styles.form}>
+            <h2 className={styles.sectionTitle}>관리자 정보</h2>
+            
             <div className={styles.inputGroup}>
-              <label className={styles.label}>비밀번호</label>
+              <label className={styles.label}>이메일</label>
               <input 
-                name="password"
-                type="password" 
+                name="email"
+                type="email" 
                 className={styles.input}
-                placeholder="••••••••"
-                value={formData.password}
+                placeholder="admin@company.com"
+                value={formData.email}
                 onChange={handleChange}
                 required
               />
             </div>
-            <div className={styles.inputGroup}>
-              <label className={styles.label}>비밀번호 확인</label>
-              <input 
-                name="confirmPassword"
-                type="password" 
-                className={styles.input}
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-              />
-            </div>
-          </div>
 
-          <div className={styles.row}>
+            <div className={styles.row}>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>비밀번호</label>
+                <input 
+                  name="password"
+                  type="password" 
+                  className={styles.input}
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>비밀번호 확인</label>
+                <input 
+                  name="confirmPassword"
+                  type="password" 
+                  className={styles.input}
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className={styles.row}>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>성함</label>
+                <input 
+                  name="fullName"
+                  type="text" 
+                  className={styles.input}
+                  placeholder="홍길동"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>연락처</label>
+                <input 
+                  name="phone"
+                  type="tel" 
+                  className={styles.input}
+                  placeholder="010-0000-0000"
+                  value={formData.phone}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+            </div>
+
+            <h2 className={styles.sectionTitle}>기업 정보</h2>
+
             <div className={styles.inputGroup}>
-              <label className={styles.label}>성함</label>
+              <label className={styles.label}>회사명</label>
               <input 
-                name="fullName"
+                name="companyName"
                 type="text" 
                 className={styles.input}
-                placeholder="홍길동"
-                value={formData.fullName}
+                placeholder="(주) 기업명"
+                value={formData.companyName}
                 onChange={handleChange}
                 required
               />
             </div>
+
             <div className={styles.inputGroup}>
-              <label className={styles.label}>연락처</label>
+              <label className={styles.label}>사업자등록번호</label>
               <input 
-                name="phone"
-                type="tel" 
+                name="registrationNumber"
+                type="text" 
                 className={styles.input}
-                placeholder="010-0000-0000"
-                value={formData.phone}
+                placeholder="000-00-00000"
+                value={formData.registrationNumber}
                 onChange={handleChange}
                 required
               />
             </div>
+
+            {error && <div className={styles.errorMessage}>{error}</div>}
+
+            <button 
+              type="submit" 
+              className={styles.submitBtn}
+              disabled={loading}
+            >
+              {loading ? '가입 처리 중...' : '기업 회원가입'}
+            </button>
+          </form>
+        )}
+
+        {!isSuccess && (
+          <div className={styles.footer}>
+            이미 계정이 있으신가요? 
+            <Link href="/login" className={styles.link}>로그인하기</Link>
           </div>
-
-          <h2 className={styles.sectionTitle}>기업 정보</h2>
-
-          <div className={styles.inputGroup}>
-            <label className={styles.label}>회사명</label>
-            <input 
-              name="companyName"
-              type="text" 
-              className={styles.input}
-              placeholder="(주) 기업명"
-              value={formData.companyName}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className={styles.inputGroup}>
-            <label className={styles.label}>사업자등록번호</label>
-            <input 
-              name="registrationNumber"
-              type="text" 
-              className={styles.input}
-              placeholder="000-00-00000"
-              value={formData.registrationNumber}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          {error && <div className={styles.errorMessage}>{error}</div>}
-
-          <button 
-            type="submit" 
-            className={styles.submitBtn}
-            disabled={loading}
-          >
-            {loading ? '가입 처리 중...' : '기업 회원가입'}
-          </button>
-        </form>
-
-        <div className={styles.footer}>
-          이미 계정이 있으신가요? 
-          <Link href="/login" className={styles.link}>로그인하기</Link>
-        </div>
+        )}
       </div>
       
       <div className={styles.visualSection}>

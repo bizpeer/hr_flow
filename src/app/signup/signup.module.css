@@ -212,3 +212,28 @@
     grid-template-columns: 1fr;
   }
 }
+
+.successView {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 0;
+  animation: fadeIn 0.6s ease-out;
+}
+
+.successIcon {
+  width: 80px;
+  height: 80px;
+  background: var(--success);
+  color: white;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 10px 20px rgba(16, 185, 129, 0.2);
+}
+
