@@ -15,6 +15,11 @@ export interface Profile {
   children_under_20?: number;
   non_taxable?: number;
   team_id?: string;
+  resident_number?: string;
+  address?: string;
+  family_data?: { name: string; birth: string }[];
+  is_division_head?: boolean;
+  is_team_leader?: boolean;
   companies?: {
     name: string;
   };
@@ -127,6 +132,10 @@ export const registerStaff = async (staffData: {
   tempPassword: string;
   companyId: string;
   role: string;
+  residentNumber?: string;
+  address?: string;
+  familyData?: { name: string; birth: string }[];
+  teamId?: string;
 }) => {
   // Edge Function 호출
   const { data, error } = await supabase.functions.invoke('register-staff', {
@@ -265,6 +274,58 @@ export const getTeams = async (companyId: string): Promise<Team[]> => {
     .order('name');
   if (error) throw error;
   return data || [];
+};
+
+export const createDivision = async (name: string, companyId: string): Promise<Division> => {
+  const { data, error } = await supabase
+    .from('divisions')
+    .insert([{ name, company_id: companyId }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const deleteDivision = async (id: string) => {
+  const { error } = await supabase
+    .from('divisions')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+};
+
+export const createTeam = async (name: string, divisionId: string, companyId: string): Promise<Team> => {
+  const { data, error } = await supabase
+    .from('teams')
+    .insert([{ name, division_id: divisionId, company_id: companyId }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
+export const deleteTeam = async (id: string) => {
+  const { error } = await supabase
+    .from('teams')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
+};
+
+export const setLeader = async (userId: string, type: 'division' | 'team', status: boolean) => {
+  const updates: Partial<Profile> = type === 'division' 
+    ? { is_division_head: status } 
+    : { is_team_leader: status };
+  
+  const { data, error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
 };
 
 export const updateRequestStatus = async (

@@ -34,7 +34,12 @@ import {
   fetchCompanyUsers, 
   registerStaff, 
   updateMemberProfile,
-  getPayrollHistory
+  getPayrollHistory,
+  createDivision,
+  deleteDivision,
+  createTeam,
+  deleteTeam,
+  setLeader
 } from '@/lib/api';
 
 export default function OrganizationManagement() {
@@ -55,9 +60,23 @@ export default function OrganizationManagement() {
   const [isOrgManagerOpen, setIsOrgManagerOpen] = useState(false);
 
   // Registration State
-  const [regData, setRegData] = useState({ email: '', fullName: '', teamId: '', position: '', role: 'member' });
+  const [regData, setRegData] = useState({ 
+    email: '', 
+    fullName: '', 
+    teamId: '', 
+    position: '', 
+    role: 'member',
+    residentNumber: '',
+    address: '',
+    familyData: [] as { name: string; birth: string }[]
+  });
   const [tempPassword, setTempPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+
+  // Structural State
+  const [newDivName, setNewDivName] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+  const [selectedDivForTeam, setSelectedDivForTeam] = useState('');
 
   const fetchData = async () => {
     if (!profile?.company_id) return;
@@ -95,11 +114,13 @@ export default function OrganizationManagement() {
         department: teams.find(t => t.id === regData.teamId)?.name || '',
         tempPassword: generatedPw,
         companyId: profile.company_id,
-        role: regData.role
+        role: regData.role,
+        residentNumber: regData.residentNumber,
+        address: regData.address,
+        familyData: regData.familyData,
+        teamId: regData.teamId
       });
       
-      // Also update team_id manually since registerStaff might not handle it via Edge Function yet
-      // If the edge function is updated, this might be redundant.
       setTempPassword(generatedPw);
       fetchData();
     } catch (err: any) {
@@ -107,6 +128,50 @@ export default function OrganizationManagement() {
     } finally {
       setIsRegistering(false);
     }
+  };
+
+  const handleAddDivision = async () => {
+    if (!profile || !newDivName) return;
+    try {
+      await createDivision(newDivName, profile.company_id);
+      setNewDivName('');
+      fetchData();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleDeleteDiv = async (id: string) => {
+    if (!confirm('본부를 삭제하시겠습니까? 관련 팀들이 영향을 받을 수 있습니다.')) return;
+    try {
+      await deleteDivision(id);
+      fetchData();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleAddTeam = async () => {
+    if (!profile || !newTeamName || !selectedDivForTeam) return;
+    try {
+      await createTeam(newTeamName, selectedDivForTeam, profile.company_id);
+      setNewTeamName('');
+      fetchData();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleDeleteT = async (id: string) => {
+    if (!confirm('팀을 삭제하시겠습니까?')) return;
+    try {
+      await deleteTeam(id);
+      fetchData();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleToggleLeader = async (userId: string, type: 'division' | 'team', currentStatus: boolean) => {
+    try {
+      await setLeader(userId, type, !currentStatus);
+      fetchData();
+      if (selectedMember?.id === userId) {
+        setSelectedMember(prev => prev ? { ...prev, [type === 'division' ? 'is_division_head' : 'is_team_leader']: !currentStatus } : null);
+      }
+    } catch (e: any) { alert(e.message); }
   };
 
   const filteredMembers = members.filter(m => {
@@ -236,7 +301,11 @@ export default function OrganizationManagement() {
                                      {m.full_name[0]}
                                   </div>
                                   <div>
-                                     <p className="text-sm font-black text-slate-900">{m.full_name}</p>
+                                     <div className="flex items-center gap-2">
+                                        <p className="text-sm font-black text-slate-900">{m.full_name}</p>
+                                        {m.is_division_head && <span className="text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded uppercase">본부장</span>}
+                                        {m.is_team_leader && <span className="text-[8px] font-black bg-indigo-500 text-white px-1.5 py-0.5 rounded uppercase">팀장</span>}
+                                     </div>
                                      <div className="flex items-center gap-2 mt-1">
                                         <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border transition-colors ${['super_admin', 'admin'].includes(m.role) ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>
                                            {m.role === 'super_admin' ? '최고 관리자' : 
@@ -284,9 +353,23 @@ export default function OrganizationManagement() {
                          </div>
                       </div>
                    </div>
-                   <button className="p-4 bg-slate-50 text-slate-400 rounded-3xl hover:text-indigo-600 transition-all">
-                      <Settings className="w-6 h-6" />
-                   </button>
+                   <div className="flex gap-2">
+                      <button 
+                        onClick={() => handleToggleLeader(selectedMember.id, 'division', !!selectedMember.is_division_head)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedMember.is_division_head ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      >
+                        본부장 임명
+                      </button>
+                      <button 
+                        onClick={() => handleToggleLeader(selectedMember.id, 'team', !!selectedMember.is_team_leader)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${selectedMember.is_team_leader ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
+                      >
+                        팀장 임명
+                      </button>
+                      <button className="p-4 bg-slate-50 text-slate-400 rounded-3xl hover:text-indigo-600 transition-all">
+                         <Settings className="w-6 h-6" />
+                      </button>
+                   </div>
                 </div>
 
                 <div className="flex p-2 bg-slate-100 rounded-[2.5rem] w-fit gap-2">
@@ -296,20 +379,36 @@ export default function OrganizationManagement() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                   {activeTab === 'info' && (
-                     <>
-                        <InfoItem label="Current Position" value={selectedMember.position || 'N/A'} icon={<Briefcase />} />
-                        <InfoItem label="Organization Unit" value={teams.find(t => t.id === selectedMember.team_id)?.name || 'General Branch'} icon={<Building />} />
-                        <InfoItem label="Authority Level" value={selectedMember.role} icon={<ShieldCheck />} />
-                        <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white flex items-center justify-between">
-                           <div>
-                              <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Base Compensation</p>
-                              <p className="text-2xl font-black tracking-tighter italic">₩ {(selectedMember.annual_salary || 0).toLocaleString()}</p>
-                           </div>
-                           <CreditCard className="w-10 h-10 text-white/20" />
-                        </div>
-                     </>
-                   )}
+                    {activeTab === 'info' && (
+                      <>
+                         <InfoItem label="Current Position" value={selectedMember.position || 'N/A'} icon={<Briefcase />} />
+                         <InfoItem label="Organization Unit" value={teams.find(t => t.id === selectedMember.team_id)?.name || 'General Branch'} icon={<Building />} />
+                         <InfoItem label="Resident Number" value={selectedMember.resident_number ? `${selectedMember.resident_number.substring(0, 8)}******` : 'N/A'} icon={<ShieldCheck />} />
+                         <InfoItem label="Home Address" value={selectedMember.address || 'N/A'} icon={<Building />} />
+                         <div className="col-span-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">Dependent Family</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                               {selectedMember.family_data && selectedMember.family_data.length > 0 ? (
+                                 selectedMember.family_data.map((f, idx) => (
+                                   <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between">
+                                      <span className="text-xs font-black text-slate-700">{f.name}</span>
+                                      <span className="text-[10px] font-bold text-slate-400">{f.birth}</span>
+                                   </div>
+                                 ))
+                               ) : (
+                                 <p className="text-[10px] text-slate-400 italic">No family data registered.</p>
+                               )}
+                            </div>
+                         </div>
+                         <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white flex items-center justify-between col-span-2">
+                            <div>
+                               <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Base Compensation</p>
+                               <p className="text-2xl font-black tracking-tighter italic">₩ {(selectedMember.annual_salary || 0).toLocaleString()}</p>
+                            </div>
+                            <CreditCard className="w-10 h-10 text-white/20" />
+                         </div>
+                      </>
+                    )}
                    {activeTab === 'payroll' && (
                      <div className="col-span-2 py-20 text-center space-y-6 bg-slate-50 rounded-[3rem] border border-slate-100 border-dashed">
                         <Database className="w-12 h-12 text-slate-200 mx-auto" />
@@ -352,57 +451,150 @@ export default function OrganizationManagement() {
       {/* Enroll Modal */}
       {isRegisterOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-500">
-              <div className="p-10 pb-6 flex justify-between items-center bg-slate-50">
+           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto premium-scrollbar animate-in zoom-in-95 duration-500">
+              <div className="p-10 pb-6 flex justify-between items-center bg-slate-50 sticky top-0 z-10">
                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase font-sans">Member Enrollment</h2>
-                 <button onClick={() => setIsRegisterOpen(false)} className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-slate-400 shadow-sm"><X className="w-6 h-6" /></button>
+                 <button onClick={() => setIsRegisterOpen(false)} className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-slate-400 shadow-sm hover:text-rose-500 transition-colors"><X className="w-6 h-6" /></button>
               </div>
 
               <div className="p-10">
                  {!tempPassword ? (
-                    <form onSubmit={handleRegister} className="space-y-8">
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                          <FormInput label="Full Name" value={regData.fullName} onChange={(v: string) => setRegData({...regData, fullName: v})} placeholder="Real name" />
-                          <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
+                    <form onSubmit={handleRegister} className="space-y-12">
+                       {/* Section 1: Basic Info */}
+                       <div className="space-y-6">
+                          <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest flex items-center gap-3">
+                             <div className="w-1.5 h-6 bg-indigo-600 rounded-full" />
+                             Basic Identity & Security
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <FormInput label="Full Name" value={regData.fullName} onChange={(v: string) => setRegData({...regData, fullName: v})} placeholder="Real name" />
+                             <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Resident Number (주민번호)</label>
+                                <input 
+                                 type="text" 
+                                 value={regData.residentNumber} 
+                                 onChange={e => {
+                                    let val = e.target.value.replace(/\D/g, '');
+                                    if (val.length > 6) val = val.slice(0, 6) + '-' + val.slice(6, 13);
+                                    setRegData({...regData, residentNumber: val.slice(0, 14)});
+                                 }}
+                                 placeholder="000000-0000000"
+                                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
+                                 required
+                                />
+                             </div>
+                             <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
+                          </div>
                        </div>
-                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Assignment</label>
-                              <select 
-                               value={regData.teamId} 
-                               onChange={e => setRegData({...regData, teamId: e.target.value})}
-                               className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
-                               required
-                              >
-                                 <option value="">Select Team...</option>
-                                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                              </select>
+
+                       {/* Section 2: Organization & Access */}
+                       <div className="space-y-6">
+                           <h3 className="text-sm font-black text-emerald-600 uppercase tracking-widest flex items-center gap-3">
+                              <div className="w-1.5 h-6 bg-emerald-600 rounded-full" />
+                              Departmental Access
+                           </h3>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Assignment</label>
+                                 <select 
+                                  value={regData.teamId} 
+                                  onChange={e => setRegData({...regData, teamId: e.target.value})}
+                                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
+                                  required
+                                 >
+                                    <option value="">Select Team...</option>
+                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name} ({divisions.find(d => d.id === t.division_id)?.name})</option>)}
+                                 </select>
+                              </div>
+                              <div className="space-y-2">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Access Role & Permission</label>
+                                 <select 
+                                  value={regData.role} 
+                                  onChange={e => setRegData({...regData, role: e.target.value})}
+                                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
+                                  required
+                                 >
+                                    <option value="member">직원 (Member) - 일반 사용자 권한</option>
+                                    <option value="sub_admin">보조 관리자 (Sub Admin) - 제한된 관리 기능</option>
+                                    {profile?.role === 'super_admin' && (
+                                      <option value="admin">기업 관리자 (Admin) - 전권한</option>
+                                    )}
+                                 </select>
+                              </div>
                            </div>
-                           <div className="space-y-2">
-                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Access Role</label>
-                              <select 
-                               value={regData.role} 
-                               onChange={e => setRegData({...regData, role: e.target.value})}
-                               className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
-                               required
-                              >
-                                 <option value="member">직원 (Member)</option>
-                                 <option value="sub_admin">보조 관리자 (Sub Admin)</option>
-                                 {profile?.role === 'super_admin' && (
-                                   <option value="admin">기업 관리자 (Admin)</option>
-                                 )}
-                              </select>
+                       </div>
+
+                       {/* Section 3: Contact & Family */}
+                       <div className="space-y-6">
+                           <h3 className="text-sm font-black text-rose-600 uppercase tracking-widest flex items-center gap-3">
+                              <div className="w-1.5 h-6 bg-rose-600 rounded-full" />
+                              Personal & Family Details
+                           </h3>
+                           <FormInput label="Home Address (주소)" value={regData.address} onChange={(v: string) => setRegData({...regData, address: v})} placeholder="Full address" />
+                           
+                           <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dependents (부양가족)</label>
+                                 <button 
+                                   type="button"
+                                   onClick={() => setRegData({...regData, familyData: [...regData.familyData, { name: '', birth: '' }]})}
+                                   className="text-[9px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all"
+                                 >
+                                    + ADD FAMILY MEMBER
+                                 </button>
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                 {regData.familyData.map((f, i) => (
+                                    <div key={i} className="flex gap-2 items-end p-4 bg-slate-50 rounded-2xl border border-slate-200 group">
+                                       <div className="flex-1 space-y-2">
+                                          <input 
+                                            type="text" 
+                                            placeholder="Name" 
+                                            value={f.name} 
+                                            onChange={e => {
+                                              const newF = [...regData.familyData];
+                                              newF[i].name = e.target.value;
+                                              setRegData({...regData, familyData: newF});
+                                            }}
+                                            className="w-full bg-white border-none rounded-xl p-2 text-xs font-black outline-none"
+                                          />
+                                          <input 
+                                            type="text" 
+                                            placeholder="YYYY.MM.DD" 
+                                            value={f.birth} 
+                                            onChange={e => {
+                                              const newF = [...regData.familyData];
+                                              newF[i].birth = e.target.value;
+                                              setRegData({...regData, familyData: newF});
+                                            }}
+                                            className="w-full bg-white border-none rounded-xl p-2 text-xs font-black outline-none"
+                                          />
+                                       </div>
+                                       <button 
+                                         type="button"
+                                         onClick={() => {
+                                           const newF = regData.familyData.filter((_, idx) => idx !== i);
+                                           setRegData({...regData, familyData: newF});
+                                         }}
+                                         className="p-2 text-rose-400 hover:text-rose-600"
+                                       >
+                                          <Trash2 className="w-4 h-4" />
+                                       </button>
+                                    </div>
+                                 ))}
+                              </div>
                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                           <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
-                        </div>
+                       </div>
+
                        <div className="bg-indigo-50 border border-indigo-100 rounded-[2.5rem] p-8 space-y-4">
                           <div className="flex items-center gap-4">
                              <ShieldCheck className="w-10 h-10 text-indigo-600" />
                              <div>
-                                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Security Credentials</p>
-                                <p className="text-xs font-bold text-slate-400">Temporary password will be securely generated upon enrollment.</p>
+                                <p className="text-sm font-black text-slate-900 uppercase tracking-tight">System Security Protocol</p>
+                                <p className="text-xs font-bold text-slate-400">All data is encrypted. Temporary access code will be generated.</p>
                              </div>
                           </div>
                           <button 
@@ -410,7 +602,7 @@ export default function OrganizationManagement() {
                             disabled={isRegistering}
                             className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px]"
                           >
-                             {isRegistering ? 'Processing Data...' : 'Finalize & Enroll'}
+                             {isRegistering ? 'Processing Secure Data...' : 'Finalize & Enroll Member'}
                           </button>
                        </div>
                     </form>
@@ -421,14 +613,14 @@ export default function OrganizationManagement() {
                        </div>
                        <div className="space-y-3">
                           <h3 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">Enrollment Complete</h3>
-                          <p className="text-slate-400 text-sm font-bold">The following temporary credential has been issued:</p>
+                          <p className="text-slate-400 text-sm font-bold">Credential successfully issued to the registry.</p>
                        </div>
                        <div className="p-8 bg-slate-900 text-white rounded-[2.5rem] relative overflow-hidden group">
                           <div className="absolute top-0 right-0 p-4 opacity-10"><Database className="w-10 h-10" /></div>
                           <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2">Temporary Access Code</p>
                           <p className="text-4xl font-black font-mono tracking-widest text-emerald-400">{tempPassword}</p>
                        </div>
-                       <button onClick={() => setIsRegisterOpen(false)} className="w-full py-5 bg-white border-2 border-slate-900 text-slate-900 font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest text-[11px]">Return to Directory</button>
+                       <button onClick={() => setIsRegisterOpen(false)} className="w-full py-5 bg-white border-2 border-slate-900 text-slate-900 font-black rounded-2xl hover:bg-slate-900 hover:text-white transition-all uppercase tracking-widest text-[11px]">Return to Talent Hub</button>
                     </div>
                  )}
               </div>
@@ -436,31 +628,108 @@ export default function OrganizationManagement() {
         </div>
       )}
 
-      {/* Org Structure Manager (Basic placeholder for now) */}
+      {/* Org Structure Manager */}
       {isOrgManagerOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-lg overflow-hidden translate-z-0">
-              <div className="p-10 pb-6 flex justify-between items-center text-slate-900">
-                 <h2 className="text-2xl font-black tracking-tighter uppercase">Structure Manager</h2>
-                 <button onClick={() => setIsOrgManagerOpen(false)} className="w-11 h-11 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-400"><X className="w-6 h-6" /></button>
+           <div className="bg-white rounded-[3.5rem] shadow-2xl w-full max-w-4xl overflow-hidden animate-in slide-in-from-bottom-10 duration-500">
+              <div className="p-10 pb-6 flex justify-between items-center bg-slate-50">
+                 <h2 className="text-2xl font-black tracking-tighter uppercase">Structure Intelligence</h2>
+                 <button onClick={() => setIsOrgManagerOpen(false)} className="w-11 h-11 bg-white rounded-2xl flex items-center justify-center text-slate-400 shadow-sm hover:text-rose-500 transition-colors"><X className="w-6 h-6" /></button>
               </div>
-              <div className="p-10 space-y-8">
-                 <div className="space-y-4">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Divisions Intelligence</p>
-                    <div className="space-y-2 max-h-60 overflow-y-auto premium-scrollbar pr-2">
+              
+              <div className="p-10 grid grid-cols-1 md:grid-cols-2 gap-10 max-h-[70vh] overflow-y-auto premium-scrollbar">
+                 {/* Division Management */}
+                 <div className="space-y-8">
+                    <div className="space-y-4">
+                       <h3 className="text-sm font-black text-indigo-600 uppercase tracking-widest flex items-center gap-3">
+                          <div className="w-1.5 h-6 bg-indigo-600 rounded-full" />
+                          본부 관리 (Divisions)
+                       </h3>
+                       <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="New Division Name..." 
+                            value={newDivName}
+                            onChange={e => setNewDivName(e.target.value)}
+                            className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-indigo-100"
+                          />
+                          <button 
+                            onClick={handleAddDivision}
+                            className="px-6 py-3 bg-indigo-600 text-white font-black rounded-xl text-[10px] uppercase shadow-lg hover:bg-slate-900 transition-all"
+                          >
+                             ADD
+                          </button>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
                        {divisions.map(d => (
                          <div key={d.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
                             <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{d.name}</span>
-                            <div className="flex gap-2">
-                               <button className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-300 hover:text-rose-500 transition-all shadow-sm"><Trash2 className="w-4 h-4" /></button>
-                            </div>
+                            <button 
+                              onClick={() => handleDeleteDiv(d.id)}
+                              className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-300 hover:text-rose-500 transition-all shadow-sm"
+                            >
+                               <Trash2 className="w-4 h-4" />
+                            </button>
                          </div>
                        ))}
                     </div>
                  </div>
-                 <button className="w-full py-5 bg-slate-900 text-white font-black rounded-2xl flex items-center justify-center gap-3 uppercase tracking-widest text-[11px]">
-                    <PlusCircle className="w-5 h-5" /> New Division
-                 </button>
+
+                 {/* Team Management */}
+                 <div className="space-y-8">
+                    <div className="space-y-4">
+                       <h3 className="text-sm font-black text-emerald-600 uppercase tracking-widest flex items-center gap-3">
+                          <div className="w-1.5 h-6 bg-emerald-600 rounded-full" />
+                          팀 관리 (Teams)
+                       </h3>
+                       <div className="space-y-2">
+                          <select 
+                            value={selectedDivForTeam}
+                            onChange={e => setSelectedDivForTeam(e.target.value)}
+                            className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none appearance-none"
+                          >
+                             <option value="">소속 본부 선택...</option>
+                             {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          </select>
+                          <div className="flex gap-2">
+                             <input 
+                               type="text" 
+                               placeholder="New Team Name..." 
+                               value={newTeamName}
+                               onChange={e => setNewTeamName(e.target.value)}
+                               className="flex-1 bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black outline-none focus:ring-4 focus:ring-emerald-100"
+                             />
+                             <button 
+                               onClick={handleAddTeam}
+                               className="px-6 py-3 bg-emerald-600 text-white font-black rounded-xl text-[10px] uppercase shadow-lg hover:bg-slate-900 transition-all"
+                             >
+                                ADD
+                             </button>
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                       {teams.map(t => (
+                         <div key={t.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 group">
+                            <div>
+                               <span className="text-xs font-black text-slate-700 uppercase tracking-widest">{t.name}</span>
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                                  {divisions.find(d => d.id === t.division_id)?.name}
+                                </p>
+                            </div>
+                            <button 
+                              onClick={() => handleDeleteT(t.id)}
+                              className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-300 hover:text-rose-500 transition-all shadow-sm"
+                            >
+                               <Trash2 className="w-4 h-4" />
+                            </button>
+                         </div>
+                       ))}
+                    </div>
+                 </div>
               </div>
            </div>
         </div>
