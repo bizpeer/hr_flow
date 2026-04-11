@@ -19,9 +19,10 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userData, setUserData] = useState<{ email?: string; name: string; role: string }>({
+  const [userData, setUserData] = useState<{ email?: string; name: string; role: string; companyName: string }>({
     name: '사용자',
     role: '멤버',
+    companyName: '회사명',
   });
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function Sidebar() {
       if (user) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, role')
+          .select('full_name, role, companies(name)')
           .eq('id', user.id)
           .single();
         
@@ -47,6 +48,8 @@ export default function Sidebar() {
                 isSuperAdmin ? '최고 관리자' : 
                 isAdmin ? '기업 관리자' :
                 isSubAdmin ? '보조 관리자' : '직원',
+          companyName: isSystemAdmin ? '시스템 관리' : 
+                      (profile as any)?.companies?.name || '회사 정보 없음',
         });
       }
     };
@@ -93,9 +96,9 @@ export default function Sidebar() {
         <div className={styles.userSection}>
           <div className={styles.avatar}>{userData.name?.[0] || 'U'}</div>
           <div className={styles.userInfo}>
-            <p className={styles.userName}>{userData.name}</p>
-            <p className={styles.userRole}>{userData.role}</p>
-            {userData.email && userData.email !== userData.name && (
+            <p className={styles.userName}>{userData.companyName}</p>
+            <p className={styles.userRole}>{userData.name}</p>
+            {userData.email && (
               <p style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '-0.2rem' }}>{userData.email}</p>
             )}
           </div>
