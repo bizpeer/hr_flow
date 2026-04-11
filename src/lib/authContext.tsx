@@ -38,9 +38,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
+      // 프로필 정보와 회사 이름을 함께 가져옴
       const { data, error } = await supabase
         .from('profiles')
-        .select('*, companies(name)')
+        .select(`
+          *,
+          companies:company_id (
+            name
+          )
+        `)
         .eq('id', userId)
         .single();
       
@@ -51,7 +57,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           throw error;
         }
       } else {
-        setProfile(data);
+        // 데이터 구조가 중첩되어 올 수 있으므로 정규화 처리
+        const formattedProfile = {
+          ...data,
+          companies: data.companies || { name: '회사 정보 없음' }
+        };
+        setProfile(formattedProfile as any);
       }
     } catch (error) {
       console.error('Error fetching profile:', error);

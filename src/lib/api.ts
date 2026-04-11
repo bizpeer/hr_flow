@@ -185,7 +185,9 @@ export const getAllCompaniesWithStats = async (): Promise<Company[]> => {
 
   // 기업별 카운트 계산
   const countMap = (profileStats || []).reduce((acc: any, curr: any) => {
-    acc[curr.company_id] = (acc[curr.company_id] || 0) + 1;
+    if (curr.company_id) {
+      acc[curr.company_id] = (acc[curr.company_id] || 0) + 1;
+    }
     return acc;
   }, {});
 
