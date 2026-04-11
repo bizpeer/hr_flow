@@ -22,9 +22,31 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const formatPhone = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+  };
+
+  const formatBusinessNumber = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 10)}`;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    let formattedValue = value;
+    if (name === 'phone') {
+      formattedValue = formatPhone(value);
+    } else if (name === 'registrationNumber') {
+      formattedValue = formatBusinessNumber(value);
+    }
+    
+    setFormData(prev => ({ ...prev, [name]: formattedValue }));
   };
 
   const handleSignup = async (e: React.FormEvent) => {
@@ -167,6 +189,7 @@ export default function SignupPage() {
                   placeholder="010-0000-0000"
                   value={formData.phone}
                   onChange={handleChange}
+                  maxLength={13}
                   required
                 />
               </div>
@@ -196,6 +219,7 @@ export default function SignupPage() {
                 placeholder="000-00-00000"
                 value={formData.registrationNumber}
                 onChange={handleChange}
+                maxLength={12}
                 required
               />
             </div>
