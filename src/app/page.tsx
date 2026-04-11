@@ -10,22 +10,41 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleInitialRedirect = async () => {
-      // 1. URL 해시에서 복구 모드 확인
-      const hash = window.location.hash;
-      if (hash && (hash.includes('type=recovery') || hash.includes('error_code=404'))) {
+    // 1. URL 해시에서 복구 모드 즉시 확인 (초기 로드 시)
+    const hash = window.location.hash;
+    if (hash && (hash.includes('type=recovery') || hash.includes('error_code=404'))) {
+      router.push('/reset-password/');
+      return;
+    }
+
+    // 2. Supabase 인증 이벤트 리스너 (공식 방식)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
         router.push('/reset-password/');
         return;
       }
 
-      // 2. 기존 세션 확인 로직
+      if (event === 'SIGNED_IN' && session) {
+        // 복구 모드가 아닐 때만 대시보드로 이동
+        const currentHash = window.location.hash;
+        if (!currentHash.includes('type=recovery')) {
+          router.push('/dashboard/');
+        }
+      }
+    });
+
+    // 3. 기존 세션 확인 (백업)
+    const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (session && !window.location.hash.includes('type=recovery')) {
         router.push('/dashboard/');
       }
     };
-    
-    handleInitialRedirect();
+    checkSession();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [router]);
   return (
     <div className={styles.page}>
