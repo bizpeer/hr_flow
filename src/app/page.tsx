@@ -10,13 +10,22 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkSession = async () => {
+    const handleInitialRedirect = async () => {
+      // 1. URL 해시에서 복구 모드 확인
+      const hash = window.location.hash;
+      if (hash && (hash.includes('type=recovery') || hash.includes('error_code=404'))) {
+        router.push('/reset-password/');
+        return;
+      }
+
+      // 2. 기존 세션 확인 로직
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         router.push('/dashboard/');
       }
     };
-    checkSession();
+    
+    handleInitialRedirect();
   }, [router]);
   return (
     <div className={styles.page}>
