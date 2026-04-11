@@ -15,6 +15,9 @@ export interface Profile {
   children_under_20?: number;
   non_taxable?: number;
   team_id?: string;
+  companies?: {
+    name: string;
+  };
 }
 
 export interface Division {

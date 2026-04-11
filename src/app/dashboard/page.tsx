@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/authContext';
 import styles from './page.module.css';
 
 const modules = [
@@ -12,8 +12,10 @@ const modules = [
 ];
 
 export default function DashboardPage() {
-  const [userName] = useState('사용자');
-  const [companyName] = useState('우리 회사');
+  const { user, profile } = useAuth();
+  
+  const userName = profile?.full_name || user?.email?.split('@')[0] || '사용자';
+  const companyName = profile?.companies?.name || '우리 회사';
 
   return (
     <div className={styles.container}>
@@ -26,6 +28,7 @@ export default function DashboardPage() {
           {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
         </div>
       </header>
+...
 
       <section className={styles.statsGrid}>
         <div className={styles.statCard}>

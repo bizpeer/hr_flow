@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useAuth } from '@/lib/authContext';
 import styles from './Layout.module.css';
 
 const menuItems = [
@@ -19,42 +19,24 @@ const menuItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [userData, setUserData] = useState<{ email?: string; name: string; role: string; companyName: string }>({
-    name: '사용자',
-    role: '멤버',
-    companyName: '회사명',
-  });
+  const { user, profile } = useAuth();
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, role, companies(name)')
-          .eq('id', user.id)
-          .single();
-        
-        const isSystemAdmin = user.email === 'bizpeer@gmail.com';
-        const role = profile?.role || 'member';
-        const isSuperAdmin = role === 'super_admin';
-        const isAdmin = role === 'admin';
-        const isSubAdmin = role === 'sub_admin';
-        
-        setUserData({
-          email: user.email,
-          name: profile?.full_name || user.email?.split('@')[0] || '사용자',
-          role: isSystemAdmin ? '시스템 관리자' : 
-                isSuperAdmin ? '최고 관리자' : 
-                isAdmin ? '기업 관리자' :
-                isSubAdmin ? '보조 관리자' : '직원',
-          companyName: isSystemAdmin ? '시스템 관리' : 
-                      (profile as any)?.companies?.name || '회사 정보 없음',
-        });
-      }
-    };
-    fetchUser();
-  }, []);
+  const isSystemAdmin = user?.email === 'bizpeer@gmail.com';
+  const role = profile?.role || 'member';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin';
+  const isSubAdmin = role === 'sub_admin';
+
+  const userData = {
+    email: user?.email,
+    name: profile?.full_name || user?.email?.split('@')[0] || '사용자',
+    role: isSystemAdmin ? '시스템 관리자' : 
+          isSuperAdmin ? '최고 관리자' : 
+          isAdmin ? '기업 관리자' :
+          isSubAdmin ? '보조 관리자' : '직원',
+    companyName: isSystemAdmin ? '시스템 관리' : 
+                (profile as any)?.companies?.name || '회사 정보 없음',
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -80,7 +62,7 @@ export default function Sidebar() {
             <span className={styles.title}>{item.title}</span>
           </Link>
         ))}
-        {userData.email === 'bizpeer@gmail.com' && (
+        {isSystemAdmin && (
           <Link 
             href="/dashboard/system" 
             className={`${styles.navItem} ${pathname === '/dashboard/system' ? styles.active : ''}`}
