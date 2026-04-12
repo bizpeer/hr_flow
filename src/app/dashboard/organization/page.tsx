@@ -66,7 +66,8 @@ export default function OrganizationManagement() {
     role: 'member' as const,
     residentNumber: '',
     address: '',
-    familyData: [] as { name: string; birth: string }[]
+    familyData: [] as { name: string; birth: string }[],
+    tempPassword: '' // 신규 추가: 사용자 지정 임시 비밀번호
   };
   const [regData, setRegData] = useState(initRegData);
   const [tempPassword, setTempPassword] = useState('');
@@ -78,7 +79,10 @@ export default function OrganizationManagement() {
   const [selectedDivForTeam, setSelectedDivForTeam] = useState('');
 
   const fetchData = async () => {
-    if (!profile) return;
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const companyId = profile.company_id || undefined;
@@ -112,7 +116,7 @@ export default function OrganizationManagement() {
         fullName: regData.fullName,
         position: 'Professional', // Default
         department: 'General', // Default
-        tempPassword: generatedPw,
+        tempPassword: regData.tempPassword || generatedPw,
         companyId: profile.company_id,
         role: regData.role,
         residentNumber: regData.residentNumber,
@@ -469,6 +473,12 @@ export default function OrganizationManagement() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                              <FormInput label="Full Name" value={regData.fullName} onChange={(v: string) => setRegData({...regData, fullName: v})} placeholder="Real name" />
                              <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
+                             <FormInput 
+                               label="Temporary Password" 
+                               value={regData.tempPassword} 
+                               onChange={(v: string) => setRegData({...regData, tempPassword: v})} 
+                               placeholder="Min 8 characters (Leave empty for random)" 
+                             />
                           </div>
                        </div>
 

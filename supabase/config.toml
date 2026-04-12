@@ -1,0 +1,5 @@
+project_id = "syqysbjtivzqhdeqaywq"
+
+[api]
+port = 54321
+external_url = "https://syqysbjtivzqhdeqaywq.supabase.co"
