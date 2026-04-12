@@ -232,7 +232,7 @@ export default function DashboardPage() {
                  {isEditingAnn ? (selectedAnn ? '공지사항 수정' : '새 공지사항') : '공지사항'}
               </h2>
               <div className="flex gap-2">
-                 {!isEditingAnn && isManagement && (selectedAnn?.user_id === profile.id || ['super_admin','admin'].includes(profile.role)) && (
+                 {!isEditingAnn && isManagement && (selectedAnn?.user_id === profile?.id || ['super_admin','admin'].includes(profile?.role || '')) && (
                     <>
                        <button onClick={() => setIsEditingAnn(true)} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-indigo-600 shadow-sm border border-slate-100"><Edit2 className="w-4 h-4" /></button>
                        <button onClick={() => handleDeleteAnn(selectedAnn!.id)} className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-600 shadow-sm border border-slate-100"><Trash2 className="w-4 h-4" /></button>
