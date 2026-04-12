@@ -10,9 +10,10 @@ import {
   createDivision, deleteDivision, 
   createTeam, deleteTeam, setLeader, registerStaff
 } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 export default function OrganizationManagement() {
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, user } = useAuth();
   const router = useRouter();
 
   const [members, setMembers] = useState<Profile[]>([]);
@@ -23,6 +24,8 @@ export default function OrganizationManagement() {
   // 모달 상태
   const [isEnrollOpen, setIsEnrollOpen] = useState(false);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'team' | 'division' } | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
 
   // 폼 상태
   const [newDivName, setNewDivName] = useState('');
@@ -83,12 +86,42 @@ export default function OrganizationManagement() {
     } catch (e: any) { alert(e.message); }
   };
 
-  const handleDeleteTeam = async (id: string) => {
-    if (!confirm('정말 삭제하시겠습니까?')) return;
+  const handleDeleteDivision = (id: string) => {
+    setDeleteTarget({ id, type: 'division' });
+  };
+
+  const handleDeleteTeam = (id: string) => {
+    setDeleteTarget({ id, type: 'team' });
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget || !deletePassword || !user?.email) {
+        alert('삭제 타겟이 없거나 비밀번호가 입력되지 않았습니다.');
+        return;
+    }
+    
     try {
-      await deleteTeam(id);
-      fetchData();
-    } catch (e: any) { alert(e.message); }
+        // 비밀번호 검증 (Re-auth)
+        const { error: authError } = await supabase.auth.signInWithPassword({
+            email: user.email,
+            password: deletePassword,
+        });
+
+        if (authError) throw new Error('비밀번호가 일치하지 않습니다. 관리자 보안 확인에 실패했습니다.');
+
+        if (deleteTarget.type === 'division') {
+            await deleteDivision(deleteTarget.id);
+        } else {
+            await deleteTeam(deleteTarget.id);
+        }
+
+        setDeleteTarget(null);
+        setDeletePassword('');
+        fetchData();
+        alert('성공적으로 삭제되었습니다.');
+    } catch (e: any) {
+        alert(e.message);
+    }
   };
 
   if (loading) {
@@ -187,9 +220,17 @@ export default function OrganizationManagement() {
               const divHead = members.find(m => m.is_division_head && m.team_id && teams.find(t => t.id === m.team_id)?.division_id === div.id);
               return (
                 <div key={div.id} className="p-5 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-3 group hover:border-indigo-200 transition-colors cursor-pointer">
-                  <div className="flex items-center gap-3 text-slate-800">
-                    <Users className="w-4 h-4 text-slate-400" />
-                    <span className="font-bold">{div.name}</span>
+                  <div className="flex items-center justify-between gap-3 text-slate-800">
+                    <div className="flex items-center gap-3">
+                      <Users className="w-4 h-4 text-slate-400" />
+                      <span className="font-bold">{div.name}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteDivision(div.id); }}
+                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1">
@@ -297,7 +338,83 @@ export default function OrganizationManagement() {
         </div>
       </div>
       
-      {/* 임시 등록 모달 및 팀 생성 모달 생략 (UI 중점 반영, 필요시 기존 컴포넌트 유지) */}
+      {/* Team Modal */}
+      {isTeamModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold mb-6">신규 팀 생성</h2>
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-2 block">소속 본부</label>
+                <select 
+                  value={selectedDivForTeam}
+                  onChange={e => setSelectedDivForTeam(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none"
+                >
+                  <option value="">본부를 선택하세요</option>
+                  {divisions.map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-500 mb-2 block">팀 이름</label>
+                <input 
+                  type="text" 
+                  value={newTeamName}
+                  onChange={e => setNewTeamName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none"
+                  placeholder="예: 마케팅팀"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setIsTeamModalOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">취소</button>
+              <button onClick={handleCreateTeam} className="flex-1 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700">팀 생성</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Enroll Modal (Simplified for Employee Registration) */}
+      {isEnrollOpen && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-full max-w-lg shadow-2xl">
+            <h2 className="text-xl font-bold mb-6">신규 구성원 임시 등록</h2>
+            <div className="space-y-4 mb-8">
+               <p className="text-sm text-slate-500">임시직원을 등록하여 배치할 수 있습니다. (실제 가입 및 등록 절차는 별도의 가이드 참고)</p>
+               {/* 폼 간소화 (Mock registration or real depending on backend) */}
+               <div className="px-4 py-8 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-slate-400">
+                  직원 등록 양식 폼 (준비 중)
+               </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setIsEnrollOpen(false)} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Password Confirm Modal */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl">
+            <h2 className="text-xl font-bold text-rose-600 mb-2">보안 확인 (삭제)</h2>
+            <p className="text-sm text-slate-500 mb-6">항목을 삭제하려면 관리자 비밀번호를 입력해주세요.</p>
+            <input 
+              type="password" 
+              value={deletePassword}
+              onChange={e => setDeletePassword(e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm outline-none mb-6 focus:border-rose-300 focus:ring-4 focus:ring-rose-50"
+              placeholder="비밀번호 입력..."
+            />
+            <div className="flex gap-3">
+              <button onClick={() => { setDeleteTarget(null); setDeletePassword(''); }} className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl hover:bg-slate-200">취소</button>
+              <button onClick={executeDelete} className="flex-1 py-3 bg-rose-600 text-white font-bold rounded-xl hover:bg-rose-700">영구 삭제</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
