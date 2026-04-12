@@ -39,6 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // 프로필 정보와 회사 이름을 함께 가져옴
+      // fetchProfile은 중단되지 않도록 내부에서 모든 에러를 처리합니다.
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -51,21 +52,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (error) {
+        console.error('Profile fetch error details:', error);
         if (error.code === 'PGRST116') { // No rows found
           setProfile(null);
         } else {
-          throw error;
+          // 기타 에러 발생 시 세션 유저 정보만으로 최소 프로필 생성
+          setProfile({
+            id: userId,
+            email: email || '',
+            full_name: email?.split('@')[0] || '사용자',
+            role: 'member',
+            companies: { name: '회사 정보 조회 실패' }
+          } as any);
         }
-      } else {
+      } else if (data) {
         let division_id = null;
-        if (data && data.team_id) {
+        if (data.team_id) {
           try {
             const { data: teamData } = await supabase.from('teams').select('division_id').eq('id', data.team_id).single();
             if (teamData) division_id = teamData.division_id;
-          } catch(e) {}
+          } catch(e) {
+            console.warn('Team/Division lookup failed:', e);
+          }
         }
 
-        // 데이터 구조가 중첩되어 올 수 있으므로 정규화 처리
         const formattedProfile = {
           ...data,
           companies: data.companies || { name: '회사 정보 없음' },
@@ -74,8 +84,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile(formattedProfile as any);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
-      setProfile(null);
+      console.error('Critical error in fetchProfile:', error);
+      // 최소한의 profile 상태라도 유지하여 앱 크래시 방지
+      setProfile({ id: userId, email: email || '', role: 'member' } as any);
     }
   };
 
@@ -109,38 +120,47 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initAuth();
 
-    // 3. Safety Timeout (로딩이 너무 오래 걸릴 경우 강제 해제)
-    const timeoutId = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn('Auth initialization timed out, forcing loading to false');
-        setLoading(false);
-      }
-    }, 5000);
-
     // 2. Listen for Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
       
-      if (currentUser) {
-        await fetchProfile(currentUser.id, currentUser.email);
-      } else {
+      // SIGNED_OUT 시 즉시 처리
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
         setProfile(null);
+        setLoading(false);
+        return;
+      }
+
+      // 세션 정보가 변경되었을 때만 처리
+      if (currentUser?.id !== user?.id || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setUser(currentUser);
+        if (currentUser) {
+          await fetchProfile(currentUser.id, currentUser.email);
+        } else {
+          setProfile(null);
+        }
       }
       
-      // onAuthStateChange에서 발생하는 이벤트를 통해 로딩 상태 해제
       setLoading(false);
-      clearTimeout(timeoutId);
     });
+
+    // 3. Safety Timeout (로딩이 너무 오래 걸릴 경우 강제 해제)
+    const timeoutId = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('Auth initialization timed out');
+        setLoading(false);
+      }
+    }, 6000);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [user?.id]); // id가 바뀔 때만 재구독 방지
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>

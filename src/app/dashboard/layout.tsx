@@ -18,34 +18,38 @@ export default function DashboardLayout({
 
   useEffect(() => {
     let timer: any;
+    
+    // 인증 체크 로딩이 너무 길어질 경우 대비
     if (loading) {
-      timer = setTimeout(() => setShowRetry(true), 3000);
+      timer = setTimeout(() => setShowRetry(true), 5000);
     } else {
       setShowRetry(false);
     }
 
-    // 인증 확인이 완료되었고 유저가 없으면 로그인 페이지로 이동
+    // 로딩이 끝났는데 유저가 없으면 로그인으로 리다이렉트
     if (!loading && !user) {
-      router.push('/login');
+      console.log('No user session found, redirecting to login');
+      router.replace('/login');
     }
 
     return () => clearTimeout(timer);
   }, [user, loading, router]);
 
-  // 전역 인증 상태가 로딩 중이거나, 로딩은 끝났지만 유저가 없는 경우(리다이렉트 중) 
-  // "인증 확인 중..." 메시지를 유지합니다.
-  if (loading || !user) {
+  // 로딩 중이거나 유저 세션이 아직 도달하지 않은 경우 대기 화면 표시
+  if (loading || (!user && typeof window !== 'undefined')) {
     return (
-      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--background)', gap: '1rem' }}>
-        <p style={{ color: 'var(--muted)', fontSize: '1rem' }}>인증 확인 중...</p>
+      <div style={{ display: 'flex', height: '100vh', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--background)', gap: '1rem', fontFamily: 'sans-serif' }}>
+        <div style={{ width: '40px', height: '40px', border: '3px solid #f3f3f3', borderTop: '3px solid var(--primary)', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', fontWeight: '500' }}>보안 세션 확인 중...</p>
         {showRetry && (
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginBottom: '0.5rem' }}>인증 확인이 지연되고 있습니다.</p>
+          <div style={{ textAlign: 'center', marginTop: '1rem', animation: 'fadeIn 0.5s ease' }}>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)', marginBottom: '0.75rem' }}>인증 확인이 지연되고 있습니다.</p>
             <button 
               onClick={() => window.location.reload()}
-              style={{ padding: '0.5rem 1rem', background: 'var(--primary)', color: 'white', borderRadius: '0.5rem', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' }}
+              style={{ padding: '0.6rem 1.2rem', background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '0.75rem', fontSize: '0.8rem', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
             >
-              페이지 새로고침
+              새로고침
             </button>
           </div>
         )}

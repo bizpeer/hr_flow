@@ -25,23 +25,23 @@ export default function LoginPage() {
     setMessage('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
       
-      try {
+      if (data.session) {
+        // 즉시 대시보드로 이동 시도
         router.push('/dashboard');
+        
+        // Next.js 라우터가 반응하지 않을 경우를 대비한 즉각적인 하드 리다이렉트
         setTimeout(() => {
           if (window.location.pathname.includes('/login')) {
-            window.location.replace('/dashboard');
+            window.location.href = '/dashboard';
           }
-        }, 2000);
-      } catch (navError) {
-        console.error('Navigation error:', navError);
-        window.location.replace('/dashboard');
+        }, 100);
       }
     } catch (err: any) {
       setError(err.message || '로그인 중 오류가 발생했습니다.');
