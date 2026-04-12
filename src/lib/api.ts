@@ -146,7 +146,10 @@ export const registerStaff = async (staffData: {
     body: staffData,
   });
 
-  if (error) throw error;
+  if (error) {
+    console.error('Edge Function Error:', error);
+    throw new Error(`${error.message || 'Unknown error occurred during registration'}`);
+  }
   return data;
 };
 

@@ -60,16 +60,15 @@ export default function OrganizationManagement() {
   const [isOrgManagerOpen, setIsOrgManagerOpen] = useState(false);
 
   // Registration State
-  const [regData, setRegData] = useState({ 
-    email: '', 
-    fullName: '', 
-    teamId: '', 
-    position: '', 
-    role: 'member',
+  const initRegData = {
+    email: '',
+    fullName: '',
+    role: 'member' as const,
     residentNumber: '',
     address: '',
     familyData: [] as { name: string; birth: string }[]
-  });
+  };
+  const [regData, setRegData] = useState(initRegData);
   const [tempPassword, setTempPassword] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
 
@@ -111,15 +110,15 @@ export default function OrganizationManagement() {
       await registerStaff({
         email: regData.email,
         fullName: regData.fullName,
-        position: regData.position,
-        department: teams.find(t => t.id === regData.teamId)?.name || '',
+        position: 'Professional', // Default
+        department: 'General', // Default
         tempPassword: generatedPw,
         companyId: profile.company_id,
         role: regData.role,
         residentNumber: regData.residentNumber,
         address: regData.address,
         familyData: regData.familyData,
-        teamId: regData.teamId
+        teamId: '' // Unassigned
       });
       
       setTempPassword(generatedPw);
@@ -471,24 +470,6 @@ export default function OrganizationManagement() {
                              <FormInput label="Full Name" value={regData.fullName} onChange={(v: string) => setRegData({...regData, fullName: v})} placeholder="Real name" />
                              <FormInput label="Professional Email" value={regData.email} onChange={(v: string) => setRegData({...regData, email: v})} placeholder="corp@domain.com" />
                           </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Resident Number (주민번호)</label>
-                                <input 
-                                 type="text" 
-                                 value={regData.residentNumber} 
-                                 onChange={e => {
-                                    let val = e.target.value.replace(/\D/g, '');
-                                    if (val.length > 6) val = val.slice(0, 6) + '-' + val.slice(6, 13);
-                                    setRegData({...regData, residentNumber: val.slice(0, 14)});
-                                 }}
-                                 placeholder="000000-0000000"
-                                 className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
-                                 required
-                                />
-                             </div>
-                             <FormInput label="Assigned Position" value={regData.position} onChange={(v: string) => setRegData({...regData, position: v})} placeholder="e.g. Lead Designer" />
-                          </div>
                        </div>
 
                        {/* Section 2: Organization & Access */}
@@ -497,24 +478,27 @@ export default function OrganizationManagement() {
                               <div className="w-1.5 h-6 bg-emerald-600 rounded-full" />
                               Departmental Access
                            </h3>
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                           <div className="grid grid-cols-1 gap-8">
                               <div className="space-y-2">
-                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Team Assignment</label>
-                                 <select 
-                                  value={regData.teamId} 
-                                  onChange={e => setRegData({...regData, teamId: e.target.value})}
+                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Resident Number (주민번호)</label>
+                                 <input 
+                                  type="text" 
+                                  value={regData.residentNumber} 
+                                  onChange={e => {
+                                     let val = e.target.value.replace(/\D/g, '');
+                                     if (val.length > 6) val = val.slice(0, 6) + '-' + val.slice(6, 13);
+                                     setRegData({...regData, residentNumber: val.slice(0, 14)});
+                                  }}
+                                  placeholder="000000-0000000"
                                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
                                   required
-                                 >
-                                    <option value="">Select Team...</option>
-                                    {teams.map(t => <option key={t.id} value={t.id}>{t.name} ({divisions.find(d => d.id === t.division_id)?.name})</option>)}
-                                 </select>
+                                 />
                               </div>
                               <div className="space-y-2">
                                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Access Role & Permission</label>
                                  <select 
                                   value={regData.role} 
-                                  onChange={e => setRegData({...regData, role: e.target.value})}
+                                  onChange={e => setRegData({...regData, role: e.target.value as any})}
                                   className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-black text-xs outline-none focus:ring-4 focus:ring-indigo-100 appearance-none"
                                   required
                                  >
