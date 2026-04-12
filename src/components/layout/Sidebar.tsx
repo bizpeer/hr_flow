@@ -36,12 +36,12 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const role = (profile?.role || 'member').trim().toLowerCase();
+  const role = (profile?.role || 'member').toString().trim().toLowerCase();
   const isSystemAdmin = role === 'system_admin';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
   const isSubAdmin = role === 'sub_admin';
-  const isMember = role === 'member';
+  const isMember = role === 'member' && !isSystemAdmin && !isSuperAdmin && !isAdmin && !isSubAdmin;
 
   const userData = {
     email: user?.email,

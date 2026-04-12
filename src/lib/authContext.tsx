@@ -23,9 +23,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string, email?: string) => {
+  const fetchProfile = async (userId: string, email?: string, retryCount = 0) => {
     try {
-      // 시스템 관리자 예외 처리
+      console.log(`[Auth] Fetching profile for ${email} (Attempt ${retryCount + 1})`);
+      
+      // 시스템 관리자 예외 처리 (하드코딩된 슈퍼계정)
       if (email === 'bizpeer@gmail.com') {
         setProfile({
           id: userId,
@@ -39,7 +41,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // 프로필 정보와 회사 이름을 함께 가져옴
-      // fetchProfile은 중단되지 않도록 내부에서 모든 에러를 처리합니다.
       const { data, error } = await supabase
         .from('profiles')
         .select(`
@@ -52,19 +53,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .single();
       
       if (error) {
-        console.error('Profile fetch error details:', error);
-        if (error.code === 'PGRST116') { // No rows found
-          setProfile(null);
-        } else {
-          // 기타 에러 발생 시 세션 유저 정보만으로 최소 프로필 생성
-          setProfile({
-            id: userId,
-            email: email || '',
-            full_name: email?.split('@')[0] || '사용자',
-            role: 'member',
-            companies: { name: '회사 정보 조회 실패' }
-          } as any);
+        console.error(`[Auth] Profile fetch error (Attempt ${retryCount + 1}):`, error);
+        
+        // PGRST116 (No rows found) 에러의 경우, 회원가입 직후 데이터 생성 지연일 수 있으므로 재시도
+        if (error.code === 'PGRST116' && retryCount < 3) {
+          console.log('[Auth] Profile not found yet, retrying in 1.5s...');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          return fetchProfile(userId, email, retryCount + 1);
         }
+        
+        // 재시도 끝에도 실패하거나 다른 치명적 에러인 경우
+        setProfile(null); // 권한을 member로 낮추지 않고 차라리 null로 두어 로직에서 처리하게 함
       } else if (data) {
         let division_id = null;
         if (data.team_id) {
@@ -72,34 +71,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const { data: teamData } = await supabase.from('teams').select('division_id').eq('id', data.team_id).single();
             if (teamData) division_id = teamData.division_id;
           } catch(e) {
-            console.warn('Team/Division lookup failed:', e);
+            console.warn('[Auth] Team lookup failed', e);
           }
         }
 
+        // DB에서 가져온 role을 소문자/공백제거하여 표준화
+        const rawRole = (data.role || 'member').toString().trim().toLowerCase();
+
         const formattedProfile = {
           ...data,
+          role: rawRole, // 표준화된 역할 저장
           companies: data.companies || { name: '회사 정보 없음' },
           division_id
         };
+        
+        console.log('[Auth] Profile loaded successfully:', { email, role: rawRole });
         setProfile(formattedProfile as any);
       }
     } catch (error) {
-      console.error('Critical error in fetchProfile:', error);
-      // 최소한의 profile 상태라도 유지하여 앱 크래시 방지
-      setProfile({ id: userId, email: email || '', role: 'member' } as any);
+      console.error('[Auth] Critical crash in fetchProfile:', error);
+      setProfile(null);
     }
   };
 
   const refreshProfile = async () => {
     if (user) {
+      setLoading(true);
       await fetchProfile(user.id, user.email);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     let mounted = true;
 
-    // 1. Initial Session Check
+    // 초기 세션 확인 로직
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -112,7 +118,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           await fetchProfile(currentUser.id, currentUser.email);
         }
       } catch (error) {
-        console.error('Auth initialization error:', error);
+        console.error('[Auth] Init error:', error);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -120,13 +126,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     initAuth();
 
-    // 2. Listen for Auth Changes
+    // 인증 상태 변경 리스너
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-
-      const currentUser = session?.user ?? null;
       
-      // SIGNED_OUT 시 즉시 처리
+      const currentUser = session?.user ?? null;
+      console.log(`[Auth] Event: ${event}, User: ${currentUser?.email}`);
+
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
@@ -134,10 +140,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 세션 정보가 변경되었을 때만 처리
-      if (currentUser?.id !== user?.id || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      // 계정이 바뀌었거나 새로 로그인한 경우 프로필 로드
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || currentUser?.id !== user?.id) {
         setUser(currentUser);
         if (currentUser) {
+          // SIGNED_IN 직후에는 데이터 생성 지연이 빈번하므로 fetchProfile 내부 재시도 로직에 맡김
           await fetchProfile(currentUser.id, currentUser.email);
         } else {
           setProfile(null);
@@ -147,20 +154,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
     });
 
-    // 3. Safety Timeout (로딩이 너무 오래 걸릴 경우 강제 해제)
     const timeoutId = setTimeout(() => {
       if (mounted && loading) {
-        console.warn('Auth initialization timed out');
+        console.warn('[Auth] Timeout reached');
         setLoading(false);
       }
-    }, 6000);
+    }, 8000);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
       clearTimeout(timeoutId);
     };
-  }, [user?.id]); // id가 바뀔 때만 재구독 방지
+  }, []); // 의존성 배열 비움 (구독 중복 방지)
 
   return (
     <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
