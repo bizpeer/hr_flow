@@ -36,7 +36,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const role = (profile?.role || 'member').toLowerCase();
+  const role = (profile?.role || 'member').trim().toLowerCase();
   const isSystemAdmin = role === 'system_admin';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
@@ -77,7 +77,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
     }
     
     if (isSubAdmin) {
-      return managementMenuItems.filter(i => i.id === 'approvals');
+      return managementMenuItems.filter(i => ['approvals', 'expenses-all'].includes(i.id));
     }
     
     return [];
@@ -157,7 +157,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
             <div className={styles.avatar}>{userData.name?.[0] || 'U'}</div>
             <div className={styles.userInfo}>
               <p className={styles.userName}>{userData.companyName}</p>
-              <p className={styles.userRole}>{userData.name}</p>
+              <p className={styles.userRole}>{userData.role}</p>
             </div>
             <button className={styles.logoutBtn} onClick={handleLogout} title="로그아웃">
               🚪

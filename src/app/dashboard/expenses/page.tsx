@@ -27,11 +27,14 @@ export default function ExpensesManagement() {
   const [endDate, setEndDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
 
+  const role = (profile?.role || 'member').trim().toLowerCase();
+  const isSubAdmin = role === 'sub_admin';
+
   useEffect(() => {
     if (!authLoading) {
       if (profile?.role === 'system_admin') {
         router.replace('/dashboard/system');
-      } else if (profile && !['super_admin', 'admin'].includes(profile.role.toLowerCase())) {
+      } else if (profile && !['super_admin', 'admin', 'sub_admin'].includes(profile.role.toLowerCase())) {
         router.replace('/dashboard');
       }
     }
@@ -43,14 +46,32 @@ export default function ExpensesManagement() {
       setLoading(true);
       try {
         // 'APPROVED' 상태의 지출결의 내역만 가져오기 (회사 단위 필터링)
-        const { data, error } = await supabase
+        let query = supabase
           .from('expense_requests')
-          .select('id, created_at, category, description, amount, user_id, profiles(full_name)')
+          .select(`
+            id, 
+            created_at, 
+            category, 
+            description, 
+            amount, 
+            user_id, 
+            profiles!inner(
+              full_name,
+              teams:team_id(division_id)
+            )
+          `)
           .eq('company_id', profile.company_id)
-          .eq('status', 'APPROVED')
+          .eq('status', 'APPROVED');
+
+        // sub_admin은 본인 본부 데이터만
+        if (isSubAdmin) {
+          query = query.eq('profiles.teams.division_id', (profile as any).division_id);
+        }
+
+        const { data, error } = await query
+          .order('created_at', { ascending: false })
           .gte('created_at', `${startDate}T00:00:00.000Z`)
-          .lte('created_at', `${endDate}T23:59:59.999Z`)
-          .order('created_at', { ascending: false });
+          .lte('created_at', `${endDate}T23:59:59.999Z`);
 
         if (error) {
           if (error.code !== '42P01') throw error; // 테이블이 아직 없는 경우 무시 (mock data fallback 가능)

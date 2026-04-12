@@ -15,11 +15,16 @@ export default function ApprovalsManagement() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const role = (profile?.role || 'member').trim().toLowerCase();
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin';
+  const isSubAdmin = role === 'sub_admin';
+
   useEffect(() => {
     if (!authLoading) {
       if (profile?.role === 'system_admin') {
         router.replace('/dashboard/system');
-      } else if (profile && !['super_admin', 'admin'].includes(profile.role.toLowerCase())) {
+      } else if (profile && !['super_admin', 'admin', 'sub_admin'].includes(profile.role.toLowerCase())) {
         router.replace('/dashboard');
       }
     }
@@ -31,29 +36,38 @@ export default function ApprovalsManagement() {
     try {
       const targetTable = activeTab === 'EXPENSE' ? 'expense_requests' : 'leave_requests';
       
-      const { data, error } = await supabase
+      let query = supabase
         .from(targetTable)
         .select(`
           *,
-          profiles(full_name, role)
+          profiles!inner(
+            full_name, 
+            role,
+            team_id,
+            teams:team_id(division_id)
+          )
         `)
-        .eq('company_id', profile.company_id)
-        .in('status', ['PENDING', 'SUB_APPROVED'])
-        .order('created_at', { ascending: false });
+        .eq('company_id', profile.company_id);
+
+      // 1. sub_admin: 본인 본부의 PENDING 건만 (자신 제외)
+      if (isSubAdmin) {
+        query = query
+          .eq('status', 'PENDING')
+          .neq('user_id', profile.id)
+          .eq('profiles.teams.division_id', (profile as any).division_id);
+      } 
+      // 2. super_admin / admin: 1차 승인 완료(SUB_APPROVED) 건 또는 sub_admin이 신청한 PENDING 건
+      else if (isSuperAdmin || isAdmin) {
+        query = query.or(`status.eq.SUB_APPROVED,and(status.eq.PENDING,profiles.role.eq.sub_admin)`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error && error.code !== '42P01') throw error;
       
-      if (!data || data.length === 0) {
-        // Dummy data for visual confirmation if table is empty
-        setRequests([
-          { id: '1', created_at: new Date().toISOString(), type: activeTab, category: '비품/소모품', description: '개발팀 신규 모니터 구매', amount: 450000, status: 'PENDING', profiles: { full_name: '권택림', role: 'member' } },
-          { id: '2', created_at: new Date(Date.now() - 86400000).toISOString(), type: activeTab, category: '식비', description: '하반기 회식', amount: 600000, status: 'SUB_APPROVED', profiles: { full_name: 'insa22', role: 'sub_admin' } },
-        ]);
-      } else {
-        setRequests(data);
-      }
+      setRequests(data || []);
     } catch (err) {
-      console.error(err);
+      console.error('Error fetching requests:', err);
     } finally {
       setLoading(false);
     }
@@ -64,9 +78,13 @@ export default function ApprovalsManagement() {
   }, [profile?.company_id, activeTab]);
 
   const handleApprove = async (id: string) => {
-    if (!confirm('승인하시겠습니까?')) return;
+    const confirmMsg = isSubAdmin ? '1차 승인하시겠습니까?' : '최종 승인하시겠습니까?';
+    if (!confirm(confirmMsg)) return;
+
     try {
-      await updateRequestStatus(activeTab === 'EXPENSE' ? 'expense' : 'leave', id, 'APPROVED');
+      // sub_admin은 SUB_APPROVED로, 최고관리자는 APPROVED로 변경
+      const nextStatus = isSubAdmin ? 'SUB_APPROVED' : 'APPROVED';
+      await updateRequestStatus(activeTab === 'EXPENSE' ? 'expense' : 'leave', id, nextStatus);
       fetchRequests();
     } catch (e: any) { alert(e.message); }
   };
