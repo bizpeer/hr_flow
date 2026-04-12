@@ -48,14 +48,19 @@ export default function ExpensesDashboard() {
   const [submitting, setSubmitting] = useState(false);
 
   const fetchExpenses = async () => {
-    if (!profile?.company_id) return;
+    if (!profile) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const isSuperAdmin = profile.role === 'super_admin';
+      let query = supabase
         .from('expense_requests')
-        .select('*, profiles(full_name)')
-        .eq('company_id', profile.company_id)
-        .order('date', { ascending: false });
+        .select('*, profiles(full_name)');
+      
+      if (!isSuperAdmin) {
+        query = query.eq('company_id', profile.company_id);
+      }
+
+      const { data, error } = await query.order('date', { ascending: false });
 
       if (error) throw error;
       setExpenses(data || []);
@@ -68,7 +73,7 @@ export default function ExpensesDashboard() {
 
   useEffect(() => {
     fetchExpenses();
-  }, [profile?.company_id]);
+  }, [profile?.company_id, profile?.role]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

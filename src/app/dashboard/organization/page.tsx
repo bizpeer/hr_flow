@@ -79,13 +79,14 @@ export default function OrganizationManagement() {
   const [selectedDivForTeam, setSelectedDivForTeam] = useState('');
 
   const fetchData = async () => {
-    if (!profile?.company_id) return;
+    if (!profile) return;
     setLoading(true);
     try {
+      const companyId = profile.company_id || undefined;
       const [divs, tms, users] = await Promise.all([
-        getDivisions(profile.company_id),
-        getTeams(profile.company_id),
-        fetchCompanyUsers(profile.company_id)
+        getDivisions(companyId),
+        getTeams(companyId),
+        fetchCompanyUsers(companyId)
       ]);
       setDivisions(divs);
       setTeams(tms);
@@ -99,7 +100,7 @@ export default function OrganizationManagement() {
 
   useEffect(() => {
     fetchData();
-  }, [profile?.company_id]);
+  }, [profile?.company_id, profile?.role]);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();

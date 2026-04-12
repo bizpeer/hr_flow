@@ -52,15 +52,16 @@ export default function PayrollEngine() {
   const [selectedDetails, setSelectedDetails] = useState<Profile | null>(null);
 
   useEffect(() => {
-    if (!profile?.company_id) return;
+    if (!profile) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
+        const companyId = profile.company_id || undefined;
         const [divs, tms, users] = await Promise.all([
-          getDivisions(profile.company_id),
-          getTeams(profile.company_id),
-          fetchCompanyUsers(profile.company_id)
+          getDivisions(companyId),
+          getTeams(companyId),
+          fetchCompanyUsers(companyId)
         ]);
 
         setDivisions(divs);
@@ -88,7 +89,7 @@ export default function PayrollEngine() {
     };
 
     fetchData();
-  }, [profile?.company_id]);
+  }, [profile?.company_id, profile?.role]);
 
   const handleUpdateField = (uid: string, field: keyof Profile, value: any) => {
     setEditingData(prev => ({

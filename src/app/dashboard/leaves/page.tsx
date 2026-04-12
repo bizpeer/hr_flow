@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { getLeaves, createLeave, Leave } from '@/lib/api';
+import { useAuth } from '@/lib/authContext';
 import styles from './leaves.module.css';
 
 export default function LeavesPage() {
+  const { profile } = useAuth();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -16,9 +18,13 @@ export default function LeavesPage() {
   const [reason, setReason] = useState('');
 
   const fetchLeaves = async () => {
+    if (!profile) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      // For demo, using a dummy company ID.
-      const data = await getLeaves('company-123');
+      const data = await getLeaves(profile.company_id || undefined);
       setLeaves(data);
     } catch (error) {
       console.error('Failed to fetch leaves:', error);
@@ -29,10 +35,11 @@ export default function LeavesPage() {
 
   useEffect(() => {
     fetchLeaves();
-  }, []);
+  }, [profile?.company_id, profile?.role]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!profile) return;
     try {
       await createLeave({
         start_date: startDate,
@@ -40,8 +47,8 @@ export default function LeavesPage() {
         type,
         reason,
         status: 'PENDING',
-        company_id: 'company-123',
-        user_id: 'user-123',
+        company_id: profile.company_id,
+        user_id: profile.id,
       });
       setShowModal(false);
       setStartDate('');

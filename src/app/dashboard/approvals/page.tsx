@@ -55,24 +55,37 @@ export default function ApprovalCenter() {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
 
   useEffect(() => {
-    if (!profile?.company_id) return;
+    if (!profile) return;
 
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [divs, tms, { data: profiles }] = await Promise.all([
-          getDivisions(profile.company_id),
-          getTeams(profile.company_id),
-          supabase.from('profiles').select('*').eq('company_id', profile.company_id)
+        const isSuperAdmin = profile.role === 'super_admin';
+        const companyId = profile.company_id;
+
+        const [divs, tms, profilesRes] = await Promise.all([
+          getDivisions(companyId),
+          getTeams(companyId),
+          isSuperAdmin 
+            ? supabase.from('profiles').select('*')
+            : supabase.from('profiles').select('*').eq('company_id', companyId)
         ]);
         
         setDivisions(divs);
         setTeams(tms);
-        setAllProfiles(profiles || []);
+        setAllProfiles(profilesRes.data || []);
+
+        let leavesQuery = supabase.from('leave_requests').select('*, profiles(full_name)');
+        let expensesQuery = supabase.from('expense_requests').select('*, profiles(full_name)');
+
+        if (!isSuperAdmin) {
+          leavesQuery = leavesQuery.eq('company_id', companyId);
+          expensesQuery = expensesQuery.eq('company_id', companyId);
+        }
 
         const [leavesRes, expensesRes] = await Promise.all([
-          supabase.from('leave_requests').select('*, profiles(full_name)').eq('company_id', profile.company_id).order('created_at', { ascending: false }),
-          supabase.from('expense_requests').select('*, profiles(full_name)').eq('company_id', profile.company_id).order('created_at', { ascending: false })
+          leavesQuery.order('created_at', { ascending: false }),
+          expensesQuery.order('created_at', { ascending: false })
         ]);
 
         if (leavesRes.data) setLeaveRequests(leavesRes.data);
@@ -86,14 +99,30 @@ export default function ApprovalCenter() {
 
     fetchData();
 
-    // Real-time updates
+    // Real-time 업데이트 설정
+    const isSuperAdmin = profile.role === 'super_admin';
+    const companyId = profile.company_id;
+    
+    // super_admin은 필터 없이, 일반 사용자는 company_id 필터 적용
+    const filter = !isSuperAdmin && companyId ? `company_id=eq.${companyId}` : undefined;
+
     const channel = supabase.channel('approvals_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leave_requests', filter: `company_id=eq.${profile.company_id}` }, fetchData)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'expense_requests', filter: `company_id=eq.${profile.company_id}` }, fetchData)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'leave_requests', 
+        filter: filter 
+      }, fetchData)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'expense_requests', 
+        filter: filter 
+      }, fetchData)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.company_id]);
+  }, [profile?.company_id, profile?.role]);
 
   const handleUpdateStatus = async (type: 'expense' | 'leave', id: string, newStatus: any) => {
     if (!profile) return;

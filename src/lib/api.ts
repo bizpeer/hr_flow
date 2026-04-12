@@ -79,12 +79,16 @@ export interface PayrollRecord {
   status: string;
 }
 
-export const getLeaves = async (companyId: string): Promise<Leave[]> => {
-  const { data, error } = await supabase
+export const getLeaves = async (companyId?: string): Promise<Leave[]> => {
+  let query = supabase
     .from('leaves')
-    .select('*, profiles(full_name)')
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
+    .select('*, profiles(full_name)');
+  
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
 
   if (error) throw error;
   return data || [];
@@ -218,12 +222,16 @@ export const updateCompanySettings = async (companyId: string, updates: Partial<
   return data;
 };
 
-export const fetchCompanyUsers = async (companyId: string): Promise<Profile[]> => {
-  const { data, error } = await supabase
+export const fetchCompanyUsers = async (companyId?: string): Promise<Profile[]> => {
+  let query = supabase
     .from('profiles')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('full_name');
+    .select('*');
+  
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query.order('full_name');
 
   if (error) throw error;
   return data || [];
@@ -256,22 +264,30 @@ export const adminDeleteCompany = async (companyId: string, adminPassword?: stri
   return data;
 };
 
-export const getDivisions = async (companyId: string): Promise<Division[]> => {
-  const { data, error } = await supabase
+export const getDivisions = async (companyId?: string): Promise<Division[]> => {
+  let query = supabase
     .from('divisions')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('name');
+    .select('*');
+
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query.order('name');
   if (error) throw error;
   return data || [];
 };
 
-export const getTeams = async (companyId: string): Promise<Team[]> => {
-  const { data, error } = await supabase
+export const getTeams = async (companyId?: string): Promise<Team[]> => {
+  let query = supabase
     .from('teams')
-    .select('*')
-    .eq('company_id', companyId)
-    .order('name');
+    .select('*');
+
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query.order('name');
   if (error) throw error;
   return data || [];
 };
