@@ -1,7 +1,11 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/authContext';
+import { supabase } from '@/lib/supabase';
+import { Leave, updateRequestFields } from '@/lib/api';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock, Edit2 } from 'lucide-react';
-import { updateRequestFields } from '@/lib/api';
-
 export default function LeavesPage() {
   const { profile } = useAuth();
   const [leaves, setLeaves] = useState<Leave[]>([]);
