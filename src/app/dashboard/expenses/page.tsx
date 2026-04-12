@@ -57,16 +57,11 @@ export default function ExpensesManagement() {
             user_id, 
             profiles!inner(
               full_name,
-              teams:team_id(division_id)
+              team_id
             )
           `)
           .eq('company_id', profile.company_id)
           .eq('status', 'APPROVED');
-
-        // sub_admin은 본인 본부 데이터만
-        if (isSubAdmin) {
-          query = query.eq('profiles.teams.division_id', (profile as any).division_id);
-        }
 
         const { data, error } = await query
           .order('created_at', { ascending: false })
@@ -77,8 +72,30 @@ export default function ExpensesManagement() {
           if (error.code !== '42P01') throw error; // 테이블이 아직 없는 경우 무시 (mock data fallback 가능)
         }
         
+        let finalData = data || [];
+
+        // sub_admin은 본인 본부 데이터만 클라이언트 필터링
+        if (isSubAdmin && (profile as any).division_id) {
+          try {
+            const { data: teamsData } = await supabase
+              .from('teams')
+              .select('id')
+              .eq('division_id', (profile as any).division_id);
+              
+            if (teamsData) {
+              const validTeamIds = teamsData.map(t => t.id);
+              finalData = finalData.filter(req => validTeamIds.includes((req.profiles as any)?.team_id));
+            } else {
+              finalData = [];
+            }
+          } catch(e) {
+            console.error('Error fetching expenses sub teams:', e);
+            finalData = [];
+          }
+        }
+
         // Mock data for display purposes if DB is empty
-        if (!data || data.length === 0) {
+        if (!finalData || finalData.length === 0) {
           setExpenses([
             { id: '1', created_at: '2026-04-07', category: '비품/소모품', description: '컴퓨터', amount: 2500000, profiles: { full_name: 'insa22' }, user_id: 'u1' },
             { id: '2', created_at: '2026-04-06', category: '식비', description: '회식', amount: 545561, profiles: { full_name: '인사' }, user_id: 'u2' },

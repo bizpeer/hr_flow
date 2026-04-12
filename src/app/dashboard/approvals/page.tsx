@@ -43,8 +43,7 @@ export default function ApprovalsManagement() {
           profiles!inner(
             full_name, 
             role,
-            team_id,
-            teams:team_id(division_id)
+            team_id
           )
         `)
         .eq('company_id', profile.company_id);
@@ -53,8 +52,7 @@ export default function ApprovalsManagement() {
       if (isSubAdmin) {
         query = query
           .eq('status', 'PENDING')
-          .neq('user_id', profile.id)
-          .eq('profiles.teams.division_id', (profile as any).division_id);
+          .neq('user_id', profile.id);
       } 
       // 2. super_admin / admin: 1차 승인 완료(SUB_APPROVED) 건 또는 sub_admin이 신청한 PENDING 건
       else if (isSuperAdmin || isAdmin) {
@@ -65,7 +63,30 @@ export default function ApprovalsManagement() {
 
       if (error && error.code !== '42P01') throw error;
       
-      setRequests(data || []);
+      let finalData = data || [];
+
+      // sub_admin인 경우, 본인 본부의 데이터만 클라이언트 필터링
+      if (isSubAdmin && (profile as any).division_id) {
+        try {
+          // 해당 본부에 속한 팀 ID 목록 조회
+          const { data: teamsData } = await supabase
+            .from('teams')
+            .select('id')
+            .eq('division_id', (profile as any).division_id);
+            
+          if (teamsData) {
+            const validTeamIds = teamsData.map(t => t.id);
+            finalData = finalData.filter(req => validTeamIds.includes(req.profiles?.team_id));
+          } else {
+            finalData = [];
+          }
+        } catch(e) {
+          console.error('Error fetching subdivision teams:', e);
+          finalData = [];
+        }
+      }
+      
+      setRequests(finalData);
     } catch (err) {
       console.error('Error fetching requests:', err);
     } finally {

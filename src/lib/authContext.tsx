@@ -38,16 +38,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 프로필 정보와 회사 이름을 함께 가져옴 (팀 정보와 본부 ID 포함)
+      // 프로필 정보와 회사 이름을 함께 가져옴
       const { data, error } = await supabase
         .from('profiles')
         .select(`
           *,
           companies:company_id (
             name
-          ),
-          teams:team_id (
-            division_id
           )
         `)
         .eq('id', userId)
@@ -60,11 +57,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           throw error;
         }
       } else {
+        let division_id = null;
+        if (data && data.team_id) {
+          try {
+            const { data: teamData } = await supabase.from('teams').select('division_id').eq('id', data.team_id).single();
+            if (teamData) division_id = teamData.division_id;
+          } catch(e) {}
+        }
+
         // 데이터 구조가 중첩되어 올 수 있으므로 정규화 처리
         const formattedProfile = {
           ...data,
           companies: data.companies || { name: '회사 정보 없음' },
-          division_id: data.teams?.division_id || null
+          division_id
         };
         setProfile(formattedProfile as any);
       }
