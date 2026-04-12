@@ -7,21 +7,28 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/authContext';
 import styles from './Layout.module.css';
 
-const menuItems = [
+const commonMenuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
-  { id: 'approvals', title: '결재 센터', icon: '🛡️', href: '/dashboard/approvals' },
-  { id: 'expenses', title: '지출결의', icon: '💰', href: '/dashboard/expenses' },
-  { id: 'leaves', title: '휴가신청', icon: '🏖️', href: '/dashboard/leaves' },
-  { id: 'payroll', title: '급여 관리', icon: '💵', href: '/dashboard/payroll' },
-  { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
+  { id: 'leaves', title: '내 휴가 및 근태', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'expenses', title: '지출결의 신청', icon: '💰', href: '/dashboard/expenses' },
+  { id: 'announcements', title: '공지사항 게시판', icon: '📢', href: '/dashboard' },
   { id: 'certificates', title: '증명서 발급', icon: '📄', href: '/dashboard/certificates' },
+];
+
+const managementMenuItems = [
+  { id: 'approvals', title: '결재/승인 관리함', icon: '🛡️', href: '/dashboard/approvals' },
+  { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
+  { id: 'payroll', title: '급여 및 연봉 관리', icon: '💵', href: '/dashboard/payroll' },
+  { id: 'expenses-all', title: '지출결의 통합 조회', icon: '📊', href: '/dashboard/expenses' },
+  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/organization' },
+  { id: 'settings', title: '시스템 설정', icon: '⚙️', href: '/dashboard/settings' },
 ];
 
 const systemMenuItems = [
   { id: 'system-dashboard', title: '시스템 현황', icon: '📊', href: '/dashboard/system' },
   { id: 'companies', title: '기업 관리', icon: '🏢', href: '/dashboard/system' },
   { id: 'all-users', title: '전체 사용자', icon: '👥', href: '/dashboard/system' },
-  { id: 'settings', title: '시스템 설정', icon: '⚙️', href: '/dashboard/system' },
+  { id: 'settings-global', title: '시스템 설정', icon: '⚙️', href: '/dashboard/system' },
 ];
 
 export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
@@ -42,7 +49,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
     role: isSystemAdmin ? '시스템 관리자' : 
           isSuperAdmin ? '최고 관리자' : 
           isAdmin ? '기업 관리자' :
-          isSubAdmin ? '보조 관리자' : '직원',
+          isSubAdmin ? '보조 관리자' : '일반 직원',
     companyName: isSystemAdmin ? '시스템관리자' : 
                 (profile as any)?.companies?.name || '회사 정보 없음',
   };
@@ -53,38 +60,34 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
     router.refresh();
   };
 
-  // 필터링된 메뉴 생성
-  const getFilteredMenu = () => {
-    if (isSystemAdmin) return systemMenuItems;
-
-    return menuItems.filter(item => {
-      // 1. 조직관리 - 최고관리자, 기업관리자 전용
-      if (item.id === 'organization') return isSuperAdmin || isAdmin;
-      
-      // 2. 급여관리 - 최고관리자, 기업관리자 전용 (사용자 요청에 따라 멤버/보조관리자 제외)
-      if (item.id === 'payroll') return isSuperAdmin || isAdmin;
-
-      // 3. 결재센터 - 최고관리자, 기업관리자, 보조관리자 전용
-      if (item.id === 'approvals') {
-        if (isMember) return false; // 일반 직원은 '결재내역' 메뉴를 별도로 보여줌
-        return true;
-      }
-
-      return true;
-    });
+  const getCommonMenu = () => {
+    if (isSystemAdmin) return [];
+    const menu = [...commonMenuItems];
+    if (isMember) {
+      menu.push({ id: 'approvals-track', title: '내 결재 진행상태', icon: '📋', href: '/dashboard/approvals' });
+    }
+    return menu;
   };
 
-  const currentMenu = getFilteredMenu();
-  
-  // 멤버를 위한 '결재내역' 추가 (필요시)
-  const finalMenu = [...currentMenu];
-  if (isMember && !finalMenu.some(m => m.id === 'approvals-track')) {
-    finalMenu.push({ id: 'approvals-track', title: '결재내역', icon: '📋', href: '/dashboard/approvals' });
-  }
+  const getManagementMenu = () => {
+    if (isSystemAdmin) return systemMenuItems;
+    
+    if (isSuperAdmin || isAdmin) {
+      return managementMenuItems;
+    }
+    
+    if (isSubAdmin) {
+      return managementMenuItems.filter(i => i.id === 'approvals');
+    }
+    
+    return [];
+  };
+
+  const commonMenu = getCommonMenu();
+  const managementMenu = getManagementMenu();
 
   return (
     <>
-      {/* Mobile Overlay */}
       <div 
         className={`${styles.overlay} ${isOpen ? styles.show : ''}`} 
         onClick={onClose}
@@ -92,8 +95,8 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
       
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ''}`}>
         <div className={styles.logo}>
-          <div className={styles.logoIcon}>OM</div>
-          <span className={styles.logoText}>OrgMgt</span>
+          <div className={styles.logoIcon}>HF</div>
+          <span className={styles.logoText}>HR FLOW</span>
           {isOpen && (
             <button onClick={onClose} style={{ marginLeft: 'auto', fontSize: '1.2rem' }} className="lg:hidden">
               ✕
@@ -101,18 +104,52 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
           )}
         </div>
 
-        <nav className={styles.nav}>
-          {finalMenu.map((item) => (
-            <Link 
-              key={item.id} 
-              href={item.href}
-              className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
-              onClick={onClose}
-            >
-              <span className={styles.icon}>{item.icon}</span>
-              <span className={styles.title}>{item.title}</span>
-            </Link>
-          ))}
+        <nav className={`flex-1 overflow-y-auto w-full ${styles.nav}`}>
+          {/* 공통 메뉴 (system_admin 제외) */}
+          {commonMenu.length > 0 && (
+            <div className="mb-8 w-full">
+              {commonMenu.map((item) => (
+                <Link 
+                  key={item.id} 
+                  href={item.href}
+                  className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
+                  onClick={onClose}
+                >
+                  <span className={styles.icon}>{item.icon}</span>
+                  <span className={styles.title}>{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+
+          {/* 시스템 관리자용 메인 라벨 */}
+          {isSystemAdmin && (
+            <div className="px-6 mb-2">
+              <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">System Admin</p>
+            </div>
+          )}
+
+          {/* 관리자 및 시스템 메뉴 영역 */}
+          {managementMenu.length > 0 && (
+            <div className="w-full">
+              {!isSystemAdmin && (
+                <div className="px-6 mb-3 mt-4">
+                  <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] uppercase">Management</p>
+                </div>
+              )}
+              {managementMenu.map((item) => (
+                <Link 
+                  key={item.id} 
+                  href={item.href}
+                  className={`${styles.navItem} ${pathname === item.href ? styles.active : ''}`}
+                  onClick={onClose}
+                >
+                  <span className={styles.icon}>{item.icon}</span>
+                  <span className={styles.title}>{item.title}</span>
+                </Link>
+              ))}
+            </div>
+          )}
         </nav>
 
         <div className={styles.sidebarFooter}>
