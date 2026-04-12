@@ -22,15 +22,18 @@ import {
   List,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Edit2
 } from 'lucide-react';
-import { format, startOfMonth, addMonths, parseISO } from 'date-fns';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { updateRequestFields } from '@/lib/api';
 
 export default function ExpensesDashboard() {
   const { profile } = useAuth();
   const [expenses, setExpenses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'INSIGHTS' | 'LIST'>('INSIGHTS');
   
   // States for analytics
@@ -48,6 +51,7 @@ export default function ExpensesDashboard() {
   const [date, setDate] = useState(format(today, 'yyyy-MM-dd'));
   const [submitting, setSubmitting] = useState(false);
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
+  const [existingEvidenceUrl, setExistingEvidenceUrl] = useState<string>('');
 
   const fetchExpenses = async () => {
     if (!profile) return;
@@ -78,15 +82,35 @@ export default function ExpensesDashboard() {
     fetchExpenses();
   }, [profile?.company_id, profile?.role]);
 
+  const openAppModal = (expense?: any) => {
+    if (expense) {
+      setEditingId(expense.id);
+      setAmount(expense.amount.toString());
+      setCategory(expense.category);
+      setDescription(expense.description);
+      setDate(expense.date);
+      setExistingEvidenceUrl(expense.evidence_url || '');
+    } else {
+      setEditingId(null);
+      setAmount('');
+      setCategory('식비');
+      setDescription('');
+      setDate(format(new Date(), 'yyyy-MM-dd'));
+      setExistingEvidenceUrl('');
+    }
+    setEvidenceFile(null);
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     
     setSubmitting(true);
     try {
-      let evidenceUrl = '';
+      let evidenceUrl = existingEvidenceUrl;
       
-      // 1. 파일 업로드 (있을 경우)
+      // 1. 파일 업로드 (새 파일이 있을 경우 덮어쓰기)
       if (evidenceFile) {
         const fileExt = evidenceFile.name.split('.').pop();
         const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
@@ -98,23 +122,34 @@ export default function ExpensesDashboard() {
         evidenceUrl = fileName;
       }
 
-      // 2. 요청 제출
-      const { error } = await supabase
-        .from('expense_requests')
-        .insert([{
+      // 2. 요청 제출 (수정 vs 생성)
+      if (editingId) {
+        await updateRequestFields('expense', editingId, {
           amount: Number(amount),
           category,
           description,
           title: description.substring(0, 20),
           date,
-          status: 'PENDING',
-          user_id: profile.id,
-          user_name: profile.full_name,
-          company_id: profile.company_id,
           evidence_url: evidenceUrl
-        }]);
+        });
+      } else {
+        const { error } = await supabase
+          .from('expense_requests')
+          .insert([{
+            amount: Number(amount),
+            category,
+            description,
+            title: description.substring(0, 20),
+            date,
+            status: 'PENDING',
+            user_id: profile.id,
+            user_name: profile.full_name,
+            company_id: profile.company_id,
+            evidence_url: evidenceUrl
+          }]);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
       
       setShowModal(false);
       setAmount('');
@@ -196,7 +231,7 @@ export default function ExpensesDashboard() {
 
         <div className="flex flex-col sm:flex-row items-center gap-4">
            <button 
-            onClick={() => setShowModal(true)}
+            onClick={() => openAppModal()}
             className="flex items-center gap-4 px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px]"
            >
               <PlusCircle className="w-5 h-5" />
@@ -309,6 +344,7 @@ export default function ExpensesDashboard() {
                 <th className="px-10 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50">Applicant</th>
                 <th className="px-10 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-center">Status</th>
                 <th className="px-10 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-right">Value (KRW)</th>
+                <th className="px-10 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-50 text-right">Manage</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
@@ -346,11 +382,21 @@ export default function ExpensesDashboard() {
                   <td className="px-10 py-7 text-right text-lg font-black text-slate-900 tracking-tighter italic">
                     ₩ {Number(e.amount || 0).toLocaleString()}
                   </td>
+                  <td className="px-10 py-7 text-right">
+                    {(e.status === 'PENDING' || e.status === 'SUB_APPROVED') && (profile?.id === e.user_id || ['super_admin','admin'].includes(profile?.role || '')) && (
+                      <button 
+                        onClick={() => openAppModal(e)}
+                        className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 hover:border-indigo-200 transition-all ml-auto opacity-0 group-hover/row:opacity-100 shadow-sm"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {filteredExpenses.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="py-20 text-center text-slate-300 font-bold uppercase text-xs italic tracking-widest">No matching records found</td>
+                  <td colSpan={6} className="py-20 text-center text-slate-300 font-bold uppercase text-xs italic tracking-widest">No matching records found</td>
                 </tr>
               )}
             </tbody>

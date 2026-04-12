@@ -14,6 +14,7 @@ const menuItems = [
   { id: 'leaves', title: '휴가신청', icon: '🏖️', href: '/dashboard/leaves' },
   { id: 'payroll', title: '급여 관리', icon: '💵', href: '/dashboard/payroll' },
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
+  { id: 'certificates', title: '증명서 발급', icon: '📄', href: '/dashboard/certificates' },
 ];
 
 const systemMenuItems = [

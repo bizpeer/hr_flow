@@ -366,3 +366,77 @@ export const updateRequestStatus = async (
   return data;
 };
 
+export const updateRequestFields = async (
+  type: 'expense' | 'leave',
+  id: string,
+  updates: any
+) => {
+  const table = type === 'expense' ? 'expense_requests' : 'leave_requests';
+  const { data, error } = await supabase
+    .from(table)
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data;
+};
+
+// --- Announcements API ---
+
+export interface Announcement {
+  id: string;
+  created_at: string;
+  title: string;
+  content: string;
+  user_id: string;
+  author_name: string;
+  company_id: string;
+}
+
+export const getAnnouncements = async (companyId: string): Promise<Announcement[]> => {
+  const { data, error } = await supabase
+    .from('announcements')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false })
+    .limit(50); // Get recent announcements
+
+  if (error && error.code !== '42P01') { // Ignore relation does not exist before SQL is run
+    console.error('getAnnouncements error:', error);
+  }
+  return data || [];
+};
+
+export const createAnnouncement = async (announcement: Partial<Announcement>): Promise<Announcement> => {
+  const { data, error } = await supabase
+    .from('announcements')
+    .insert([announcement])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const updateAnnouncement = async (id: string, updates: Partial<Announcement>) => {
+  const { data, error } = await supabase
+    .from('announcements')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const deleteAnnouncement = async (id: string) => {
+  const { error } = await supabase
+    .from('announcements')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw error;
+};

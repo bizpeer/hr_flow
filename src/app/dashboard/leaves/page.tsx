@@ -1,11 +1,13 @@
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock, Edit2 } from 'lucide-react';
+import { updateRequestFields } from '@/lib/api';
 
 export default function LeavesPage() {
   const { profile } = useAuth();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   
   // Date Range State
   const today = new Date();
@@ -51,28 +53,51 @@ export default function LeavesPage() {
     fetchLeaves();
   }, [profile?.company_id, profile?.role]);
 
+  const openAppModal = (leave?: any) => {
+    if (leave) {
+      setEditingId(leave.id);
+      setStartDate(leave.start_date);
+      setEndDate(leave.end_date);
+      setType(leave.type);
+      setReason(leave.reason);
+    } else {
+      setEditingId(null);
+      setStartDate(format(new Date(), 'yyyy-MM-dd'));
+      setEndDate(format(new Date(), 'yyyy-MM-dd'));
+      setType('연차');
+      setReason('');
+    }
+    setShowModal(true);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
     try {
-      const { error } = await supabase.from('leave_requests').insert([{
-        start_date: startDate,
-        end_date: endDate,
-        type,
-        reason,
-        status: 'PENDING',
-        company_id: profile.company_id,
-        user_id: profile.id,
-      }]);
+      if (editingId) {
+        await updateRequestFields('leave', editingId, {
+          start_date: startDate,
+          end_date: endDate,
+          type,
+          reason,
+        });
+      } else {
+        const { error } = await supabase.from('leave_requests').insert([{
+          start_date: startDate,
+          end_date: endDate,
+          type,
+          reason,
+          status: 'PENDING',
+          company_id: profile.company_id,
+          user_id: profile.id,
+        }]);
+        if (error) throw error;
+      }
 
-      if (error) throw error;
       setShowModal(false);
-      setStartDate(format(new Date(), 'yyyy-MM-dd'));
-      setEndDate(format(new Date(), 'yyyy-MM-dd'));
-      setReason('');
       fetchLeaves();
     } catch (error) {
-      alert('신청 중 오류가 발생했습니다.');
+      alert('저장 중 오류가 발생했습니다.');
     }
   };
 
@@ -122,7 +147,7 @@ export default function LeavesPage() {
               />
            </div>
            <button 
-            onClick={() => setShowModal(true)}
+            onClick={() => openAppModal()}
             className="flex items-center gap-4 px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-emerald-600 transition-all uppercase tracking-widest text-[11px]"
            >
               <Plus className="w-5 h-5" />
@@ -156,16 +181,17 @@ export default function LeavesPage() {
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">사유</th>
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">신청자</th>
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">상태</th>
+                <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">관리</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-bold italic tracking-widest animate-pulse">데이터를 불러오는 중...</td></tr>
+                <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold italic tracking-widest animate-pulse">데이터를 불러오는 중...</td></tr>
               ) : filteredLeaves.length === 0 ? (
-                <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-bold uppercase text-xs tracking-widest italic">기록이 없습니다</td></tr>
+                <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold uppercase text-xs tracking-widest italic">기록이 없습니다</td></tr>
               ) : (
                 filteredLeaves.map((leave) => (
-                  <tr key={leave.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={leave.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-10 py-6">
                       <div className="space-y-1">
                         <span className="text-xs font-black text-slate-900">{leave.type}</span>
@@ -175,6 +201,16 @@ export default function LeavesPage() {
                     <td className="px-10 py-6 text-sm font-bold text-slate-700">{leave.reason}</td>
                     <td className="px-10 py-6 text-xs font-black text-slate-900 uppercase tracking-widest">{leave.profiles?.full_name}</td>
                     <td className="px-10 py-6">{getStatusBadge(leave.status)}</td>
+                    <td className="px-10 py-6 text-right">
+                       {(leave.status === 'PENDING' || leave.status === 'SUB_APPROVED') && (profile?.id === leave.user_id || ['super_admin','admin'].includes(profile?.role || '')) && (
+                          <button 
+                            onClick={() => openAppModal(leave)}
+                            className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all ml-auto opacity-0 group-hover:opacity-100 shadow-sm"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                       )}
+                    </td>
                   </tr>
                 ))
               )}
