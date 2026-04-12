@@ -36,7 +36,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const role = profile?.role || 'member';
+  const role = (profile?.role || 'member').toLowerCase();
   const isSystemAdmin = role === 'system_admin';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
