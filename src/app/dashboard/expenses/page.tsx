@@ -34,8 +34,9 @@ export default function ExpensesDashboard() {
   const [viewMode, setViewMode] = useState<'INSIGHTS' | 'LIST'>('INSIGHTS');
   
   // States for analytics
-  const initialStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const initialEnd = format(addMonths(parseISO(initialStart), 1), 'yyyy-MM-dd');
+  const today = new Date();
+  const initialStart = format(startOfMonth(today), 'yyyy-MM-dd');
+  const initialEnd = format(endOfMonth(today), 'yyyy-MM-dd');
   const [startDate, setStartDate] = useState(initialStart);
   const [endDate, setEndDate] = useState(initialEnd);
   const [searchQuery, setSearchQuery] = useState('');
@@ -44,19 +45,21 @@ export default function ExpensesDashboard() {
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('식비');
   const [description, setDescription] = useState('');
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [date, setDate] = useState(format(today, 'yyyy-MM-dd'));
   const [submitting, setSubmitting] = useState(false);
+  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
 
   const fetchExpenses = async () => {
     if (!profile) return;
     setLoading(true);
     try {
-      const isSuperAdmin = profile.role === 'super_admin';
+      const role = profile.role || 'member';
+      const isManagement = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role);
       let query = supabase
         .from('expense_requests')
         .select('*, profiles(full_name)');
       
-      if (!isSuperAdmin) {
+      if (!isManagement) {
         query = query.eq('company_id', profile.company_id);
       }
 
@@ -81,6 +84,21 @@ export default function ExpensesDashboard() {
     
     setSubmitting(true);
     try {
+      let evidenceUrl = '';
+      
+      // 1. 파일 업로드 (있을 경우)
+      if (evidenceFile) {
+        const fileExt = evidenceFile.name.split('.').pop();
+        const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('expense-evidence')
+          .upload(fileName, evidenceFile);
+          
+        if (uploadError) throw new Error('증빙 서류 업로드 실패: ' + uploadError.message);
+        evidenceUrl = fileName;
+      }
+
+      // 2. 요청 제출
       const { error } = await supabase
         .from('expense_requests')
         .insert([{
@@ -92,7 +110,8 @@ export default function ExpensesDashboard() {
           status: 'PENDING',
           user_id: profile.id,
           user_name: profile.full_name,
-          company_id: profile.company_id
+          company_id: profile.company_id,
+          evidence_url: evidenceUrl
         }]);
 
       if (error) throw error;
@@ -100,6 +119,7 @@ export default function ExpensesDashboard() {
       setShowModal(false);
       setAmount('');
       setDescription('');
+      setEvidenceFile(null);
       fetchExpenses();
     } catch (error: any) {
       alert('신청 실패: ' + error.message);
@@ -114,7 +134,9 @@ export default function ExpensesDashboard() {
     const dateMatch = e.date >= startDate && e.date <= endDate;
     
     // Non-admin can only see their own
-    const ownershipMatch = (['super_admin', 'admin', 'sub_admin'].includes(profile?.role || '')) || e.user_id === profile?.id;
+    const role = profile?.role || 'member';
+    const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
+    const ownershipMatch = isManagement || e.user_id === profile?.id;
     
     return dateMatch && (nameMatch || descMatch) && ownershipMatch;
   });
@@ -139,7 +161,8 @@ export default function ExpensesDashboard() {
     link.click();
   };
 
-  const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(profile?.role || '');
+  const role = profile?.role || 'member';
+  const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
 
   if (loading) {
     return (
@@ -385,21 +408,27 @@ export default function ExpensesDashboard() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
-                <textarea 
-                  value={description} 
-                  onChange={(e) => setDescription(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm h-32 outline-none focus:ring-4 focus:ring-indigo-100 resize-none"
-                  placeholder="지출 사유를 구체적으로 입력하세요"
-                  required 
-                />
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Evidence Attachment (Option)</label>
+                <div className="relative">
+                  <input 
+                    type="file" 
+                    onChange={(e) => setEvidenceFile(e.target.files?.[0] || null)}
+                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-indigo-100"
+                    accept="image/*,application/pdf"
+                  />
+                  {evidenceFile && (
+                    <p className="mt-2 text-[10px] font-bold text-emerald-600 ml-1 italic">
+                      ✓ {evidenceFile.name} 선택됨
+                    </p>
+                  )}
+                </div>
               </div>
               <button 
                 type="submit" 
                 disabled={submitting}
                 className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px]"
               >
-                {submitting ? 'Submitting...' : 'Submit Request'}
+                {submitting ? 'Submitting...' : 'Submit 지출결의'}
               </button>
             </form>
           </div>

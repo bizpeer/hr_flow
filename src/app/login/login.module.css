@@ -121,6 +121,11 @@
   gap: 0.5rem;
 }
 
+.linkContainer {
+  margin-top: 1rem;
+  text-align: right;
+}
+
 .link {
   color: var(--primary);
   font-weight: 700;
@@ -129,8 +134,11 @@
   transition: var(--transition);
   position: relative;
   z-index: 10;
-  padding: 0.5rem;
-  margin: -0.5rem;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
 }
 
 .link:hover {

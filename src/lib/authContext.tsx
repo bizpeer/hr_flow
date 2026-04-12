@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           id: userId,
           full_name: '시스템 관리자',
           email: email,
-          role: 'super_admin',
-          company_id: '',
+          role: 'system_admin',
+          company_id: null,
           companies: { name: '시스템관리자' }
         } as any);
         return;

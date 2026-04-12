@@ -3,7 +3,7 @@ import { supabase } from './supabase';
 export interface Profile {
   id: string;
   full_name: string;
-  role: 'super_admin' | 'admin' | 'sub_admin' | 'member';
+  role: 'system_admin' | 'super_admin' | 'admin' | 'sub_admin' | 'member';
   company_id: string;
   department?: string;
   position?: string;
@@ -295,7 +295,8 @@ export const getTeams = async (companyId?: string): Promise<Team[]> => {
   return data || [];
 };
 
-export const createDivision = async (name: string, companyId: string): Promise<Division> => {
+export const createDivision = async (name: string, companyId: string | null): Promise<Division> => {
+  if (!companyId) throw new Error('조직을 생성할 회사 정보가 없습니다. 관리자에게 문의해 주세요.');
   const { data, error } = await supabase
     .from('divisions')
     .insert([{ name, company_id: companyId }])
@@ -313,7 +314,8 @@ export const deleteDivision = async (id: string) => {
   if (error) throw error;
 };
 
-export const createTeam = async (name: string, divisionId: string, companyId: string): Promise<Team> => {
+export const createTeam = async (name: string, divisionId: string, companyId: string | null): Promise<Team> => {
+  if (!companyId) throw new Error('팀을 생성할 회사 정보가 없습니다. 관리자에게 문의해 주세요.');
   const { data, error } = await supabase
     .from('teams')
     .insert([{ name, division_id: divisionId, company_id: companyId }])

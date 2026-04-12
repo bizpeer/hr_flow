@@ -11,7 +11,7 @@ const menuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
   { id: 'approvals', title: '결재 센터', icon: '🛡️', href: '/dashboard/approvals' },
   { id: 'expenses', title: '지출결의', icon: '💰', href: '/dashboard/expenses' },
-  { id: 'leaves', title: '휴가관리', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'leaves', title: '휴가신청', icon: '🏖️', href: '/dashboard/leaves' },
   { id: 'payroll', title: '급여 관리', icon: '💵', href: '/dashboard/payroll' },
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
 ];
@@ -28,11 +28,12 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
   const router = useRouter();
   const { user, profile } = useAuth();
 
-  const isSystemAdmin = user?.email === 'bizpeer@gmail.com';
   const role = profile?.role || 'member';
+  const isSystemAdmin = role === 'system_admin';
   const isSuperAdmin = role === 'super_admin';
   const isAdmin = role === 'admin';
   const isSubAdmin = role === 'sub_admin';
+  const isMember = role === 'member';
 
   const userData = {
     email: user?.email,
@@ -50,6 +51,35 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
     router.push('/login');
     router.refresh();
   };
+
+  // 필터링된 메뉴 생성
+  const getFilteredMenu = () => {
+    if (isSystemAdmin) return systemMenuItems;
+
+    return menuItems.filter(item => {
+      // 1. 조직관리 - 최고관리자, 기업관리자 전용
+      if (item.id === 'organization') return isSuperAdmin || isAdmin;
+      
+      // 2. 급여관리 - 최고관리자, 기업관리자 전용 (사용자 요청에 따라 멤버/보조관리자 제외)
+      if (item.id === 'payroll') return isSuperAdmin || isAdmin;
+
+      // 3. 결재센터 - 최고관리자, 기업관리자, 보조관리자 전용
+      if (item.id === 'approvals') {
+        if (isMember) return false; // 일반 직원은 '결재내역' 메뉴를 별도로 보여줌
+        return true;
+      }
+
+      return true;
+    });
+  };
+
+  const currentMenu = getFilteredMenu();
+  
+  // 멤버를 위한 '결재내역' 추가 (필요시)
+  const finalMenu = [...currentMenu];
+  if (isMember && !finalMenu.some(m => m.id === 'approvals-track')) {
+    finalMenu.push({ id: 'approvals-track', title: '결재내역', icon: '📋', href: '/dashboard/approvals' });
+  }
 
   return (
     <>
@@ -71,7 +101,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
         </div>
 
         <nav className={styles.nav}>
-          {(isSystemAdmin ? systemMenuItems : menuItems).map((item) => (
+          {finalMenu.map((item) => (
             <Link 
               key={item.id} 
               href={item.href}

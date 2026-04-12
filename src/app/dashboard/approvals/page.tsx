@@ -41,8 +41,15 @@ export default function ApprovalCenter() {
   const [expenseRequests, setExpenseRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const role = profile?.role || 'member';
+  const isSystemAdmin = role === 'system_admin';
+  const isSuperAdmin = role === 'super_admin';
+  const isAdmin = role === 'admin';
+  const isSubAdmin = role === 'sub_admin';
+  const isMember = role === 'member';
+
   // Filters
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('ALL');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
   const [selectedTeam, setSelectedTeam] = useState<string>('ALL');
@@ -60,27 +67,25 @@ export default function ApprovalCenter() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const isSuperAdmin = profile.role === 'super_admin';
         const companyId = profile.company_id;
 
         const [divs, tms, profilesRes] = await Promise.all([
           getDivisions(companyId),
           getTeams(companyId),
-          isSuperAdmin 
-            ? supabase.from('profiles').select('*')
-            : supabase.from('profiles').select('*').eq('company_id', companyId)
+          supabase.from('profiles').select('*').eq('company_id', companyId)
         ]);
         
         setDivisions(divs);
         setTeams(tms);
         setAllProfiles(profilesRes.data || []);
 
-        let leavesQuery = supabase.from('leave_requests').select('*, profiles(full_name)');
-        let expensesQuery = supabase.from('expense_requests').select('*, profiles(full_name)');
+        let leavesQuery = supabase.from('leave_requests').select('*, profiles(full_name)').eq('company_id', companyId);
+        let expensesQuery = supabase.from('expense_requests').select('*, profiles(full_name)').eq('company_id', companyId);
 
-        if (!isSuperAdmin) {
-          leavesQuery = leavesQuery.eq('company_id', companyId);
-          expensesQuery = expensesQuery.eq('company_id', companyId);
+        // 멤버는 자신의 신청 건만 조회
+        if (isMember) {
+          leavesQuery = leavesQuery.eq('user_id', profile.id);
+          expensesQuery = expensesQuery.eq('user_id', profile.id);
         }
 
         const [leavesRes, expensesRes] = await Promise.all([
@@ -100,11 +105,8 @@ export default function ApprovalCenter() {
     fetchData();
 
     // Real-time 업데이트 설정
-    const isSuperAdmin = profile.role === 'super_admin';
     const companyId = profile.company_id;
-    
-    // super_admin은 필터 없이, 일반 사용자는 company_id 필터 적용
-    const filter = !isSuperAdmin && companyId ? `company_id=eq.${companyId}` : undefined;
+    const filter = `company_id=eq.${companyId}`;
 
     const channel = supabase.channel('approvals_realtime')
       .on('postgres_changes', { 
@@ -122,10 +124,10 @@ export default function ApprovalCenter() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [profile?.company_id, profile?.role]);
+  }, [profile?.company_id, profile?.role, isMember]);
 
   const handleUpdateStatus = async (type: 'expense' | 'leave', id: string, newStatus: any) => {
-    if (!profile) return;
+    if (!profile || isMember) return;
     
     const actionText = newStatus === 'SUB_APPROVED' ? '1차 승인' : 
                       newStatus === 'APPROVED' ? '최종 승인' : 
@@ -135,7 +137,6 @@ export default function ApprovalCenter() {
     
     try {
       await updateRequestStatus(type, id, newStatus);
-      // Data will refresh via real-time channel
     } catch (err: any) {
       alert('상태 업데이트 실패: ' + err.message);
     }
@@ -156,15 +157,15 @@ export default function ApprovalCenter() {
       const userTeamId = req.team_id || applicantProfile?.team_id;
       const userDivId = req.division_id || teams.find(t => t.id === userTeamId)?.division_id;
 
-      const divMatch = selectedDivision === 'ALL' || userDivId === selectedDivision;
-      const teamMatch = selectedTeam === 'ALL' || userTeamId === selectedTeam;
+      const divMatch = isMember || selectedDivision === 'ALL' || userDivId === selectedDivision;
+      const teamMatch = isMember || selectedTeam === 'ALL' || userTeamId === selectedTeam;
 
       // 4. Name Search
       const nameMatch = !searchQuery || req.profiles?.full_name?.toLowerCase().includes(searchQuery.toLowerCase());
 
       // 5. sub_admin Security: Only show their own division
-      if (profile?.role === 'sub_admin') {
-        const subAdminTeam = teams.find(t => t.id === profile.team_id);
+      if (isSubAdmin) {
+        const subAdminTeam = teams.find(t => t.id === profile?.team_id);
         if (userDivId !== subAdminTeam?.division_id) return false;
       }
 
@@ -189,7 +190,7 @@ export default function ApprovalCenter() {
       <div className="flex-1 flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">결재 센터 정보를 불러오는 중...</p>
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-xs animate-pulse">결재 정보를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -205,10 +206,12 @@ export default function ApprovalCenter() {
               <ShieldCheck className="w-8 h-8" />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">Approval Center</h1>
+              <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">
+                {isMember ? 'Status Check' : 'Approval Center'}
+              </h1>
               <p className="text-slate-500 font-medium text-sm mt-1 uppercase tracking-widest flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
-                Workflow Management Engine
+                {isMember ? 'My Request Progress' : 'Workflow Management Engine'}
               </p>
             </div>
           </div>
@@ -383,7 +386,7 @@ export default function ApprovalCenter() {
                       >
                         <Search className="w-4 h-4" />
                       </button>
-                      {(req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || '')) ) && (
+                      {!isMember && (req.status === 'PENDING' || (req.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || '')) ) && (
                         <div className="flex gap-2">
                           <button 
                             onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', req.id, ['super_admin', 'admin'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED')}
@@ -435,6 +438,35 @@ export default function ApprovalCenter() {
                 <DetailBox label="Category" value={activeTab === 'LEAVE' ? selectedRequest.type : selectedRequest.category} highlight />
                 <DetailBox label="Amount/Period" value={activeTab === 'LEAVE' ? `${selectedRequest.start_date} ~ ${selectedRequest.end_date}` : `₩ ${(selectedRequest.amount || 0).toLocaleString()}`} highlight />
               </div>
+              
+              {/* 지출 증빙 이미지 표시 (있을 경우) */}
+              {activeTab === 'EXPENSE' && selectedRequest.evidence_url && (
+                <div className="space-y-2">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Evidence Attachment</p>
+                  <div className="relative aspect-video bg-slate-100 rounded-2xl overflow-hidden border border-slate-200">
+                     {selectedRequest.evidence_url.toLowerCase().endsWith('.pdf') ? (
+                       <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-500 font-bold">
+                         PDF DOCUMENT (Download below)
+                       </div>
+                     ) : (
+                       <img 
+                        src={supabase.storage.from('expense-evidence').getPublicUrl(selectedRequest.evidence_url).data.publicUrl} 
+                        alt="Evidence" 
+                        className="w-full h-full object-cover"
+                       />
+                     )}
+                     <a 
+                      href={supabase.storage.from('expense-evidence').getPublicUrl(selectedRequest.evidence_url).data.publicUrl} 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl text-[10px] font-black uppercase text-slate-900 shadow-lg hover:bg-slate-900 hover:text-white transition-all"
+                     >
+                       Open Full Size
+                     </a>
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Description / Reason</p>
                 <p className="text-slate-800 font-bold leading-relaxed">{selectedRequest.reason || selectedRequest.description || 'No additional details provided.'}</p>
@@ -442,7 +474,7 @@ export default function ApprovalCenter() {
             </div>
             <div className="p-10 pt-4 bg-slate-50/50 flex gap-4">
               <button onClick={() => setSelectedRequest(null)} className="flex-1 py-4 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl uppercase text-[11px]">Close</button>
-              {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || ''))) && (
+              {!isMember && (selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && ['super_admin', 'admin'].includes(profile?.role || ''))) && (
                 <button 
                   onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leave' : 'expense', selectedRequest.id, ['super_admin', 'admin'].includes(profile?.role || '') ? 'APPROVED' : 'SUB_APPROVED'); setSelectedRequest(null); }}
                   className="flex-[2] py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase text-[11px]"

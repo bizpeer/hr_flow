@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/authContext';
 import { 
@@ -43,11 +44,23 @@ import {
 } from '@/lib/api';
 
 export default function OrganizationManagement() {
-  const { profile } = useAuth();
+  const { profile, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [members, setMembers] = useState<Profile[]>([]);
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 권한 체크: 시스템 관리자 또는 권한 없는 사용자는 접근 불가
+  useEffect(() => {
+    if (!authLoading) {
+      if (profile?.role === 'system_admin') {
+        router.replace('/dashboard/system');
+      } else if (profile && !['super_admin', 'admin'].includes(profile.role)) {
+        router.replace('/dashboard');
+      }
+    }
+  }, [profile, authLoading, router]);
   
   // Selection
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);

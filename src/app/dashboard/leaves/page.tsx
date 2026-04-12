@@ -1,9 +1,5 @@
-'use client';
-
-import { useState, useEffect } from 'react';
-import { getLeaves, createLeave, Leave } from '@/lib/api';
-import { useAuth } from '@/lib/authContext';
-import styles from './leaves.module.css';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export default function LeavesPage() {
   const { profile } = useAuth();
@@ -11,9 +7,13 @@ export default function LeavesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   
+  // Date Range State
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(format(today, 'yyyy-MM'));
+
   // New Leave Form State
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(format(today, 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(format(today, 'yyyy-MM-dd'));
   const [type, setType] = useState('연차');
   const [reason, setReason] = useState('');
 
@@ -24,8 +24,22 @@ export default function LeavesPage() {
     }
     setLoading(true);
     try {
-      const data = await getLeaves(profile.company_id || undefined);
-      setLeaves(data);
+      // API call or direct Supabase query
+      const role = profile.role || 'member';
+      const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
+      
+      let query = supabase
+        .from('leave_requests')
+        .select('*, profiles(full_name)')
+        .eq('company_id', profile.company_id);
+      
+      if (!isManagement) {
+        query = query.eq('user_id', profile.id);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+      if (error) throw error;
+      setLeaves(data || []);
     } catch (error) {
       console.error('Failed to fetch leaves:', error);
     } finally {
@@ -41,7 +55,7 @@ export default function LeavesPage() {
     e.preventDefault();
     if (!profile) return;
     try {
-      await createLeave({
+      const { error } = await supabase.from('leave_requests').insert([{
         start_date: startDate,
         end_date: endDate,
         type,
@@ -49,10 +63,12 @@ export default function LeavesPage() {
         status: 'PENDING',
         company_id: profile.company_id,
         user_id: profile.id,
-      });
+      }]);
+
+      if (error) throw error;
       setShowModal(false);
-      setStartDate('');
-      setEndDate('');
+      setStartDate(format(new Date(), 'yyyy-MM-dd'));
+      setEndDate(format(new Date(), 'yyyy-MM-dd'));
       setReason('');
       fetchLeaves();
     } catch (error) {
@@ -60,65 +76,105 @@ export default function LeavesPage() {
     }
   };
 
+  const filteredLeaves = leaves.filter(leave => {
+    const leaveMonth = format(new Date(leave.start_date), 'yyyy-MM');
+    // 신청일 기준 혹은 시작일 기준으로 필터링 가능 (여기서는 시작일 기준)
+    return leaveMonth === selectedMonth;
+  });
+
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'APPROVED': return <span className={`${styles.badge} ${styles.approved}`}>승인됨</span>;
-      case 'REJECTED': return <span className={`${styles.badge} ${styles.rejected}`}>반려됨</span>;
-      default: return <span className={`${styles.badge} ${styles.pending}`}>대기중</span>;
+      case 'APPROVED': return <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100 flex items-center gap-1.5 w-fit"><CheckCircle className="w-3 h-3" /> 승인됨</span>;
+      case 'SUB_APPROVED': return <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black border border-indigo-100 flex items-center gap-1.5 w-fit"><CheckCircle className="w-3 h-3" /> 1차승인</span>;
+      case 'REJECTED': return <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black border border-rose-100 flex items-center gap-1.5 w-fit"><XCircle className="w-3 h-3" /> 반려됨</span>;
+      default: return <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black border border-amber-100 flex items-center gap-1.5 w-fit"><Clock className="w-3 h-3" /> 대기중</span>;
     }
   };
 
   return (
-    <div className={styles.container}>
-      <div className={styles.header}>
-        <div>
-          <h1 className={styles.title}>휴가 관리</h1>
-          <p className={styles.subtitle}>남은 휴가 일수를 확인하고 새로운 휴가를 신청하세요.</p>
+    <div className="max-w-7xl mx-auto space-y-12 pb-20">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
+        <div className="space-y-4">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 bg-emerald-600 rounded-[2rem] text-white flex items-center justify-center shadow-2xl">
+              <Calendar className="w-8 h-8" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">휴가신청</h1>
+              <p className="text-slate-500 font-medium text-sm mt-1 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Leave & Absence Management
+              </p>
+            </div>
+          </div>
         </div>
-        <button className={styles.addBtn} onClick={() => setShowModal(true)}>
-          + 휴가 신청하기
-        </button>
+
+        <div className="flex flex-col sm:flex-row items-center gap-4">
+           <div className="bg-white p-1.5 rounded-[2rem] shadow-xl border border-slate-100 flex items-center gap-4 pr-6">
+              <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+                <Filter className="w-4 h-4" />
+              </div>
+              <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent border-none outline-none font-black text-xs text-slate-900 tracking-widest uppercase cursor-pointer"
+              />
+           </div>
+           <button 
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-4 px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-emerald-600 transition-all uppercase tracking-widest text-[11px]"
+           >
+              <Plus className="w-5 h-5" />
+              <span>신청하기</span>
+           </button>
+        </div>
       </div>
 
-      <div className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>총 연차</span>
-          <span className={styles.statValue}>15일</span>
-        </div>
-        <div className={styles.statCard}>
-          <span className={styles.statLabel}>사용 휴가</span>
-          <span className={styles.statValue}>5.5일</span>
-        </div>
-        <div className={`${styles.statCard} ${styles.highlight}`}>
-          <span className={styles.statLabel}>잔여 휴가</span>
-          <span className={styles.statValue}>9.5일</span>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <StatCard label="총 연차" value="15.0" />
+        <StatCard label="사용 휴가" value="5.5" />
+        <StatCard label="잔여 휴가" value="9.5" highlight />
       </div>
 
-      <div className={styles.contentCard}>
-        <h2 className={styles.sectionTitle}>최근 휴가 신청 내역</h2>
-        <div className={styles.tableContainer}>
-          <table className={styles.table}>
+      <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
+        <div className="p-10 border-b border-slate-50 flex items-center gap-5">
+           <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center">
+              <FileText className="w-7 h-7" />
+           </div>
+           <div>
+              <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">My Leave Records</h2>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction History for {selectedMonth}</p>
+           </div>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-separate border-spacing-0">
             <thead>
-              <tr>
-                <th>유형</th>
-                <th>기간</th>
-                <th>사유</th>
-                <th>상태</th>
+              <tr className="bg-slate-50/50">
+                <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">유형 / 기간</th>
+                <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">사유</th>
+                <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">신청자</th>
+                <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">상태</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-slate-50">
               {loading ? (
-                <tr><td colSpan={4} className={styles.loading}>로딩 중...</td></tr>
-              ) : leaves.length === 0 ? (
-                <tr><td colSpan={4} className={styles.empty}>신청 내역이 없습니다.</td></tr>
+                <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-bold italic tracking-widest animate-pulse">데이터를 불러오는 중...</td></tr>
+              ) : filteredLeaves.length === 0 ? (
+                <tr><td colSpan={4} className="py-20 text-center text-slate-300 font-bold uppercase text-xs tracking-widest italic">기록이 없습니다</td></tr>
               ) : (
-                leaves.map((leave) => (
-                  <tr key={leave.id}>
-                    <td><span className={styles.leaveType}>{leave.type}</span></td>
-                    <td>{leave.start_date} ~ {leave.end_date}</td>
-                    <td>{leave.reason}</td>
-                    <td>{getStatusBadge(leave.status)}</td>
+                filteredLeaves.map((leave) => (
+                  <tr key={leave.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-10 py-6">
+                      <div className="space-y-1">
+                        <span className="text-xs font-black text-slate-900">{leave.type}</span>
+                        <p className="text-[10px] font-bold text-slate-400">{leave.start_date} ~ {leave.end_date}</p>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-sm font-bold text-slate-700">{leave.reason}</td>
+                    <td className="px-10 py-6 text-xs font-black text-slate-900 uppercase tracking-widest">{leave.profiles?.full_name}</td>
+                    <td className="px-10 py-6">{getStatusBadge(leave.status)}</td>
                   </tr>
                 ))
               )}
@@ -128,23 +184,31 @@ export default function LeavesPage() {
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay}>
-          <div className={styles.modal}>
-            <h2 className={styles.modalTitle}>휴가 신청</h2>
-            <form onSubmit={handleSubmit} className={styles.form}>
-              <div className={styles.inputGrid}>
-                <div className={styles.inputGroup}>
-                  <label>시작일</label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-10 pb-6 flex justify-between items-center bg-slate-50">
+              <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">New Absence Request</h2>
+              <button 
+                onClick={() => setShowModal(false)}
+                className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500"
+              >
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSubmit} className="p-10 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">시작일</label>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100" required />
                 </div>
-                <div className={styles.inputGroup}>
-                  <label>종료일</label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required />
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">종료일</label>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100" required />
                 </div>
               </div>
-              <div className={styles.inputGroup}>
-                <label>휴가 유형</label>
-                <select value={type} onChange={(e) => setType(e.target.value)}>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">유형</label>
+                <select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100 appearance-none">
                   <option>연차</option>
                   <option>반차 (오전)</option>
                   <option>반차 (오후)</option>
@@ -152,23 +216,38 @@ export default function LeavesPage() {
                   <option>경조사</option>
                 </select>
               </div>
-              <div className={styles.inputGroup}>
-                <label>사유</label>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">사유</label>
                 <textarea 
                   value={reason} 
                   onChange={(e) => setReason(e.target.value)} 
-                  placeholder="상세 사유를 입력하세요"
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm h-32 outline-none focus:ring-4 focus:ring-emerald-100 resize-none"
+                  placeholder="구체적인 사유를 입력하세요"
                   required 
                 />
               </div>
-              <div className={styles.modalFooter}>
-                <button type="button" className={styles.cancelBtn} onClick={() => setShowModal(false)}>취on취소</button>
-                <button type="submit" className={styles.submitBtn}>신청하기</button>
-              </div>
+              <button type="submit" className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px]">제출하기</button>
             </form>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, highlight = false }: any) {
+  return (
+    <div className={`p-10 rounded-[3rem] border shadow-sm relative overflow-hidden group transition-all duration-500 hover:-translate-y-1 ${highlight ? 'bg-slate-900 border-slate-900 ring-4 ring-slate-900/10' : 'bg-white border-slate-100 hover:border-emerald-200'}`}>
+      <div className="space-y-2 relative z-10">
+        <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${highlight ? 'text-emerald-400' : 'text-slate-400'}`}>{label}</p>
+        <div className="flex items-baseline gap-2">
+          <span className={`text-5xl font-black tracking-tighter ${highlight ? 'text-white' : 'text-slate-900'}`}>{value}</span>
+          <span className={`text-xs font-black uppercase tracking-widest ${highlight ? 'text-emerald-500' : 'text-slate-300'}`}>Days</span>
+        </div>
+      </div>
+      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200'}`}>
+        <Calendar className="w-24 h-24" />
+      </div>
     </div>
   );
 }
