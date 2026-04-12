@@ -1,3 +1,7 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
   /* Colors - Premium Light Mode (Slate/Indigo) */
   --primary: #4f46e5;
