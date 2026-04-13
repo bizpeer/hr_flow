@@ -86,8 +86,16 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Registration Error:', error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('Registration Error:', error);
+    
+    // 데이터베이스 에러나 Auth 에러의 상세 메시지를 추출
+    const errorMessage = error.message || 'Unknown error occurred during registration';
+    
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      details: error.details || null,
+      code: error.code || null
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
     });

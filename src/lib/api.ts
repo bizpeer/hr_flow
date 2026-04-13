@@ -148,8 +148,16 @@ export const registerStaff = async (staffData: {
   });
 
   if (error) {
-    console.error('Edge Function Error:', error);
-    throw new Error(`${error.message || 'Unknown error occurred during registration'}`);
+    console.error('Edge Function Error Details:', error);
+    // 에지 함수 응답 본문에서 상세 메시지 추출 시도
+    let detailedMessage = error.message;
+    if (error.context && typeof error.context.json === 'function') {
+      try {
+        const body = await error.context.json();
+        detailedMessage = body.error || detailedMessage;
+      } catch (e) {}
+    }
+    throw new Error(detailedMessage || 'Unknown error occurred during registration');
   }
   return data;
 };
@@ -315,6 +323,17 @@ export const deleteDivision = async (id: string) => {
   if (error) throw error;
 };
 
+export const updateDivision = async (id: string, name: string) => {
+  const { data, error } = await supabase
+    .from('divisions')
+    .update({ name })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+};
+
 export const createTeam = async (name: string, divisionId: string, companyId: string | null): Promise<Team> => {
   if (!companyId) throw new Error('팀을 생성할 회사 정보가 없습니다. 관리자에게 문의해 주세요.');
   const { data, error } = await supabase
@@ -332,6 +351,17 @@ export const deleteTeam = async (id: string) => {
     .delete()
     .eq('id', id);
   if (error) throw error;
+};
+
+export const updateTeam = async (id: string, name: string) => {
+  const { data, error } = await supabase
+    .from('teams')
+    .update({ name })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 };
 
 export const setLeader = async (userId: string, type: 'division' | 'team', status: boolean) => {

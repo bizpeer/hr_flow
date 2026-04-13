@@ -3,12 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { Search, UserPlus, Shield, Trash2, Plus, Clock, Users, User, X, ArrowRight } from 'lucide-react';
+import { Search, UserPlus, Shield, Trash2, Plus, Clock, Users, User, X, ArrowRight, Edit2, Save } from 'lucide-react';
 import { 
   Profile, Division, Team, 
   getDivisions, getTeams, fetchCompanyUsers, 
-  createDivision, deleteDivision, 
-  createTeam, deleteTeam, setLeader, updateMemberProfile
+  createDivision, deleteDivision, updateDivision,
+  createTeam, deleteTeam, updateTeam, setLeader, updateMemberProfile
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
@@ -24,16 +24,20 @@ export default function OrganizationManagement() {
   // 모달 상태
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const [selectedMemberForAssign, setSelectedMemberForAssign] = useState<Profile | null>(null);
   const [selectedTeamForAssign, setSelectedTeamForAssign] = useState('');
   
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; type: 'team' | 'division' } | null>(null);
+  const [editTarget, setEditTarget] = useState<{ id: string; type: 'team' | 'division'; name: string } | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
 
   // 폼 상태
   const [newDivName, setNewDivName] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [selectedDivForTeam, setSelectedDivForTeam] = useState('');
+  const [editName, setEditName] = useState('');
 
   // 권한 체크
   useEffect(() => {
@@ -73,20 +77,38 @@ export default function OrganizationManagement() {
   const handleCreateDivision = async () => {
     if (!newDivName.trim() || !profile) return;
     try {
+      setLoading(true);
       await createDivision(newDivName, profile.company_id);
       setNewDivName('');
-      fetchData();
-    } catch (e: any) { alert(e.message); }
+      await fetchData(); // 최신 목록 즉시 갱신
+    } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   };
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim() || !selectedDivForTeam || !profile) return;
     try {
+      setLoading(true);
       await createTeam(newTeamName, selectedDivForTeam, profile.company_id);
       setNewTeamName('');
       setIsTeamModalOpen(false);
-      fetchData();
-    } catch (e: any) { alert(e.message); }
+      await fetchData();
+    } catch (e: any) { alert(e.message); } finally { setLoading(false); }
+  };
+
+  const handleUpdateOrganization = async () => {
+    if (!editTarget || !editName.trim()) return;
+    try {
+      setLoading(true);
+      if (editTarget.type === 'division') {
+        await updateDivision(editTarget.id, editName);
+      } else {
+        await updateTeam(editTarget.id, editName);
+      }
+      setIsEditModalOpen(false);
+      setEditTarget(null);
+      await fetchData();
+      alert('정보가 성공적으로 수정되었습니다.');
+    } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   };
 
   const handleAssignTeam = async () => {
@@ -112,7 +134,7 @@ export default function OrganizationManagement() {
     try {
       setLoading(true);
       await updateMemberProfile(memberId, {
-        team_id: undefined // This will be handled as null in Postgres if the column allows
+        team_id: undefined 
       });
       fetchData();
     } catch (e: any) {
@@ -120,14 +142,6 @@ export default function OrganizationManagement() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeleteDivision = (id: string) => {
-    setDeleteTarget({ id, type: 'division' });
-  };
-
-  const handleDeleteTeam = (id: string) => {
-    setDeleteTarget({ id, type: 'team' });
   };
 
   const executeDelete = async () => {
@@ -194,27 +208,10 @@ export default function OrganizationManagement() {
         </div>
       </div>
 
-      {/* 2. 보안 제어판 (Dark Banner) */}
-      <div className="bg-[#0f172a] rounded-[2rem] p-6 lg:p-8 flex flex-col md:flex-row items-center justify-between shadow-xl">
-        <div className="flex items-center gap-5">
-          <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400">
-            <Shield className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-white font-bold text-lg">시스템 마스터 제어판</h2>
-            <p className="text-slate-400 text-sm">부관리자 임명 및 시스템 전역 보안 설정을 관리할 수 있습니다.</p>
-          </div>
-        </div>
-        <button className="mt-4 md:mt-0 px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-rose-400 font-bold text-sm flex items-center gap-2 hover:bg-rose-500/10 transition-colors">
-          <Trash2 className="w-4 h-4" />
-          전체 이력 삭제
-        </button>
-      </div>
-
-      {/* 3. 메인 콘텐츠 (Grid) */}
+      {/* 2. 메인 콘텐츠 (Grid) */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         
-        {/* 본부 구성 (Left Side) */}
+        {/* 본부 구성 (Left Side) - 수정 버튼 추가 */}
         <div className="xl:col-span-4 bg-white rounded-[2rem] border border-slate-200 p-6 shadow-sm overflow-hidden flex flex-col h-[700px]">
           <div className="flex items-center justify-between mb-8 px-2">
             <div className="flex items-center gap-3">
@@ -248,12 +245,20 @@ export default function OrganizationManagement() {
                       <Users className="w-4 h-4 text-slate-400" />
                       <span className="font-bold">{div.name}</span>
                     </div>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteDivision(div.id); }}
-                      className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all p-1"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button 
+                            onClick={() => { setEditTarget({id: div.id, type: 'division', name: div.name}); setEditName(div.name); setIsEditModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                        >
+                            <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                            onClick={() => setDeleteTarget({ id: div.id, type: 'division' })}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                    </div>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1">
@@ -272,7 +277,7 @@ export default function OrganizationManagement() {
           </div>
         </div>
 
-        {/* 소속 팀 관리 (Right Side) */}
+        {/* 소속 팀 관리 (Right Side) - 수정 버튼 추가 */}
         <div className="xl:col-span-8 bg-slate-50/50 rounded-[2rem] flex flex-col">
           <div className="flex items-center justify-between p-6">
             <h2 className="text-lg font-bold text-slate-800 px-2">소속 팀 및 팀원 배정</h2>
@@ -305,9 +310,6 @@ export default function OrganizationManagement() {
                       <ArrowRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-all" />
                     </button>
                   ))}
-                  {unassignedMembers.length === 0 && (
-                    <p className="text-sm text-slate-400 font-medium">모든 구성원이 팀에 배치되었습니다.</p>
-                  )}
                 </div>
               </div>
 
@@ -318,14 +320,22 @@ export default function OrganizationManagement() {
                 const teamLeader = teamMembers.find(m => m.is_team_leader);
 
                 return (
-                  <div key={team.id} className="bg-white rounded-[2rem] border border-slate-100 p-6 flex flex-col shadow-sm">
+                  <div key={team.id} className="bg-white rounded-[2rem] border border-slate-100 p-6 flex flex-col shadow-sm group">
                     <div className="flex items-start justify-between mb-2">
                       <span className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-lg border border-indigo-100">
                         {division?.name || '소속 없음'}
                       </span>
-                      <button onClick={() => handleDeleteTeam(team.id)} className="text-slate-300 hover:text-rose-500">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1 opacity-10 md:opacity-0 group-hover:opacity-100 transition-all">
+                        <button 
+                            onClick={() => { setEditTarget({id: team.id, type: 'team', name: team.name}); setEditName(team.name); setIsEditModalOpen(true); }}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"
+                        >
+                            <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => setDeleteTarget({ id: team.id, type: 'team' })} className="p-1.5 text-slate-400 hover:text-rose-500 transition-colors">
+                            <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                     <h3 className="text-xl font-bold text-slate-800 mb-6">{team.name}</h3>
                     
@@ -340,22 +350,17 @@ export default function OrganizationManagement() {
                           <span className="text-xs font-bold text-slate-400">미지정</span>
                         )}
                       </div>
-
                       <div>
                         <div className="text-[10px] text-slate-400 font-medium mb-3 uppercase tracking-widest">구성원 ({teamMembers.length})</div>
                         <div className="flex flex-wrap gap-2">
                           {teamMembers.map(m => (
                             <div key={m.id} className="px-3 py-1.5 rounded-full border border-slate-100 bg-slate-50 text-xs font-medium text-slate-600 flex items-center gap-2 group relative">
                               {m.full_name}
-                              <button 
-                                onClick={() => handleRemoveFromTeam(m.id)}
-                                className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"
-                              >
+                              <button onClick={() => handleRemoveFromTeam(m.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all">
                                 <X className="w-3 h-3" />
                               </button>
                             </div>
                           ))}
-                          {teamMembers.length === 0 && <p className="text-[10px] text-slate-300 italic">구성원이 없습니다.</p>}
                         </div>
                       </div>
                     </div>
@@ -367,6 +372,36 @@ export default function OrganizationManagement() {
         </div>
       </div>
       
+      {/* 4. Edit Modal (Division / Team) */}
+      {isEditModalOpen && editTarget && (
+        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[110] p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
+            <h2 className="text-xl font-black text-slate-900 mb-6 uppercase tracking-tight">명칭 수정</h2>
+            <div className="space-y-4 mb-8">
+              <div>
+                <label className="text-[10px] font-black text-slate-500 mb-2 block uppercase tracking-widest">
+                  기존 {editTarget.type === 'division' ? '본부' : '팀'}명: <span className="text-indigo-600">{editTarget.name}</span>
+                </label>
+                <input 
+                  type="text" 
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-sm outline-none focus:ring-4 focus:ring-indigo-100"
+                  placeholder="변경할 이름을 입력하세요"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setIsEditModalOpen(false)} className="flex-1 py-4 bg-slate-100 text-slate-600 font-bold rounded-2xl hover:bg-slate-200 uppercase text-xs tracking-widest">취소</button>
+              <button onClick={handleUpdateOrganization} className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-slate-900 transition-colors uppercase text-xs tracking-widest flex items-center justify-center gap-2">
+                <Save className="w-4 h-4" />
+                적용하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Team Create Modal */}
       {isTeamModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
