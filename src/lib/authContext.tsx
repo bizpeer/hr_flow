@@ -76,17 +76,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
 
         // DB에서 가져온 role을 소문자/공백제거하여 표준화
-        const rawRole = (data.role || 'member').toString().trim().toLowerCase();
+        const rawRole = (data.role || (user?.user_metadata?.role) || 'member').toString().trim().toLowerCase();
 
         const formattedProfile = {
           ...data,
-          role: rawRole, // 표준화된 역할 저장
+          role: rawRole,
           companies: data.companies || { name: '회사 정보 없음' },
           division_id
         };
         
         console.log('[Auth] Profile loaded successfully:', { email, role: rawRole });
         setProfile(formattedProfile as any);
+      } else {
+        // 데이터는 없지만 사용자는 있는 경우 (회원가입 직후 등) 메타데이터 활용
+        const metaRole = (user?.user_metadata?.role || 'member').toString().trim().toLowerCase();
+        setProfile({
+          id: userId,
+          email: email,
+          role: metaRole,
+          full_name: user?.user_metadata?.full_name || '사용자',
+          company_id: user?.user_metadata?.company_id
+        } as any);
       }
     } catch (error) {
       console.error('[Auth] Critical crash in fetchProfile:', error);
@@ -144,8 +154,19 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || currentUser?.id !== user?.id) {
         setUser(currentUser);
         if (currentUser) {
-          // SIGNED_IN 직후에는 데이터 생성 지연이 빈번하므로 fetchProfile 내부 재시도 로직에 맡김
-          await fetchProfile(currentUser.id, currentUser.email);
+          // 메타데이터만으로도 우선 권한을 설정하여 화면 전환이 즉시 일어나게 함
+          const metaRole = (currentUser.user_metadata?.role || 'member').toString().trim().toLowerCase();
+          setProfile(prev => ({
+            ...prev,
+            id: currentUser.id,
+            email: currentUser.email,
+            role: metaRole,
+            full_name: currentUser.user_metadata?.full_name || '사용자',
+            company_id: currentUser.user_metadata?.company_id
+          } as any));
+
+          // 백그라운드에서 DB 정보 업데이트 (비성능 저하 방지)
+          fetchProfile(currentUser.id, currentUser.email);
         } else {
           setProfile(null);
         }
