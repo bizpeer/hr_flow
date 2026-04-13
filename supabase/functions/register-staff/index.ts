@@ -20,6 +20,12 @@ serve(async (req) => {
       throw new Error('Missing environment variables');
     }
 
+    // Manual JWT Verification
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing Authorization header');
+    }
+
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
     const { 
