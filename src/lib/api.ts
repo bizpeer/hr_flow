@@ -149,15 +149,27 @@ export const registerStaff = async (staffData: {
 
   if (error) {
     console.error('Edge Function Error Details:', error);
-    // 에지 함수 응답 본문에서 상세 메시지 추출 시도
-    let detailedMessage = error.message;
+    let detailedMessage = '등록 중 알 수 없는 오류가 발생했습니다.';
+    
+    // 에러 객체의 상세 정보 추출 (Supabase FunctionsError 전용)
+    if (error.message && !error.message.includes('non-2xx')) {
+      detailedMessage = error.message;
+    }
+
+    // 서버가 보낸 JSON 본문 파싱 시도
     if (error.context && typeof error.context.json === 'function') {
       try {
         const body = await error.context.json();
-        detailedMessage = body.error || detailedMessage;
-      } catch (e) {}
+        if (body && body.error) {
+          detailedMessage = body.error;
+          if (body.details) detailedMessage += ` (${body.details})`;
+        }
+      } catch (e) {
+        console.error('Failed to parse error body:', e);
+      }
     }
-    throw new Error(detailedMessage || 'Unknown error occurred during registration');
+    
+    throw new Error(detailedMessage);
   }
   return data;
 };

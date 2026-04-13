@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { 
   Search, UserPlus, Shield, Edit2, Trash2, 
-  Users, User, X, Mail, MapPin, CreditCard, Heart, Plus, Save
+  Users, User, X, Mail, MapPin, CreditCard, Heart, Plus, Save, Calendar
 } from 'lucide-react';
 import { 
   Profile, fetchCompanyUsers, registerStaff, updateMemberProfile 
@@ -25,11 +25,15 @@ export default function HRManagement() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
 
-  // 등록 폼 상태
+  // 오늘 날짜 기본값 (YYYY-MM-DD)
+  const today = new Date().toISOString().split('T')[0];
+
+  // 등록 폼 상태 - hireDate 추가
   const [newStaff, setNewStaff] = useState({
     fullName: '',
     email: '',
-    tempPassword: ''
+    tempPassword: '',
+    hireDate: today
   });
 
   // 상세 정보 폼 상태
@@ -85,9 +89,10 @@ export default function HRManagement() {
       });
       alert('직원이 성공적으로 등록되었습니다.');
       setIsEnrollModalOpen(false);
-      setNewStaff({ fullName: '', email: '', tempPassword: '' });
+      setNewStaff({ fullName: '', email: '', tempPassword: '', hireDate: today });
       fetchData();
     } catch (e: any) {
+      // 이제 e.message에 "이미 가입된 이메일" 등 상세 내용이 표시됩니다.
       alert('등록 실패: ' + e.message);
     } finally {
       setLoading(false);
@@ -235,19 +240,12 @@ export default function HRManagement() {
                   </td>
                 </tr>
               ))}
-              {filteredMembers.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center text-slate-400 font-medium italic">
-                    일치하는 구성원이 없습니다.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* 3. 등록 모달 */}
+      {/* 3. 등록 모달 - hireDate 필드 추가 */}
       {isEnrollModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-in zoom-in-95">
@@ -266,7 +264,7 @@ export default function HRManagement() {
                     value={newStaff.fullName}
                     onChange={e => setNewStaff({...newStaff, fullName: e.target.value})}
                     placeholder="실명을 입력하세요"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all font-bold"
                   />
                 </div>
               </div>
@@ -283,17 +281,31 @@ export default function HRManagement() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">임시 비밀번호</label>
-                <div className="relative">
-                   <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                   <input 
-                    type="text" 
-                    value={newStaff.tempPassword}
-                    onChange={e => setNewStaff({...newStaff, tempPassword: e.target.value})}
-                    placeholder="최소 6자 이상"
-                    className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
-                  />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">근무시작일</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="date" 
+                      value={newStaff.hireDate}
+                      onChange={e => setNewStaff({...newStaff, hireDate: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">임시 비밀번호</label>
+                  <div className="relative">
+                    <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={newStaff.tempPassword}
+                      onChange={e => setNewStaff({...newStaff, tempPassword: e.target.value})}
+                      placeholder="최소 6자"
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-12 pr-4 py-3.5 text-xs outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -386,9 +398,6 @@ export default function HRManagement() {
                       </button>
                     </div>
                   ))}
-                  {detailForm.familyData.length === 0 && (
-                    <p className="text-xs text-slate-400 text-center py-6 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-100">등록된 가족 정보가 없습니다.</p>
-                  )}
                 </div>
               </div>
             </div>
