@@ -261,6 +261,15 @@ export const fetchCompanyUsers = async (companyId?: string): Promise<Profile[]> 
   return data || [];
 };
 
+export const adminUpdateRole = async (userId: string, newRole: string) => {
+  const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+    body: { action: 'update-role', userId, newRole },
+  });
+
+  if (error) throw error;
+  return data;
+};
+
 export const adminResetPassword = async (userId: string, tempPassword: string) => {
   // 실제 비밀번호 초기화는 관리자 권한이 있는 Edge Function을 통해 수행
   const { data, error } = await supabase.functions.invoke('admin-manage-user', {

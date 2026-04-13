@@ -77,6 +77,48 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
+    } else if (action === 'update-role') {
+      const { newRole } = body;
+      if (!newRole) {
+        return new Response(JSON.stringify({ error: 'New role is required' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+
+      console.log(`Updating role to ${newRole} for user: ${userId}`);
+
+      // 1. Update Auth Metadata
+      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        user_metadata: { role: newRole }
+      });
+
+      if (authError) {
+        console.error('Auth Role Update Error:', authError);
+        return new Response(JSON.stringify({ error: authError.message }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+
+      // 2. Update Profile Table
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId);
+
+      if (profileError) {
+        console.error('Profile Role Update Error:', profileError);
+        return new Response(JSON.stringify({ error: profileError.message }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, message: `Role updated to ${newRole}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     } else {
       return new Response(JSON.stringify({ error: `Unsupported action: ${action}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
