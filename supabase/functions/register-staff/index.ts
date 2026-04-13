@@ -45,7 +45,8 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: { 
         full_name: fullName,
-        company_id: companyId
+        company_id: companyId,
+        role: role || 'member'
       }
     });
 
