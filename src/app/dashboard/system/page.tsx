@@ -165,7 +165,7 @@ export default function SystemAdminPage() {
 
     setIsDeleting(true);
     try {
-      // 1. 비밀번호 확인 (재로그인 시도)
+      // 1. 관리자 권한 최종 확인 (비밀번호 재검증)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('인증 정보가 없습니다.');
 
@@ -175,22 +175,22 @@ export default function SystemAdminPage() {
       });
 
       if (authError) {
-        alert('비밀번호가 일치하지 않습니다.');
+        alert('관리자 보안 인증에 실패했습니다.');
         setIsDeleting(false);
         return;
       }
 
-      // 2. 삭제 API 호출
-      const { adminDeleteCompany } = await import('@/lib/api');
+      // 2. 통합 삭제 API 호출 (인증 계정 + DB 데이터)
+      console.log(`Starting full deletion for company: ${deleteConfirmCompany.name}`);
       await adminDeleteCompany(deleteConfirmCompany.id);
       
-      alert('기업 및 모든 연관 데이터가 성공적으로 삭제되었습니다.');
+      alert(`[${deleteConfirmCompany.name}] 기업과 관련된 모든 인증 계정 및 데이터가 영구적으로 삭제되었습니다.`);
       setDeleteConfirmCompany(null);
       setAdminPassword('');
       loadData();
     } catch (error: any) {
-      console.error('Delete failed:', error);
-      alert('삭제 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+      console.error('Full delete failed:', error);
+      alert('삭제 중 치명적인 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
     } finally {
       setIsDeleting(false);
     }

@@ -280,20 +280,21 @@ export const adminResetPassword = async (userId: string, tempPassword: string) =
   return data;
 };
 
-export const adminDeleteCompany = async (companyId: string, adminPassword?: string) => {
-  // 1. 보안을 위해 클라이언트 사이드에서 직접 삭제 시도
-  // 주의: 이 작업을 위해선 SQL에서 'System Admin can delete companies' RLS 정책이 설정되어 있어야 합니다.
-  const { data, error } = await supabase
-    .from('companies')
-    .delete()
-    .eq('id', companyId)
-    .select();
+export const adminDeleteCompany = async (companyId: string) => {
+  const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+    body: { action: 'delete-company', companyId },
+  });
 
-  if (error) {
-    console.error('Database delete failed:', error);
-    throw new Error('데이터베이스 삭제에 실패했습니다: ' + error.message);
-  }
+  if (error) throw error;
+  return data;
+};
 
+export const adminDeleteUser = async (userId: string) => {
+  const { data, error } = await supabase.functions.invoke('admin-manage-user', {
+    body: { action: 'delete-user', userId },
+  });
+
+  if (error) throw error;
   return data;
 };
 
