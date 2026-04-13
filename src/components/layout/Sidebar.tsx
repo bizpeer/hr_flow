@@ -20,7 +20,7 @@ const managementMenuItems = [
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
   { id: 'payroll', title: '급여 및 연봉 관리', icon: '💵', href: '/dashboard/payroll' },
   { id: 'expenses-all', title: '지출결의 통합 조회', icon: '📊', href: '/dashboard/expenses' },
-  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/organization' },
+  { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/hr' },
   { id: 'settings', title: '시스템 설정', icon: '⚙️', href: '/dashboard/settings' },
 ];
 
