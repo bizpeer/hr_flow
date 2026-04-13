@@ -8,6 +8,8 @@ import {
   updateCompanySettings, 
   fetchCompanyUsers, 
   adminResetPassword,
+  adminDeleteCompany,
+  adminDeleteUser,
   Company,
   Profile
 } from '@/lib/api';
