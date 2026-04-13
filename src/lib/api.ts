@@ -148,37 +148,28 @@ export const registerStaff = async (staffData: {
   });
 
   if (error) {
-    console.error('Edge Function Error Details:', error);
-    let detailedMessage = '등록 중 알 수 없는 오류가 발생했습니다.';
+    console.error('Edge Function Error Full Details:', error);
     
-    // 에러 객체의 상세 정보 추출 (Supabase FunctionsError 전용)
-    if (error.message && !error.message.includes('non-2xx')) {
-      detailedMessage = error.message;
-    }
-
-    // 서버가 보낸 본문 파싱 시도 (JSON 또는 Text)
+    let displayMessage = '등록 실패 사유:\n';
+    
+    // 서버가 보낸 본문 파싱 시도
     if (error.context) {
       try {
-        // 우선 JSON 시도
-        if (typeof error.context.json === 'function') {
-          const body = await error.context.clone().json();
-          if (body && body.error) {
-            detailedMessage = body.error;
-            if (body.details) detailedMessage += `\n\n상세내용: ${body.details}`;
-          }
-        }
+        const body = await error.context.clone().json();
+        displayMessage += JSON.stringify(body, null, 2);
       } catch (e) {
-        // JSON 실패 시 텍스트 시도
         try {
-          if (typeof error.context.text === 'function') {
-            const text = await error.context.clone().text();
-            if (text) detailedMessage = text;
-          }
-        } catch (e2) {}
+          const text = await error.context.clone().text();
+          displayMessage += text || error.message;
+        } catch (e2) {
+          displayMessage += error.message;
+        }
       }
+    } else {
+      displayMessage += error.message;
     }
     
-    throw new Error(detailedMessage);
+    throw new Error(displayMessage);
   }
   return data;
 };

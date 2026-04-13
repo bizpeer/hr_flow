@@ -55,7 +55,7 @@ serve(async (req) => {
 
     const userId = authData.user.id;
 
-    // 2. Create Profile in public.profiles
+    // 2. Create Profile in public.profiles (Safe handling of strings)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -63,9 +63,9 @@ serve(async (req) => {
         company_id: companyId,
         email: email,
         full_name: fullName,
-        role: role,
-        position: position || 'Professional',
-        department: department || 'General',
+        role: (role || 'member').toString().toLowerCase().trim(),
+        position: (position || 'Professional').toString().trim(),
+        department: (department || 'General').toString().trim(),
         resident_number: residentNumber,
         address: address,
         family_data: familyData || [],
