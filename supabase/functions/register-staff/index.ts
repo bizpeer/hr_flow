@@ -89,7 +89,12 @@ serve(async (req) => {
     console.error('Registration Error:', error);
     
     // 데이터베이스 에러나 Auth 에러의 상세 메시지를 추출
-    const errorMessage = error.message || 'Unknown error occurred during registration';
+    let errorMessage = error.message || 'Unknown error occurred during registration';
+    
+    // Postgres 에러 상세 정보가 있다면 추가
+    if (error.details) {
+      errorMessage += ` (Details: ${error.details})`;
+    }
     
     return new Response(JSON.stringify({ 
       error: errorMessage,

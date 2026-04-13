@@ -156,16 +156,25 @@ export const registerStaff = async (staffData: {
       detailedMessage = error.message;
     }
 
-    // 서버가 보낸 JSON 본문 파싱 시도
-    if (error.context && typeof error.context.json === 'function') {
+    // 서버가 보낸 본문 파싱 시도 (JSON 또는 Text)
+    if (error.context) {
       try {
-        const body = await error.context.json();
-        if (body && body.error) {
-          detailedMessage = body.error;
-          if (body.details) detailedMessage += ` (${body.details})`;
+        // 우선 JSON 시도
+        if (typeof error.context.json === 'function') {
+          const body = await error.context.clone().json();
+          if (body && body.error) {
+            detailedMessage = body.error;
+            if (body.details) detailedMessage += `\n\n상세내용: ${body.details}`;
+          }
         }
       } catch (e) {
-        console.error('Failed to parse error body:', e);
+        // JSON 실패 시 텍스트 시도
+        try {
+          if (typeof error.context.text === 'function') {
+            const text = await error.context.clone().text();
+            if (text) detailedMessage = text;
+          }
+        } catch (e2) {}
       }
     }
     
