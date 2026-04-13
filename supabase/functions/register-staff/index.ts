@@ -31,6 +31,7 @@ serve(async (req) => {
       residentNumber, 
       address, 
       familyData,
+      hireDate,
       position,
       department,
       teamId 
@@ -69,6 +70,7 @@ serve(async (req) => {
         address: address,
         family_data: familyData || [],
         team_id: teamId || null,
+        hire_date: hireDate || null,
         must_change_password: true
       });
 
