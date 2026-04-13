@@ -21,6 +21,11 @@ export interface Profile {
   family_data?: { name: string; birth: string }[];
   is_division_head?: boolean;
   is_team_leader?: boolean;
+  phone_number?: string;
+  hire_date?: string;
+  additional_annual_leave?: number;
+  status?: 'active' | 'suspended' | 'resigned';
+  resignation_date?: string;
   companies?: {
     name: string;
   };
@@ -141,6 +146,7 @@ export const registerStaff = async (staffData: {
   address?: string;
   familyData?: { name: string; birth: string }[];
   teamId?: string;
+  hireDate?: string;
 }) => {
   // Edge Function 호출
   const { data, error } = await supabase.functions.invoke('register-staff', {
