@@ -87,7 +87,7 @@ export interface PayrollRecord {
 
 export const getLeaves = async (companyId?: string): Promise<Leave[]> => {
   let query = supabase
-    .from('leaves')
+    .from('leave_requests')
     .select('*, profiles(full_name)');
   
   if (companyId) {
@@ -102,7 +102,7 @@ export const getLeaves = async (companyId?: string): Promise<Leave[]> => {
 
 export const createLeave = async (leaveData: Partial<Leave>): Promise<Leave> => {
   const { data, error } = await supabase
-    .from('leaves')
+    .from('leave_requests')
     .insert([leaveData])
     .select()
     .single();

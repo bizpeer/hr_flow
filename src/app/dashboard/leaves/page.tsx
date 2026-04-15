@@ -77,7 +77,14 @@ export default function LeavesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
+
+    if (new Date(endDate) < new Date(startDate)) {
+      alert('종료일은 시작일보다 빠를 수 없습니다.');
+      return;
+    }
+
     try {
+      setLoading(true);
       if (editingId) {
         await updateRequestFields('leave', editingId, {
           start_date: startDate,
@@ -100,8 +107,10 @@ export default function LeavesPage() {
 
       setShowModal(false);
       fetchLeaves();
-    } catch (error) {
-      alert('저장 중 오류가 발생했습니다.');
+    } catch (error: any) {
+      alert('저장 실패: ' + (error.message || '알 수 없는 오류가 발생했습니다.'));
+    } finally {
+      setLoading(false);
     }
   };
 
