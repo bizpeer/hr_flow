@@ -48,14 +48,18 @@ export interface Team {
 export interface Expense {
   id: string;
   created_at: string;
+  expense_date: string;
   amount: number;
   category: string;
   description: string;
+  details?: string;
+  attachment_url?: string;
   status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
   user_id: string;
   company_id: string;
   profiles?: {
     full_name: string;
+    team_id?: string;
   };
 }
 

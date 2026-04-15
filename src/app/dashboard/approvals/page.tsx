@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
-import { CheckSquare, XCircle, Clock, FileText, ChevronRight, Check, AlertCircle, X, Clock8 } from 'lucide-react';
+import { CheckSquare, XCircle, Clock, FileText, ChevronRight, Check, AlertCircle, X, Clock8, Paperclip } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { updateRequestStatus, calculateLeaveEntitlement, updateMemberProfile, updateRequestFields } from '@/lib/api';
 
@@ -239,12 +239,40 @@ export default function ApprovalsManagement() {
 
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-rose-500 uppercase tracking-widest">{req.status === 'SUB_APPROVED' ? 'REVIEWED' : 'PENDING'}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${
+                        req.status === 'SUB_APPROVED' ? 'text-indigo-500' : 'text-rose-500'
+                      }`}>
+                        {req.status === 'SUB_APPROVED' ? 'REVIEWED (1차승인)' : 'PENDING (대기중)'}
+                      </span>
                       <span className="text-[10px] text-slate-400 font-bold">{new Date(req.created_at).toISOString().split('T')[0]}</span>
                     </div>
                     <div className="text-lg font-bold text-slate-800 mb-1 line-clamp-1">
                       {req.description || req.reason || (activeTab === 'OVERTIME' ? `${req.date} 초과근무` : '제목 없음')}
                     </div>
+                    
+                    {/* 상세 내역 추가 */}
+                    {(req.details || req.attachment_url) && (
+                      <div className="flex flex-col gap-2 my-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        {req.details && (
+                          <p className="text-xs font-medium text-slate-500 flex items-start gap-2">
+                            <AlertCircle className="w-3.5 h-3.5 mt-0.5 text-slate-300" />
+                            {req.details}
+                          </p>
+                        )}
+                        {req.attachment_url && (
+                          <a 
+                            href={req.attachment_url} 
+                            target="_blank" 
+                            rel="noreferrer"
+                            className="text-[10px] font-bold text-indigo-600 flex items-center gap-1.5 hover:underline"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            첨부파일 확인하기
+                          </a>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
                       <div className="flex items-center gap-1.5">
                         <div className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center text-[8px] text-slate-400">
