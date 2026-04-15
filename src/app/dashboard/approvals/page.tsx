@@ -106,6 +106,30 @@ export default function ApprovalsManagement() {
 
   useEffect(() => {
     fetchRequests();
+
+    // 실시간 동기화 설정 (3종 테이블 통합 구독)
+    const channel = supabase
+      .channel('approval-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'expense_requests', filter: `company_id=eq.${profile?.company_id}` },
+        () => fetchRequests()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'leave_requests', filter: `company_id=eq.${profile?.company_id}` },
+        () => fetchRequests()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'overtime_requests', filter: `company_id=eq.${profile?.company_id}` },
+        () => fetchRequests()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.company_id, activeTab]);
 
   const handleApprove = async (request: any) => {

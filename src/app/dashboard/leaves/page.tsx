@@ -61,6 +61,28 @@ export default function LeavesPage() {
 
   useEffect(() => {
     fetchLeaves();
+
+    // 실시간 동기화 설정
+    const channel = supabase
+      .channel('leave-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE 모두 감지
+          schema: 'public',
+          table: 'leave_requests',
+          filter: `company_id=eq.${profile?.company_id}`
+        },
+        () => {
+          console.log('Realtime update detected in leaves');
+          fetchLeaves();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.company_id, profile?.role]);
 
   const openAppModal = (leave?: any) => {

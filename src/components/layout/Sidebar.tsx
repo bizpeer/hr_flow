@@ -9,7 +9,7 @@ import styles from './Layout.module.css';
 
 const commonMenuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
-  { id: 'leaves', title: '내 휴가 및 근태', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'leaves', title: '휴가 및 근태', icon: '🏖️', href: '/dashboard/leaves' },
   { id: 'overtime-req', title: '초과근무 신청', icon: '⏰', href: '/dashboard/overtime' },
   { id: 'expenses', title: '지출결의 신청', icon: '💰', href: '/dashboard/expenses' },
   { id: 'announcements', title: '공지사항 게시판', icon: '📢', href: '/dashboard' },

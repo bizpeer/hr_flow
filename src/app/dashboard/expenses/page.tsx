@@ -85,6 +85,25 @@ export default function ExpensesManagement() {
   useEffect(() => {
     if (!authLoading && profile) {
       fetchExpenses();
+
+      // 실시간 동기화 설정
+      const channel = supabase
+        .channel('expense-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'expense_requests',
+            filter: `company_id=eq.${profile?.company_id}`
+          },
+          () => fetchExpenses()
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
   }, [profile, authLoading, startDate, endDate]);
 
