@@ -85,6 +85,13 @@ export default function LeavesPage() {
 
     try {
       setLoading(true);
+      
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) {
+        alert('인증 세션이 만료되었습니다. 다시 로그인해주세요.');
+        return;
+      }
+
       if (editingId) {
         await updateRequestFields('leave', editingId, {
           start_date: startDate,
@@ -100,7 +107,7 @@ export default function LeavesPage() {
           reason,
           status: 'PENDING',
           company_id: profile.company_id,
-          user_id: profile.id,
+          user_id: authUser.id,
         }]);
         if (error) throw error;
       }
