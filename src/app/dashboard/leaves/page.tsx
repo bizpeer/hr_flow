@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { supabase } from '@/lib/supabase';
-import { Leave, updateRequestFields } from '@/lib/api';
+import { Leave, updateRequestFields, calculateLeaveEntitlement } from '@/lib/api';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock, Edit2 } from 'lucide-react';
+import { Calendar, Filter, Plus, FileText, CheckCircle, XCircle, Clock, Edit2, AlertCircle } from 'lucide-react';
+
 export default function LeavesPage() {
   const { profile } = useAuth();
   const [leaves, setLeaves] = useState<Leave[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   
   // Date Range State
   const today = new Date();
@@ -23,6 +25,11 @@ export default function LeavesPage() {
   const [type, setType] = useState('연차');
   const [reason, setReason] = useState('');
 
+  // Stats Calculation
+  const totalEntitlement = calculateLeaveEntitlement(profile?.hire_date || null, profile?.additional_annual_leave || 0);
+  const usedLeave = profile?.used_leave || 0;
+  const remainingLeave = totalEntitlement - usedLeave;
+
   const fetchLeaves = async () => {
     if (!profile) {
       setLoading(false);
@@ -30,7 +37,6 @@ export default function LeavesPage() {
     }
     setLoading(true);
     try {
-      // API call or direct Supabase query
       const role = profile.role || 'member';
       const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
       
@@ -83,8 +89,18 @@ export default function LeavesPage() {
       return;
     }
 
+    // 연차 사용 일수 계산
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const requestedDays = type.includes('반차') ? 0.5 : (Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+
+    if (requestedDays > remainingLeave && !editingId) {
+      alert(`잔여 연차가 부족합니다. (잔여: ${remainingLeave.toFixed(1)}일, 요청: ${requestedDays}일)`);
+      return;
+    }
+
     try {
-      setLoading(true);
+      setSubmitting(true);
       
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
@@ -114,16 +130,16 @@ export default function LeavesPage() {
 
       setShowModal(false);
       fetchLeaves();
+      alert('신청이 완료되었습니다.');
     } catch (error: any) {
       alert('저장 실패: ' + (error.message || '알 수 없는 오류가 발생했습니다.'));
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   const filteredLeaves = leaves.filter(leave => {
     const leaveMonth = format(new Date(leave.start_date), 'yyyy-MM');
-    // 신청일 기준 혹은 시작일 기준으로 필터링 가능 (여기서는 시작일 기준)
     return leaveMonth === selectedMonth;
   });
 
@@ -177,9 +193,9 @@ export default function LeavesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <StatCard label="총 연차" value="15.0" />
-        <StatCard label="사용 휴가" value="5.5" />
-        <StatCard label="잔여 휴가" value="9.5" highlight />
+        <StatCard label="총 연차" value={totalEntitlement.toFixed(1)} />
+        <StatCard label="사용 휴가" value={usedLeave.toFixed(1)} />
+        <StatCard label="잔여 휴가" value={remainingLeave.toFixed(1)} highlight />
       </div>
 
       <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden min-h-[400px]">
@@ -196,7 +212,7 @@ export default function LeavesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-separate border-spacing-0">
             <thead>
-              <tr className="bg-slate-50/50">
+              <tr className="bg-slate-50/50 dark:bg-white/5">
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">유형 / 기간</th>
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">사유</th>
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest">신청자</th>
@@ -204,7 +220,7 @@ export default function LeavesPage() {
                 <th className="px-10 py-7 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">관리</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50">
+            <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
               {loading ? (
                 <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold italic tracking-widest animate-pulse">데이터를 불러오는 중...</td></tr>
               ) : filteredLeaves.length === 0 ? (
@@ -212,16 +228,23 @@ export default function LeavesPage() {
               ) : (
                 filteredLeaves.map((leave) => (
                   <tr key={leave.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group text-slate-900 dark:text-slate-100">
-                    <td className="px-6 md:px-10 py-6 border-b border-slate-50 dark:border-slate-800">
+                    <td className="px-6 md:px-10 py-6">
                       <div className="space-y-1">
                         <span className="text-xs font-black">{leave.type}</span>
                         <p className="text-[10px] font-bold text-slate-400">{leave.start_date} ~ {leave.end_date}</p>
                       </div>
                     </td>
-                    <td className="px-6 md:px-10 py-6 text-sm font-bold border-b border-slate-50 dark:border-slate-800">{leave.reason}</td>
-                    <td className="px-6 md:px-10 py-6 text-xs font-black uppercase tracking-widest border-b border-slate-50 dark:border-slate-800">{leave.profiles?.full_name}</td>
-                    <td className="px-6 md:px-10 py-6 border-b border-slate-50 dark:border-slate-800">{getStatusBadge(leave.status)}</td>
-                    <td className="px-6 md:px-10 py-6 text-right border-b border-slate-50 dark:border-slate-800">
+                    <td className="px-6 md:px-10 py-6 text-sm font-bold">
+                      {leave.reason}
+                      {(leave as any).rejection_reason && (
+                        <p className="text-[10px] text-rose-500 font-black mt-2 inline-flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" /> 반려사유: {(leave as any).rejection_reason}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-6 md:px-10 py-6 text-xs font-black uppercase tracking-widest">{leave.profiles?.full_name}</td>
+                    <td className="px-6 md:px-10 py-6">{getStatusBadge(leave.status)}</td>
+                    <td className="px-6 md:px-10 py-6 text-right">
                        {(leave.status === 'PENDING' || leave.status === 'SUB_APPROVED') && (profile?.id === leave.user_id || ['super_admin','admin'].includes(profile?.role || '')) && (
                           <button 
                             onClick={() => openAppModal(leave)}
@@ -282,7 +305,9 @@ export default function LeavesPage() {
                   required 
                 />
               </div>
-              <button type="submit" className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px]">제출하기</button>
+              <button type="submit" disabled={submitting} className="w-full py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px] disabled:opacity-50">
+                {submitting ? '제출 중...' : '제출하기'}
+              </button>
             </form>
           </div>
         </div>
@@ -299,6 +324,15 @@ function StatCard({ label, value, highlight = false }: any) {
         <div className="flex items-baseline gap-2">
           <span className={`text-4xl md:text-5xl font-black tracking-tighter ${highlight ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{value}</span>
           <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest ${highlight ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`}>Days</span>
+        </div>
+      </div>
+      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200 dark:text-slate-700'}`}>
+        <Calendar className="w-16 h-16 md:w-24 md:h-24" />
+      </div>
+    </div>
+  );
+}
+' : 'text-slate-300 dark:text-slate-600'}`}>Days</span>
         </div>
       </div>
       <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200 dark:text-slate-700'}`}>

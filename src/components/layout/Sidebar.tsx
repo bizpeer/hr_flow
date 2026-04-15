@@ -10,6 +10,7 @@ import styles from './Layout.module.css';
 const commonMenuItems = [
   { id: 'dashboard', title: '대시보드', icon: '🏠', href: '/dashboard' },
   { id: 'leaves', title: '내 휴가 및 근태', icon: '🏖️', href: '/dashboard/leaves' },
+  { id: 'overtime-req', title: '초과근무 신청', icon: '⏰', href: '/dashboard/overtime' },
   { id: 'expenses', title: '지출결의 신청', icon: '💰', href: '/dashboard/expenses' },
   { id: 'announcements', title: '공지사항 게시판', icon: '📢', href: '/dashboard' },
   { id: 'certificates', title: '증명서 발급', icon: '📄', href: '/dashboard/certificates' },
@@ -18,6 +19,7 @@ const commonMenuItems = [
 const managementMenuItems = [
   { id: 'approvals', title: '결재/승인 관리함', icon: '🛡️', href: '/dashboard/approvals' },
   { id: 'organization', title: '조직관리', icon: '🏢', href: '/dashboard/organization' },
+  { id: 'overtime-all', title: '초과근무 현황/관리', icon: '⏱️', href: '/dashboard/overtime' },
   { id: 'payroll', title: '급여 및 연봉 관리', icon: '💵', href: '/dashboard/payroll' },
   { id: 'expenses-all', title: '지출결의 통합 조회', icon: '📊', href: '/dashboard/expenses' },
   { id: 'hr', title: '인사관리', icon: '👥', href: '/dashboard/hr' },
@@ -77,7 +79,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose
     }
     
     if (isSubAdmin) {
-      return managementMenuItems.filter(i => ['approvals', 'expenses-all'].includes(i.id));
+      return managementMenuItems.filter(i => ['approvals', 'expenses-all', 'overtime-all'].includes(i.id));
     }
     
     return [];

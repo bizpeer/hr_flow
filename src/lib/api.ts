@@ -26,6 +26,7 @@ export interface Profile {
   additional_annual_leave?: number;
   status?: 'active' | 'suspended' | 'resigned';
   resignation_date?: string;
+  used_leave?: number;
   companies?: {
     name: string;
   };
@@ -68,6 +69,23 @@ export interface Leave {
   status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
   user_id: string;
   company_id: string;
+  profiles?: {
+    full_name: string;
+  };
+}
+
+export interface Overtime {
+  id: string;
+  created_at: string;
+  date: string;
+  start_time: string;
+  end_time: string;
+  reason: string;
+  duration_hours: number;
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
+  user_id: string;
+  company_id: string;
+  rejection_reason?: string;
   profiles?: {
     full_name: string;
   };
@@ -493,4 +511,82 @@ export const deleteAnnouncement = async (id: string) => {
     .eq('id', id);
 
   if (error) throw error;
+};
+
+// --- Labor Law Utilities ---
+
+/**
+ * 한국 근로기준법에 따른 연차 산출
+ * - 1년 미만: 1개월 개근 시 1일 (최대 11일)
+ * - 1년 이상: 15일 기본 + 2년마다 1일 가산 (최대 25일)
+ */
+export const calculateLeaveEntitlement = (hireDateStr: string | null, additionalLeave: number = 0): number => {
+  if (!hireDateStr) return 15; // 기본값
+
+  const hireDate = new Date(hireDateStr);
+  const now = new Date();
+  
+  // 총 근속 개월 수 계산
+  const diffYears = now.getFullYear() - hireDate.getFullYear();
+  const diffMonths = now.getMonth() - hireDate.getMonth();
+  const totalMonths = diffYears * 12 + diffMonths;
+  const yearsOfService = Math.floor(totalMonths / 12);
+
+  if (yearsOfService < 1) {
+    // 1년 미만: 만근 시 1일씩 발생 (최대 11일)
+    return Math.min(Math.max(0, totalMonths), 11) + (additionalLeave || 0);
+  } else {
+    // 1년 이상: 15일 + (근속년수 - 1) / 2 가산
+    const extraLeave = Math.floor((yearsOfService - 1) / 2);
+    return Math.min(15 + extraLeave, 25) + (additionalLeave || 0);
+  }
+};
+
+/**
+ * 초과근무 시간 계산 (자정 경과 지원)
+ */
+export const calculateOvertimeDuration = (startTime: string, endTime: string): number => {
+  if (!startTime || !endTime) return 0;
+
+  const [startH, startM] = startTime.split(':').map(Number);
+  const [endH, endM] = endTime.split(':').map(Number);
+
+  let startTotalMinutes = startH * 60 + startM;
+  let endTotalMinutes = endH * 60 + endM;
+
+  if (endTotalMinutes <= startTotalMinutes) {
+    // 종료 시간이 시작 시간보다 같거나 작으면 자정을 넘긴 것으로 간주
+    endTotalMinutes += 24 * 60;
+  }
+
+  const diffMinutes = endTotalMinutes - startTotalMinutes;
+  return Math.round((diffMinutes / 60) * 10) / 10; // 소수점 첫째자리까지
+};
+
+// --- Overtime API ---
+
+export const getOvertimes = async (companyId?: string): Promise<Overtime[]> => {
+  let query = supabase
+    .from('overtime_requests')
+    .select('*, profiles(full_name)');
+  
+  if (companyId) {
+    query = query.eq('company_id', companyId);
+  }
+
+  const { data, error } = await query.order('created_at', { ascending: false });
+
+  if (error && error.code !== '42P01') throw error;
+  return data || [];
+};
+
+export const createOvertime = async (overtimeData: Partial<Overtime>): Promise<Overtime> => {
+  const { data, error } = await supabase
+    .from('overtime_requests')
+    .insert([overtimeData])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 };
