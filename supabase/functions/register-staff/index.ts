@@ -1,12 +1,11 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "supabase";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -17,17 +16,51 @@ serve(async (req) => {
     const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
     if (!supabaseUrl || !supabaseServiceRoleKey) {
-      throw new Error('Missing environment variables');
-    }
-
-    // Manual JWT Verification
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing Authorization header');
+      throw new Error('Server environment configuration error');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
+    // --- 수동 권한 검증 로직 시작 ---
+    // (Gateway의 --no-verify-jwt 옵션을 위해 직접 검증)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Authentication required: Missing Authorization header');
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Manual Auth Error:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token', details: authError?.message }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    // 관리자 권한 확인 (User Metadata 및 Profiles 테이블 대조)
+    let userRole = (user.user_metadata?.role || '').toLowerCase();
+    
+    if (!userRole) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profile) userRole = profile.role.toLowerCase();
+    }
+
+    if (!['super_admin', 'admin', 'sub_admin', 'system_admin'].includes(userRole)) {
+      console.error(`Access Forbidden: User ${user.email} with role ${userRole} attempted admin action.`);
+      return new Response(JSON.stringify({ error: 'Forbidden: Insufficient permissions' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+    // --- 수동 권한 검증 로직 종료 ---
+
+    const body = await req.json();
     const { 
       email, 
       fullName, 
@@ -41,12 +74,12 @@ serve(async (req) => {
       position,
       department,
       teamId 
-    } = await req.json();
+    } = body;
 
-    console.log(`Registering user: ${email} for company: ${companyId}`);
+    console.log(`Registering user: ${email} by admin: ${user.email}`);
 
     // 1. Create User in Auth
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: authData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: tempPassword,
       email_confirm: true,
@@ -57,11 +90,11 @@ serve(async (req) => {
       }
     });
 
-    if (authError) throw authError;
+    if (createUserError) throw createUserError;
 
     const userId = authData.user.id;
 
-    // 2. Create Profile in public.profiles (Safe handling of strings)
+    // 2. Create Profile in public.profiles
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -81,8 +114,7 @@ serve(async (req) => {
       });
 
     if (profileError) {
-      // Rollback Auth user if profile creation fails? 
-      // For now just throw, but a cleanup would be better in production.
+      // Cleanup: Auth 유저 생성 후 프로필 실패 시 Auth 유저 삭제 고려 가능
       throw profileError;
     }
 
@@ -92,20 +124,10 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Registration Error:', error);
-    
-    // 데이터베이스 에러나 Auth 에러의 상세 메시지를 추출
-    let errorMessage = error.message || 'Unknown error occurred during registration';
-    
-    // Postgres 에러 상세 정보가 있다면 추가
-    if (error.details) {
-      errorMessage += ` (Details: ${error.details})`;
-    }
-    
+    console.error('Worker Error:', error.message);
     return new Response(JSON.stringify({ 
-      error: errorMessage,
-      details: error.details || null,
-      code: error.code || null
+      error: error.message || 'Internal processing error',
+      code: error.code || 'FUNCTION_ERROR'
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
