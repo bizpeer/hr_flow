@@ -290,7 +290,7 @@ export default function HRManagement() {
               placeholder="이름 또는 이메일 검색..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64 pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all shadow-sm"
+              className="w-64 pl-10 pr-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm dark:text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 dark:focus:ring-indigo-900/30 transition-all shadow-sm"
             />
           </div>
           <button 
@@ -372,7 +372,7 @@ export default function HRManagement() {
       {/* 3. 등록 모달 (기존 유지하되 hireDate 처리 강화) */}
       {isEnrollModalOpen && (
         <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-[100] p-4 backdrop-blur-md">
-          <div className="bg-white rounded-[3rem] p-10 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-2xl font-black text-slate-900 tracking-tight uppercase">신규 직원 등록</h2>
               <button onClick={() => setIsEnrollModalOpen(false)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-400 transition-colors"><X className="w-5 h-5" /></button>
@@ -388,7 +388,7 @@ export default function HRManagement() {
                     value={newStaff.fullName}
                     onChange={e => setNewStaff({...newStaff, fullName: e.target.value})}
                     placeholder="실명 입력"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all font-bold group"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-sm dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all font-bold group"
                   />
                 </div>
               </div>
@@ -401,7 +401,7 @@ export default function HRManagement() {
                     value={newStaff.email}
                     onChange={e => setNewStaff({...newStaff, email: e.target.value})}
                     placeholder="company@example.com"
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-sm dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all"
                   />
                 </div>
               </div>
@@ -414,7 +414,7 @@ export default function HRManagement() {
                       type="date" 
                       value={newStaff.hireDate}
                       onChange={e => setNewStaff({...newStaff, hireDate: e.target.value})}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-[13px] outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-[13px] dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all"
                     />
                   </div>
                 </div>
@@ -427,7 +427,7 @@ export default function HRManagement() {
                       value={newStaff.tempPassword}
                       onChange={e => setNewStaff({...newStaff, tempPassword: e.target.value})}
                       placeholder="최소 6자"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-[13px] outline-none focus:ring-4 focus:ring-indigo-100 transition-all"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-[13px] dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40 transition-all"
                     />
                   </div>
                 </div>
@@ -447,7 +447,7 @@ export default function HRManagement() {
       {/* 4. 고도화된 상세 정보 수정 모달 */}
       {isDetailModalOpen && selectedProfile && (
         <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[100] p-4 backdrop-blur-md">
-          <div className="bg-white rounded-[3rem] p-10 w-full max-w-4xl shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-[3rem] p-10 w-full max-w-4xl shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-start mb-10 pb-6 border-b border-slate-100">
               <div>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase mb-2">인사 마스터 정보 관리</h2>
@@ -475,7 +475,7 @@ export default function HRManagement() {
                         value={detailForm.phoneNumber}
                         onChange={e => setDetailForm({...detailForm, phoneNumber: e.target.value})}
                         placeholder="010-0000-0000"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40"
                       />
                     </div>
                     <div>
@@ -485,7 +485,7 @@ export default function HRManagement() {
                         value={detailForm.residentNumber}
                         onChange={e => setDetailForm({...detailForm, residentNumber: e.target.value})}
                         placeholder="000000-0000000"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40"
                       />
                     </div>
                     <div className="md:col-span-2">
@@ -495,7 +495,7 @@ export default function HRManagement() {
                         value={detailForm.address}
                         onChange={e => setDetailForm({...detailForm, address: e.target.value})}
                         placeholder="동/호수까지 상세히 입력"
-                        className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-100"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-sm font-bold dark:text-white outline-none focus:ring-4 focus:ring-indigo-100 dark:focus:ring-indigo-900/40"
                       />
                     </div>
                   </div>
@@ -513,9 +513,9 @@ export default function HRManagement() {
                     <div className="space-y-3">
                       {detailForm.familyData.map((f, i) => (
                         <div key={i} className="flex gap-4 items-center animate-in slide-in-from-top-2">
-                          <input className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-400 shadow-sm" placeholder="이름" value={f.name} onChange={e => updateFamily(i, 'name', e.target.value)} />
-                          <input className="flex-1 bg-white border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:border-indigo-400 shadow-sm" placeholder="YYMMDD" value={f.birth} onChange={e => updateFamily(i, 'birth', e.target.value)} />
-                          <button onClick={() => removeFamily(i)} className="text-slate-300 hover:text-rose-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          <input className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold dark:text-white outline-none focus:border-indigo-400 shadow-sm" placeholder="이름" value={f.name} onChange={e => updateFamily(i, 'name', e.target.value)} />
+                          <input className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold dark:text-white outline-none focus:border-indigo-400 shadow-sm" placeholder="YYMMDD" value={f.birth} onChange={e => updateFamily(i, 'birth', e.target.value)} />
+                          <button onClick={() => removeFamily(i)} className="text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 transition-colors"><Trash2 className="w-4 h-4" /></button>
                         </div>
                       ))}
                     </div>
@@ -537,7 +537,7 @@ export default function HRManagement() {
                         type="date" 
                         value={detailForm.hireDate}
                         onChange={e => setDetailForm({...detailForm, hireDate: e.target.value})}
-                        className="w-full bg-white border border-indigo-200 rounded-2xl px-5 py-4 text-sm font-black outline-none focus:ring-4 focus:ring-indigo-200 shadow-sm"
+                        className="w-full bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 rounded-2xl px-5 py-4 text-sm font-black dark:text-white outline-none focus:ring-4 focus:ring-indigo-200 dark:focus:ring-indigo-900/30 shadow-sm"
                       />
                     </div>
                     
@@ -554,7 +554,7 @@ export default function HRManagement() {
                             step="0.5"
                             value={detailForm.additionalLeave}
                             onChange={e => setDetailForm({...detailForm, additionalLeave: Number(e.target.value)})}
-                            className="w-16 bg-white border border-indigo-200 rounded-lg px-2 py-1 text-center text-sm font-black outline-none"
+                            className="w-16 bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 rounded-lg px-2 py-1 text-center text-sm font-black dark:text-white outline-none"
                           />
                           <span className="text-xs font-bold text-slate-400">일</span>
                         </div>
@@ -585,7 +585,7 @@ export default function HRManagement() {
                             type="date" 
                             value={detailForm.resignationDate}
                             onChange={e => setDetailForm({...detailForm, resignationDate: e.target.value})}
-                            className="w-full bg-white border border-rose-200 rounded-xl px-4 py-3 text-xs font-bold outline-none"
+                            className="w-full bg-white dark:bg-slate-800 border border-rose-200 dark:border-rose-900/50 rounded-xl px-4 py-3 text-xs font-bold dark:text-white outline-none"
                           />
                            <button onClick={() => setDetailForm({...detailForm, status: 'active', resignationDate: ''})} className="mt-4 text-[10px] font-bold text-slate-400 hover:text-indigo-600 underline">퇴사 취소 및 복직 처리</button>
                         </div>
@@ -618,7 +618,7 @@ export default function HRManagement() {
                           type="password" 
                           value={adminPasswordForDelete}
                           onChange={e => setAdminPasswordForDelete(e.target.value)}
-                          className="w-full bg-rose-50/30 border border-rose-100 rounded-xl px-4 py-3 text-xs outline-none focus:ring-2 focus:ring-rose-200"
+                          className="w-full bg-rose-50/30 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/40 rounded-xl px-4 py-3 text-xs dark:text-white outline-none focus:ring-2 focus:ring-rose-200 dark:focus:ring-rose-900/40"
                           placeholder="비밀번호 확인"
                         />
                         <div className="flex gap-2">
@@ -654,7 +654,7 @@ export default function HRManagement() {
                           value={resetTempPassword}
                           onChange={e => setResetTempPassword(e.target.value)}
                           placeholder="최소 6자 이상"
-                          className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+                          className="w-full bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 rounded-xl px-4 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40"
                         />
                       </div>
                       <div className="space-y-3">
@@ -664,7 +664,7 @@ export default function HRManagement() {
                           value={adminPasswordForReset}
                           onChange={e => setAdminPasswordForReset(e.target.value)}
                           placeholder="현재 본인의 비밀번호"
-                          className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+                          className="w-full bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-900/50 rounded-xl px-4 py-3 text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-900/40"
                         />
                       </div>
                       <div className="flex gap-2">

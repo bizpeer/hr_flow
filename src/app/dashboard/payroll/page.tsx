@@ -125,7 +125,7 @@ export default function PayrollManagement() {
             placeholder="이름으로 검색..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full md:w-80 pl-10 pr-4 py-3 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 transition-all shadow-sm bg-white"
+            className="w-full md:w-80 pl-10 pr-4 py-3 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm dark:text-white outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50 dark:focus:ring-indigo-900/30 transition-all shadow-sm bg-white dark:bg-slate-800"
           />
         </div>
       </div>
@@ -216,7 +216,7 @@ export default function PayrollManagement() {
                       type="number"
                       value={state.annual_salary}
                       onChange={(e) => handleUpdateField(member.id, 'annual_salary', Number(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-4 text-xl font-black text-slate-800 outline-none focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-4 text-xl font-black text-slate-800 dark:text-white outline-none focus:ring-4 focus:ring-indigo-50 dark:focus:ring-indigo-900/30 focus:border-indigo-500"
                     />
                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">원</span>
                   </div>
@@ -257,7 +257,7 @@ export default function PayrollManagement() {
                       type="number"
                       value={state.non_taxable}
                       onChange={(e) => handleUpdateField(member.id, 'non_taxable', Number(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 outline-none"
+                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/50"
                     />
                   </div>
                 </div>

@@ -383,7 +383,7 @@ export default function ApprovalsManagement() {
                   onChange={(e) => setRejectionReason(e.target.value)}
                   rows={4}
                   placeholder="예: 영수증 증빙 누락, 날짜 오기입 등"
-                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-rose-500 transition-all resize-none"
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-rose-500 transition-all resize-none"
                   autoFocus
                 />
               </div>

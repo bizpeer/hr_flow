@@ -329,7 +329,7 @@ export default function SystemAdminPage() {
                 <label className={styles.label}>최종 확인을 위해 시스템 관리자 비밀번호를 입력하세요:</label>
                 <input 
                   type="password"
-                  className={styles.input}
+                  className={`${styles.input} dark:bg-slate-800 dark:text-white dark:border-slate-700`}
                   value={adminPassword}
                   onChange={e => setAdminPassword(e.target.value)}
                   placeholder="시스템 관리자 비밀번호"
@@ -392,7 +392,7 @@ export default function SystemAdminPage() {
                   <label className={styles.label}>시스템 관리자 비밀번호</label>
                   <input 
                     type="password"
-                    className={styles.input}
+                    className={`${styles.input} dark:bg-slate-800 dark:text-white dark:border-slate-700`}
                     value={adminVerifyPw}
                     onChange={e => setAdminVerifyPw(e.target.value)}
                     placeholder="관리자 비밀번호 입력"
@@ -407,7 +407,7 @@ export default function SystemAdminPage() {
                     <label className={styles.label}>새 비밀번호</label>
                     <input 
                       type="password"
-                      className={styles.input}
+                      className={`${styles.input} dark:bg-slate-800 dark:text-white dark:border-slate-700`}
                       value={newPw}
                       onChange={e => setNewPw(e.target.value)}
                       placeholder="최소 6자 이상"
@@ -418,7 +418,7 @@ export default function SystemAdminPage() {
                     <label className={styles.label}>새 비밀번호 확인</label>
                     <input 
                       type="password"
-                      className={styles.input}
+                      className={`${styles.input} dark:bg-slate-800 dark:text-white dark:border-slate-700`}
                       value={newPwConfirm}
                       onChange={e => setNewPwConfirm(e.target.value)}
                       placeholder="비밀번호 재입력"

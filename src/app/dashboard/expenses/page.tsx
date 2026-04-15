@@ -262,9 +262,9 @@ export default function ExpensesManagement() {
             <div className="space-y-2">
               <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase text-center md:text-left">Lookup Period</p>
               <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 px-4 backdrop-blur-sm">
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none" />
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 dark:text-white text-xs font-bold outline-none" />
                 <span className="text-slate-500 italic font-serif">to</span>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 text-xs font-bold outline-none" />
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 dark:text-white text-xs font-bold outline-none" />
               </div>
             </div>
           </div>
@@ -293,14 +293,14 @@ export default function ExpensesManagement() {
                 placeholder="항목 또는 신청자 검색..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-100 border-none rounded-xl pl-10 pr-4 py-3 text-xs font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl pl-10 pr-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
             </div>
             {!isAdminView && (
-               <div className="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 outline-none" />
-                  <span className="text-slate-300 italic">~</span>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 outline-none" />
+               <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none" />
+                  <span className="text-slate-300 dark:text-slate-600 italic">~</span>
+                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none" />
                </div>
             )}
             <button className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-50 shadow-sm">
@@ -406,25 +406,25 @@ export default function ExpensesManagement() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">항목명</label>
-                  <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="예: 사무용품 구매, 야간 식대 등" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all" required />
+                  <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="예: 사무용품 구매, 야간 식대 등" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지출 금액 (KRW)</label>
-                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono" required />
+                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지출 일자</label>
-                  <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500 text-xs" required />
+                  <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-xs" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">카테고리</label>
-                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 border-none rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-no-repeat bg-[right_1.5rem_center]">
-                    <option>식비</option>
-                    <option>교통비</option>
-                    <option>사무용품</option>
-                    <option>접대비</option>
-                    <option>비품/소모품</option>
-                    <option>기타</option>
+                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-no-repeat bg-[right_1.5rem_center]">
+                    <option className="dark:bg-slate-800">식비</option>
+                    <option className="dark:bg-slate-800">교통비</option>
+                    <option className="dark:bg-slate-800">사무용품</option>
+                    <option className="dark:bg-slate-800">접대비</option>
+                    <option className="dark:bg-slate-800">비품/소모품</option>
+                    <option className="dark:bg-slate-800">기타</option>
                   </select>
                 </div>
               </div>
@@ -437,7 +437,7 @@ export default function ExpensesManagement() {
                 <textarea 
                   value={details} 
                   onChange={e => setDetails(e.target.value)} 
-                  className="w-full p-5 bg-slate-50 border-none rounded-3xl font-medium text-sm h-32 outline-none focus:ring-2 focus:ring-emerald-500 resize-none transition-all"
+                  className="w-full p-5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-3xl font-medium text-sm h-32 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 resize-none transition-all"
                   placeholder="지출에 대한 상세 내용을 입력하세요 (1,000자 이내)"
                 />
               </div>

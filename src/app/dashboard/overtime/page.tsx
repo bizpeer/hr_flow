@@ -240,7 +240,7 @@ export default function OvertimePage() {
                   type="date" 
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
-                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer"
                   required
                 />
               </div>
@@ -252,7 +252,7 @@ export default function OvertimePage() {
                     type="time" 
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all"
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
                     required
                   />
                 </div>
@@ -262,24 +262,24 @@ export default function OvertimePage() {
                     type="time" 
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all"
+                    className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all"
                     required
                   />
                 </div>
               </div>
 
-              <div className="p-5 bg-indigo-50 rounded-2xl flex items-center justify-between border border-indigo-100">
+              <div className="p-5 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-between border border-indigo-100 dark:border-indigo-800">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                    <Clock className="w-5 h-5 text-indigo-600" />
+                  <div className="w-10 h-10 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center shadow-sm">
+                    <Clock className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
                     <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">계산된 시간</p>
-                    <p className="text-lg font-black text-indigo-900 tracking-tight">{calculatedHours} <span className="text-xs">시간</span></p>
+                    <p className="text-lg font-black text-indigo-900 dark:text-indigo-100 tracking-tight">{calculatedHours} <span className="text-xs">시간</span></p>
                   </div>
                 </div>
                 {endTime < startTime && (
-                  <span className="text-[10px] font-black text-white bg-indigo-600 px-2 py-1 rounded-lg">자정 경과</span>
+                  <span className="text-[10px] font-black text-white bg-indigo-600 px-2 py-1 rounded-lg italic">자정 경과</span>
                 )}
               </div>
 
@@ -290,7 +290,7 @@ export default function OvertimePage() {
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
                   placeholder="예: 프로젝트 마감 지원, 긴급 오류 수정 등"
-                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
+                  className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl text-sm font-bold dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all resize-none"
                   required
                 />
               </div>
