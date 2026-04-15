@@ -8,7 +8,7 @@ import {
   Users, User, X, Mail, MapPin, CreditCard, Heart, Plus, Save, Calendar
 } from 'lucide-react';
 import { 
-  Profile, fetchCompanyUsers, registerStaff, updateMemberProfile 
+  Profile, fetchCompanyUsers, registerStaff, updateMemberProfile, adminResetPassword
 } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
@@ -24,8 +24,13 @@ export default function HRManagement() {
   const [isEnrollModalOpen, setIsEnrollModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  
+  // 관리자 재인증 및 비밀번호 초기화 상태
   const [isAdminVerifying, setIsAdminVerifying] = useState(false);
   const [adminPasswordForDelete, setAdminPasswordForDelete] = useState('');
+  const [isAdminVerifyingForReset, setIsAdminVerifyingForReset] = useState(false);
+  const [adminPasswordForReset, setAdminPasswordForReset] = useState('');
+  const [resetTempPassword, setResetTempPassword] = useState('');
 
   // 오늘 날짜 기본값 (YYYY-MM-DD)
   const today = new Date().toISOString().split('T')[0];
@@ -96,21 +101,29 @@ export default function HRManagement() {
 
   // 직원 등록 핸들러
   const handleRegister = async () => {
-    if (!newStaff.fullName || !newStaff.email || !newStaff.tempPassword || !profile) {
+    const { fullName, email, tempPassword, hireDate } = newStaff;
+
+    if (!fullName || !email || !tempPassword || !profile) {
       alert('필수 정보를 모두 입력해주세요.');
+      return;
+    }
+
+    if (tempPassword.length < 6) {
+      alert('비밀번호는 최소 6자 이상이어야 합니다.');
       return;
     }
     
     try {
       setLoading(true);
-      const { registerStaff } = await import('@/lib/api');
       await registerStaff({
-        ...newStaff,
+        fullName,
+        email,
+        tempPassword,
+        hireDate,
         companyId: profile.company_id,
         role: 'member',
         department: 'General',
-        position: 'Professional',
-        hireDate: newStaff.hireDate // 신규 추가된 hireDate 반영
+        position: 'Professional'
       });
       alert('직원이 성공적으로 등록되었습니다.');
       setIsEnrollModalOpen(false);
@@ -138,7 +151,47 @@ export default function HRManagement() {
     });
     setIsAdminVerifying(false);
     setAdminPasswordForDelete('');
+    setIsAdminVerifyingForReset(false);
+    setAdminPasswordForReset('');
+    setResetTempPassword('');
     setIsDetailModalOpen(true);
+  };
+
+  // 비밀번호 초기화 핸들러
+  const handleResetPassword = async () => {
+    if (!selectedProfile || !adminPasswordForReset || !resetTempPassword) {
+      alert('관리자 비밀번호와 임시 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+
+    if (resetTempPassword.length < 6) {
+      alert('새 비밀번호는 최소 6자 이상이어야 합니다.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // 1. 관리자 비밀번호 확인
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: currentUser?.email!,
+        password: adminPasswordForReset,
+      });
+
+      if (authError) throw new Error('관리자 비밀번호가 일치하지 않습니다.');
+
+      // 2. 비밀번호 초기화 API 호출
+      await adminResetPassword(selectedProfile.id, resetTempPassword);
+      
+      alert(`[${selectedProfile.full_name}] 사용자의 비밀번호가 성공적으로 초기화되었습니다.`);
+      setIsAdminVerifyingForReset(false);
+      setAdminPasswordForReset('');
+      setResetTempPassword('');
+    } catch (e: any) {
+      alert('초기화 실패: ' + e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 상세 정보 저장 핸들러
@@ -575,6 +628,61 @@ export default function HRManagement() {
                       </div>
                     )}
                   </div>
+                </section>
+
+                <div className="h-px bg-slate-100 my-4"></div>
+
+                <section>
+                  <h3 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
+                    <Shield className="w-4 h-4" />
+                    Security Management
+                  </h3>
+                  
+                  {!isAdminVerifyingForReset ? (
+                    <button 
+                      onClick={() => setIsAdminVerifyingForReset(true)}
+                      className="w-full py-4 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                    >
+                      <Shield className="w-4 h-4" /> 비밀번호 초기화 및 임시 비번 발급
+                    </button>
+                  ) : (
+                    <div className="bg-indigo-50/50 p-6 rounded-[2rem] border border-indigo-100 space-y-4 animate-in slide-in-from-top-2">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">임시 비밀번호 설정</label>
+                        <input 
+                          type="text" 
+                          value={resetTempPassword}
+                          onChange={e => setResetTempPassword(e.target.value)}
+                          placeholder="최소 6자 이상"
+                          className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+                        />
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">관리자 비밀번호 확인</label>
+                        <input 
+                          type="password" 
+                          value={adminPasswordForReset}
+                          onChange={e => setAdminPasswordForReset(e.target.value)}
+                          placeholder="현재 본인의 비밀번호"
+                          className="w-full bg-white border border-indigo-200 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-200"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={handleResetPassword}
+                          className="flex-1 py-3 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg shadow-indigo-100"
+                        >
+                          초기화 실행
+                        </button>
+                        <button 
+                          onClick={() => setIsAdminVerifyingForReset(false)}
+                          className="px-4 py-3 bg-white text-slate-500 border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest"
+                        >
+                          취소
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </section>
               </div>
             </div>

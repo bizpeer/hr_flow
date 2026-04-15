@@ -155,21 +155,16 @@ export const registerStaff = async (staffData: {
 
   if (error) {
     console.error('Edge Function Error Full Details:', error);
+    let displayMessage = '등록 실패: ';
     
-    let displayMessage = '등록 실패 사유:\n';
-    
-    // 서버가 보낸 본문 파싱 시도
-    if (error.context) {
+    // FunctionsHttpError 등 context가 있는 경우 상세 메시지 추출 시도
+    if (error instanceof Error && 'context' in error) {
       try {
-        const body = await error.context.clone().json();
-        displayMessage += JSON.stringify(body, null, 2);
+        const context = (error as any).context;
+        const responseData = await context.clone().json();
+        displayMessage += responseData.error || responseData.message || error.message;
       } catch (e) {
-        try {
-          const text = await error.context.clone().text();
-          displayMessage += text || error.message;
-        } catch (e2) {
-          displayMessage += error.message;
-        }
+        displayMessage += error.message;
       }
     } else {
       displayMessage += error.message;
