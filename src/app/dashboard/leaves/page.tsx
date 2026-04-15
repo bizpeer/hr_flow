@@ -332,12 +332,3 @@ function StatCard({ label, value, highlight = false }: any) {
     </div>
   );
 }
-' : 'text-slate-300 dark:text-slate-600'}`}>Days</span>
-        </div>
-      </div>
-      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200 dark:text-slate-700'}`}>
-        <Calendar className="w-16 h-16 md:w-24 md:h-24" />
-      </div>
-    </div>
-  );
-}

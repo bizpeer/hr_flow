@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
-import { CheckSquare, XCircle, Clock, FileText, ChevronRight, Check } from 'lucide-react';
+import { CheckSquare, XCircle, Clock, FileText, ChevronRight, Check, AlertCircle, X, Clock8 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { updateRequestStatus } from '@/lib/api';
+import { updateRequestStatus, calculateLeaveEntitlement, updateMemberProfile, updateRequestFields } from '@/lib/api';
 
 export default function ApprovalsManagement() {
   const { profile, loading: authLoading } = useAuth();
