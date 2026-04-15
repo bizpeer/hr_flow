@@ -73,8 +73,10 @@ export interface Leave {
   status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
   user_id: string;
   company_id: string;
+  rejection_reason?: string;
   profiles?: {
     full_name: string;
+    team_id?: string;
   };
 }
 

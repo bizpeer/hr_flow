@@ -31,18 +31,28 @@ export default function LeavesPage() {
   const remainingLeave = totalEntitlement - usedLeave;
 
   const fetchLeaves = async () => {
-    if (!profile) {
+    if (!profile || !profile.company_id) {
+      console.log('[Leaves] Waiting for profile or company_id...');
       setLoading(false);
       return;
     }
+    
     setLoading(true);
     try {
-      const role = profile.role || 'member';
+      const role = (profile.role || 'member').toLowerCase();
       const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
+      
+      console.log(`[Leaves] Fetching for role: ${role}, company: ${profile.company_id}`);
       
       let query = supabase
         .from('leave_requests')
-        .select('*, profiles(full_name)')
+        .select(`
+          *,
+          profiles (
+            full_name,
+            team_id
+          )
+        `)
         .eq('company_id', profile.company_id);
       
       if (!isManagement) {
@@ -50,40 +60,49 @@ export default function LeavesPage() {
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('[Leaves] Fetch error:', error);
+        throw error;
+      }
+      
+      console.log(`[Leaves] Fetched ${data?.length || 0} records`);
       setLeaves(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch leaves:', error);
+      // alert('휴가 내역을 불러오는데 실패했습니다: ' + (error.message || '알 수 없는 오류'));
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLeaves();
+    if (profile?.company_id) {
+      fetchLeaves();
 
-    // 실시간 동기화 설정
-    const channel = supabase
-      .channel('leave-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE 모두 감지
-          schema: 'public',
-          table: 'leave_requests',
-          filter: `company_id=eq.${profile?.company_id}`
-        },
-        () => {
-          console.log('Realtime update detected in leaves');
-          fetchLeaves();
-        }
-      )
-      .subscribe();
+      // 실시간 동기화 설정
+      const channel = supabase
+        .channel('leave-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', 
+            schema: 'public',
+            table: 'leave_requests',
+            filter: `company_id=eq.${profile.company_id}`
+          },
+          () => {
+            console.log('Realtime update detected in leaves');
+            fetchLeaves();
+          }
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [profile?.company_id, profile?.role]);
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [profile?.company_id, profile?.role, profile?.id]);
 
   const openAppModal = (leave?: any) => {
     if (leave) {
@@ -104,7 +123,7 @@ export default function LeavesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !profile.company_id) return;
 
     if (new Date(endDate) < new Date(startDate)) {
       alert('종료일은 시작일보다 빠를 수 없습니다.');
@@ -151,7 +170,7 @@ export default function LeavesPage() {
       }
 
       setShowModal(false);
-      fetchLeaves();
+      await fetchLeaves();
       alert('신청이 완료되었습니다.');
     } catch (error: any) {
       alert('저장 실패: ' + (error.message || '알 수 없는 오류가 발생했습니다.'));
@@ -161,7 +180,9 @@ export default function LeavesPage() {
   };
 
   const filteredLeaves = leaves.filter(leave => {
-    const leaveMonth = format(new Date(leave.start_date), 'yyyy-MM');
+    if (!leave.start_date) return false;
+    // YYYY-MM-DD 형식의 문자열에서 YYYY-MM 추출 (타임존 이슈 방지)
+    const leaveMonth = leave.start_date.substring(0, 7);
     return leaveMonth === selectedMonth;
   });
 
