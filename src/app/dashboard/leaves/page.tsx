@@ -121,16 +121,16 @@ export default function LeavesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-12 pb-20">
-      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8">
+    <div className="max-w-7xl mx-auto space-y-8 md:space-y-12 pb-10 md:pb-20 px-4 md:px-0">
+      <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-8 mt-4 md:mt-0">
         <div className="space-y-4">
-          <div className="flex items-center gap-5">
-            <div className="w-16 h-16 bg-emerald-600 rounded-[2rem] text-white flex items-center justify-center shadow-2xl">
-              <Calendar className="w-8 h-8" />
+          <div className="flex items-center gap-4 md:gap-5">
+            <div className="w-12 h-12 md:w-16 md:h-16 bg-emerald-600 rounded-2xl md:rounded-[2rem] text-white flex items-center justify-center shadow-lg md:shadow-2xl">
+              <Calendar className="w-6 h-6 md:w-8 md:h-8" />
             </div>
             <div>
-              <h1 className="text-4xl font-black text-slate-900 tracking-tight uppercase">휴가신청</h1>
-              <p className="text-slate-500 font-medium text-sm mt-1 uppercase tracking-widest flex items-center gap-2">
+              <h1 className="text-2xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tight uppercase">휴가신청</h1>
+              <p className="text-slate-500 font-medium text-[10px] md:text-sm mt-1 uppercase tracking-widest flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Leave & Absence Management
               </p>
@@ -138,21 +138,21 @@ export default function LeavesPage() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-           <div className="bg-white p-1.5 rounded-[2rem] shadow-xl border border-slate-100 flex items-center gap-4 pr-6">
-              <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+           <div className="bg-white dark:bg-slate-900 p-1.5 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 pr-6 w-full sm:w-auto">
+              <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400">
                 <Filter className="w-4 h-4" />
               </div>
               <input 
                 type="month" 
                 value={selectedMonth} 
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="bg-transparent border-none outline-none font-black text-xs text-slate-900 tracking-widest uppercase cursor-pointer"
+                className="bg-transparent border-none outline-none font-black text-xs text-slate-900 dark:text-white tracking-widest uppercase cursor-pointer flex-1"
               />
            </div>
            <button 
             onClick={() => openAppModal()}
-            className="flex items-center gap-4 px-8 py-4 bg-slate-900 text-white font-black rounded-2xl shadow-xl hover:bg-emerald-600 transition-all uppercase tracking-widest text-[11px]"
+            className="flex items-center justify-center gap-4 px-8 py-4 bg-slate-900 dark:bg-emerald-600 dark:hover:bg-emerald-700 text-white font-black rounded-2xl shadow-xl hover:bg-emerald-600 transition-all uppercase tracking-widest text-[11px] w-full sm:w-auto"
            >
               <Plus className="w-5 h-5" />
               <span>신청하기</span>
@@ -166,13 +166,13 @@ export default function LeavesPage() {
         <StatCard label="잔여 휴가" value="9.5" highlight />
       </div>
 
-      <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
-        <div className="p-10 border-b border-slate-50 flex items-center gap-5">
-           <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center">
-              <FileText className="w-7 h-7" />
+      <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden min-h-[400px]">
+        <div className="p-6 md:p-10 border-b border-slate-50 dark:border-slate-800 flex items-center gap-4 md:gap-5">
+           <div className="w-12 h-12 md:w-14 md:h-14 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-2xl md:rounded-3xl flex items-center justify-center">
+              <FileText className="w-6 h-6 md:w-7 md:h-7" />
            </div>
            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">My Leave Records</h2>
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">My Leave Records</h2>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction History for {selectedMonth}</p>
            </div>
         </div>
@@ -195,21 +195,21 @@ export default function LeavesPage() {
                 <tr><td colSpan={5} className="py-20 text-center text-slate-300 font-bold uppercase text-xs tracking-widest italic">기록이 없습니다</td></tr>
               ) : (
                 filteredLeaves.map((leave) => (
-                  <tr key={leave.id} className="hover:bg-slate-50/50 transition-colors group">
-                    <td className="px-10 py-6">
+                  <tr key={leave.id} className="hover:bg-slate-50/50 dark:hover:bg-white/5 transition-colors group text-slate-900 dark:text-slate-100">
+                    <td className="px-6 md:px-10 py-6 border-b border-slate-50 dark:border-slate-800">
                       <div className="space-y-1">
-                        <span className="text-xs font-black text-slate-900">{leave.type}</span>
+                        <span className="text-xs font-black">{leave.type}</span>
                         <p className="text-[10px] font-bold text-slate-400">{leave.start_date} ~ {leave.end_date}</p>
                       </div>
                     </td>
-                    <td className="px-10 py-6 text-sm font-bold text-slate-700">{leave.reason}</td>
-                    <td className="px-10 py-6 text-xs font-black text-slate-900 uppercase tracking-widest">{leave.profiles?.full_name}</td>
-                    <td className="px-10 py-6">{getStatusBadge(leave.status)}</td>
-                    <td className="px-10 py-6 text-right">
+                    <td className="px-6 md:px-10 py-6 text-sm font-bold border-b border-slate-50 dark:border-slate-800">{leave.reason}</td>
+                    <td className="px-6 md:px-10 py-6 text-xs font-black uppercase tracking-widest border-b border-slate-50 dark:border-slate-800">{leave.profiles?.full_name}</td>
+                    <td className="px-6 md:px-10 py-6 border-b border-slate-50 dark:border-slate-800">{getStatusBadge(leave.status)}</td>
+                    <td className="px-6 md:px-10 py-6 text-right border-b border-slate-50 dark:border-slate-800">
                        {(leave.status === 'PENDING' || leave.status === 'SUB_APPROVED') && (profile?.id === leave.user_id || ['super_admin','admin'].includes(profile?.role || '')) && (
                           <button 
                             onClick={() => openAppModal(leave)}
-                            className="w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all ml-auto opacity-0 group-hover:opacity-100 shadow-sm"
+                            className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-600 hover:border-emerald-200 transition-all ml-auto md:opacity-0 group-hover:opacity-100 shadow-sm"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -224,31 +224,31 @@ export default function LeavesPage() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-10 pb-6 flex justify-between items-center bg-slate-50">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase">New Absence Request</h2>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl md:rounded-[3rem] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 md:p-10 pb-4 md:pb-6 flex justify-between items-center bg-slate-50 dark:bg-slate-800">
+              <h2 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">New Absence Request</h2>
               <button 
                 onClick={() => setShowModal(false)}
-                className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 hover:text-rose-500"
+                className="w-8 h-8 md:w-10 md:h-10 bg-white dark:bg-slate-700 rounded-xl flex items-center justify-center text-slate-400 dark:text-slate-300 hover:text-rose-500"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-10 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="p-6 md:p-10 space-y-4 md:space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">시작일</label>
-                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100" required />
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">시작일</label>
+                  <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-xs dark:text-white outline-none focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/40" required />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">종료일</label>
-                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100" required />
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">종료일</label>
+                  <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-xs dark:text-white outline-none focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/40" required />
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">유형</label>
-                <select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-xs outline-none focus:ring-4 focus:ring-emerald-100 appearance-none">
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">유형</label>
+                <select value={type} onChange={(e) => setType(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-xs dark:text-white outline-none focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 appearance-none">
                   <option>연차</option>
                   <option>반차 (오전)</option>
                   <option>반차 (오후)</option>
@@ -257,11 +257,11 @@ export default function LeavesPage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">사유</label>
+                <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest ml-1">사유</label>
                 <textarea 
                   value={reason} 
                   onChange={(e) => setReason(e.target.value)} 
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold text-sm h-32 outline-none focus:ring-4 focus:ring-emerald-100 resize-none"
+                  className="w-full p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-2xl font-bold text-sm h-32 dark:text-white outline-none focus:ring-4 focus:ring-emerald-100 dark:focus:ring-emerald-900/40 resize-none"
                   placeholder="구체적인 사유를 입력하세요"
                   required 
                 />
@@ -277,16 +277,16 @@ export default function LeavesPage() {
 
 function StatCard({ label, value, highlight = false }: any) {
   return (
-    <div className={`p-10 rounded-[3rem] border shadow-sm relative overflow-hidden group transition-all duration-500 hover:-translate-y-1 ${highlight ? 'bg-slate-900 border-slate-900 ring-4 ring-slate-900/10' : 'bg-white border-slate-100 hover:border-emerald-200'}`}>
+    <div className={`p-6 md:p-10 rounded-3xl md:rounded-[3rem] border shadow-sm relative overflow-hidden group transition-all duration-500 hover:-translate-y-1 ${highlight ? 'bg-slate-900 border-slate-900 ring-4 ring-slate-900/10' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-emerald-200'}`}>
       <div className="space-y-2 relative z-10">
-        <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${highlight ? 'text-emerald-400' : 'text-slate-400'}`}>{label}</p>
+        <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${highlight ? 'text-emerald-400' : 'text-slate-400 dark:text-slate-500'}`}>{label}</p>
         <div className="flex items-baseline gap-2">
-          <span className={`text-5xl font-black tracking-tighter ${highlight ? 'text-white' : 'text-slate-900'}`}>{value}</span>
-          <span className={`text-xs font-black uppercase tracking-widest ${highlight ? 'text-emerald-500' : 'text-slate-300'}`}>Days</span>
+          <span className={`text-4xl md:text-5xl font-black tracking-tighter ${highlight ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{value}</span>
+          <span className={`text-[10px] md:text-xs font-black uppercase tracking-widest ${highlight ? 'text-emerald-500' : 'text-slate-300 dark:text-slate-600'}`}>Days</span>
         </div>
       </div>
-      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200'}`}>
-        <Calendar className="w-24 h-24" />
+      <div className={`absolute top-0 right-0 p-8 opacity-5 group-hover:scale-125 transition-transform duration-1000 ${highlight ? 'text-emerald-500' : 'text-slate-200 dark:text-slate-700'}`}>
+        <Calendar className="w-16 h-16 md:w-24 md:h-24" />
       </div>
     </div>
   );
