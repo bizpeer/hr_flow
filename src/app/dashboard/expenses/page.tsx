@@ -1,15 +1,18 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { 
   Calendar, Download, FileText, Search, TrendingUp, 
   DollarSign, Filter, ChevronRight, Plus, Upload, 
-  X, CheckCircle, Clock, AlertCircle, Paperclip, XCircle
+  X, CheckCircle, Clock, AlertCircle, Paperclip, XCircle,
+  MoreVertical, CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Expense } from '@/lib/api';
+import { format, startOfMonth, endOfMonth, parseISO, isSameMonth } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 export default function ExpensesManagement() {
   const { profile, loading: authLoading } = useAuth();
@@ -21,21 +24,13 @@ export default function ExpensesManagement() {
   const [submitting, setSubmitting] = useState(false);
 
   // Filters
-  const getYearMonthDay = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-  };
-
-  const [startDate, setStartDate] = useState(getYearMonthDay(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
-  const [endDate, setEndDate] = useState(getYearMonthDay(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form State
   const [itemName, setItemName] = useState('');
   const [amount, setAmount] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [category, setCategory] = useState('식비');
   const [details, setDetails] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -48,35 +43,32 @@ export default function ExpensesManagement() {
     if (!profile) return;
     setLoading(true);
     try {
+      const start = `${selectedMonth}-01`;
+      const end = format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd');
+
       let query = supabase
         .from('expense_requests')
         .select('*, profiles(full_name, team_id)')
         .eq('company_id', profile.company_id);
 
-      if (!isAdminView) {
+      // system_admin은 전사 데이터를 봐야 함. 만약 company_id가 null이면 profile.company_id 대신 다른 로직이 필요할 수 있음
+      // 하지만 현재 스키마상 company_id가 필수라면 profile에 담겨있을 것.
+      
+      if (!['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role)) {
         query = query.eq('user_id', profile.id);
       }
 
-      // 날짜 필터링 적용
       query = query
-        .gte('expense_date', startDate)
-        .lte('expense_date', endDate);
+        .gte('expense_date', start)
+        .lte('expense_date', end);
 
-      // 정렬: PENDING 우선, 그 다음 날짜 역순
       const { data, error } = await query
-        .order('status', { ascending: false }) // PENDING이 문자열상 나중이므로 내림차순 등으로 조정하거나 프론트에서 재정렬
+        .order('status', { ascending: false })
         .order('expense_date', { ascending: false });
 
       if (error && error.code !== '42P01') throw error;
       
       let finalData = data || [];
-
-      // PENDING을 실제 최상단으로 올리기 위한 프론트엔드 추가 정렬 (필요시)
-      finalData.sort((a, b) => {
-        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
-        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
-        return new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime();
-      });
 
       // sub_admin 필터링 (본인 본부 데이터만)
       if (isSubAdmin && (profile as any).division_id) {
@@ -87,13 +79,13 @@ export default function ExpensesManagement() {
           
         if (teamsData) {
           const validTeamIds = teamsData.map(t => t.id);
-          finalData = finalData.filter(req => validTeamIds.includes(req.profiles?.team_id));
+          finalData = finalData.filter(req => !req.profiles || validTeamIds.includes(req.profiles.team_id));
         }
       }
 
       setExpenses(finalData);
     } catch (err) {
-      console.error(err);
+      console.error('Fetch expenses error:', err);
     } finally {
       setLoading(false);
     }
@@ -103,7 +95,6 @@ export default function ExpensesManagement() {
     if (!authLoading && profile) {
       fetchExpenses();
 
-      // 실시간 동기화 설정
       const channel = supabase
         .channel('expense-changes')
         .on(
@@ -112,7 +103,7 @@ export default function ExpensesManagement() {
             event: '*',
             schema: 'public',
             table: 'expense_requests',
-            filter: `company_id=eq.${profile?.company_id}`
+            filter: profile.company_id ? `company_id=eq.${profile.company_id}` : undefined
           },
           () => fetchExpenses()
         )
@@ -122,7 +113,7 @@ export default function ExpensesManagement() {
         supabase.removeChannel(channel);
       };
     }
-  }, [profile, authLoading, startDate, endDate]);
+  }, [profile, authLoading, selectedMonth]);
 
   const handleFileUpload = async (file: File) => {
     const fileExt = file.name.split('.').pop();
@@ -185,48 +176,53 @@ export default function ExpensesManagement() {
   const resetForm = () => {
     setItemName('');
     setAmount('');
-    setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
     setCategory('식비');
     setDetails('');
     setFile(null);
   };
 
-  const filteredExpenses = expenses.filter(e => 
-    (e.description || '').includes(searchQuery) || 
-    (e.profiles?.full_name || '').includes(searchQuery) ||
-    (e.category || '').includes(searchQuery)
-  );
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter(e => 
+      (e.description || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (e.profiles?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (e.category || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [expenses, searchQuery]);
 
-  const approvedExpenses = filteredExpenses.filter(e => e.status === 'APPROVED');
-  const totalAmount = approvedExpenses.reduce((sum, item) => sum + Number(item.amount), 0);
+  const totalAmount = useMemo(() => {
+    return filteredExpenses
+      .filter(e => e.status === 'APPROVED')
+      .reduce((sum, item) => sum + Number(item.amount), 0);
+  }, [filteredExpenses]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'APPROVED': return <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100 flex items-center gap-1.5 w-fit"><CheckCircle className="w-3 h-3" /> 승인됨</span>;
-      case 'SUB_APPROVED': return <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black border border-indigo-100 flex items-center gap-1.5 w-fit"><Clock className="w-3 h-3" /> 1차승인</span>;
-      case 'REJECTED': return <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black border border-rose-100 flex items-center gap-1.5 w-fit"><XCircle className="w-3 h-3" /> 반려됨</span>;
-      default: return <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black border border-amber-100 flex items-center gap-1.5 w-fit"><Clock className="w-3 h-3" /> 대기중</span>;
+      case 'APPROVED': 
+        return <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black border border-emerald-100 flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> 승인됨</span>;
+      case 'SUB_APPROVED': 
+        return <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black border border-indigo-100 flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> 1차승인</span>;
+      case 'REJECTED': 
+        return <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black border border-rose-100 flex items-center gap-1 w-fit"><XCircle className="w-3 h-3" /> 반려됨</span>;
+      default: 
+        return <span className="px-3 py-1 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black border border-amber-100 flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> 대기중</span>;
     }
   };
 
-  if (loading && !expenses.length) {
-    return <div className="flex h-64 items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div></div>;
-  }
-
   return (
-    <div className="max-w-[1400px] mx-auto space-y-10 pb-20 px-4 md:px-0">
-      {/* 1. Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+    <div className="max-w-[1400px] mx-auto space-y-6 pb-20 px-4 md:px-0">
+      {/* 1. Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-200">
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight transition-all">
-              {isAdminView ? '지출 분석 및 통합 조회' : '지출결의 신청'}
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              {isAdminView ? '지출 분석 및 조회' : '지출결의 신청'}
             </h1>
             <p className="text-sm text-slate-500 font-medium tracking-tight">
-              {isAdminView ? '전사 지출 데이터를 분석하고 승인 내역을 통합 조회합니다.' : '항목별 지출을 신청하고 처리 상태를 확인합니다.'}
+              {isAdminView ? '전사 지출 데이터를 분석하고 승인 내역을 조회합니다.' : '항목별 지출을 신청하고 처리 상태를 확인합니다.'}
             </p>
           </div>
         </div>
@@ -235,259 +231,300 @@ export default function ExpensesManagement() {
           {!isAdminView && (
             <button 
               onClick={() => setShowModal(true)}
-              className="px-8 py-3 bg-emerald-600 text-white font-black rounded-xl flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95"
+              className="px-8 py-3 bg-emerald-600 text-white font-black rounded-xl flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-lg active:scale-95 text-sm"
             >
               <Plus className="w-5 h-5" />
               신청하기
             </button>
           )}
           {isAdminView && (
-            <>
-              <button className="hidden md:flex px-6 py-3 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl items-center gap-2 hover:bg-slate-50 transition-colors shadow-sm text-[11px] uppercase tracking-widest">
-                <FileText className="w-4 h-4 text-indigo-600" />
-                Generate Report
-              </button>
-              <button className="px-6 py-3 bg-slate-900 border border-slate-800 text-white font-bold rounded-xl flex items-center gap-2 hover:bg-black transition-colors shadow-md text-[11px] uppercase tracking-widest">
-                <Download className="w-4 h-4" />
-                Export CSV
-              </button>
-            </>
+            <button className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl flex items-center gap-2 hover:bg-black transition-colors shadow-md text-[11px] uppercase tracking-widest">
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
           )}
         </div>
       </div>
 
-      {/* 2. Total Analysis Banner (Admin Only) */}
-      {isAdminView && (
-        <div className="bg-[#0f172a] rounded-[2.5rem] p-8 md:p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl relative overflow-hidden ring-1 ring-white/10">
+      {/* 2. Stats & Filter Bar */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <div className="lg:col-span-3 bg-[#0f172a] rounded-[2rem] p-6 flex flex-col md:flex-row items-center justify-between shadow-xl relative overflow-hidden ring-1 ring-white/10">
           <div className="absolute -left-20 top-1/2 -translate-y-1/2 w-64 h-64 bg-emerald-500/10 blur-[80px] rounded-full pointer-events-none" />
-
-          <div className="relative z-10 space-y-3">
-            <p className="text-[10px] font-black tracking-[0.2em] text-emerald-400 uppercase">Analysis Summary (Approved Only)</p>
-            <div className="flex items-end gap-3 text-white">
-              <h2 className="text-4xl md:text-5xl font-black tracking-tighter transition-all">
+          
+          <div className="relative z-10 space-y-1 text-center md:text-left">
+            <p className="text-[10px] font-black tracking-[0.2em] text-emerald-400 uppercase">Analysis Summary ({selectedMonth})</p>
+            <div className="flex items-end justify-center md:justify-start gap-2 text-white">
+              <h2 className="text-3xl md:text-4xl font-black tracking-tighter">
                 {totalAmount.toLocaleString()}
               </h2>
-              <span className="text-xl font-black text-emerald-500 mb-1">KRW</span>
-            </div>
-            <div className="flex items-center gap-2 text-emerald-500 text-xs font-bold pt-1">
-              <TrendingUp className="w-4 h-4" />
-              <span>선택 기간 내 총 {approvedExpenses.length}건 승인됨</span>
+              <span className="text-sm font-black text-emerald-500 mb-1.5 uppercase">KRW (Approved)</span>
             </div>
           </div>
 
-          <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6 mt-8 md:mt-0">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase text-center md:text-left">Lookup Period</p>
-              <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 px-4 backdrop-blur-sm">
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-slate-300 dark:text-white text-xs font-bold outline-none" />
-                <span className="text-slate-500 italic font-serif">to</span>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-slate-300 dark:text-white text-xs font-bold outline-none" />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 3. Integrated List View */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-[500px]">
-        {/* List Header */}
-        <div className="flex flex-col sm:flex-row items-center justify-between p-8 border-b border-slate-50 gap-6 bg-slate-50/30">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 bg-white flex items-center justify-center rounded-xl border border-slate-100">
-              <Search className="w-5 h-5 text-slate-400" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">{isAdminView ? '지출결의 통합 조회' : '내 지출 신청 내역'}</h2>
-              <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">{isAdminView ? 'Corporate Integrated Database' : 'My Personal Request History'}</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-64">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 mt-6 md:mt-0 w-full md:w-auto">
+            <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-2xl p-2 px-4 backdrop-blur-sm w-full">
+              <CalendarDays className="w-4 h-4 text-emerald-400" />
               <input 
-                type="text" 
-                placeholder="항목 또는 신청자 검색..." 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-xl pl-10 pr-4 py-3 text-xs font-bold dark:text-white outline-none focus:ring-2 focus:ring-emerald-500/20"
+                type="month" 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(e.target.value)} 
+                className="bg-transparent text-slate-300 text-xs font-bold outline-none flex-1" 
               />
             </div>
-            {!isAdminView && (
-               <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
-                  <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none" />
-                  <span className="text-slate-300 dark:text-slate-600 italic">~</span>
-                  <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-600 dark:text-slate-300 outline-none" />
-               </div>
-            )}
-            <button className="w-11 h-11 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-50 shadow-sm">
-              <Filter className="w-4 h-4" />
-            </button>
           </div>
         </div>
 
-        {/* Table Content */}
-        <div className="flex-1 overflow-x-auto">
-          <table className="w-full text-left border-separate border-spacing-0">
-            <thead>
-              <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                <th className="px-8 py-6 font-black font-sans">지출일자 / 분류</th>
-                <th className="px-8 py-6 font-black font-sans tracking-tight">항목명 및 상세</th>
-                {isAdminView && <th className="px-8 py-6 font-black font-sans">신청자</th>}
-                <th className="px-8 py-6 text-right font-black font-sans">금액 (KRW)</th>
-                <th className="px-8 py-6 font-black font-sans">상태</th>
-                <th className="px-8 py-6 text-center font-black font-sans uppercase">Ref</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {filteredExpenses.length === 0 ? (
-                <tr><td colSpan={isAdminView ? 6 : 5} className="py-20 text-center text-slate-300 font-bold italic tracking-widest uppercase">데이터가 없습니다</td></tr>
-              ) : (
-                filteredExpenses.map(item => (
-                  <tr key={item.id} className="hover:bg-slate-50/30 transition-colors group">
-                    <td className="px-8 py-6">
-                      <div className="space-y-1">
-                        <div className="text-xs font-black text-slate-700 uppercase tracking-tight">{item.expense_date}</div>
-                        <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold">{item.category}</span>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="max-w-xs md:max-w-md">
-                        <p className="text-sm font-black text-slate-900 mb-1">{item.description}</p>
-                        <p className="text-[10px] font-medium text-slate-400 line-clamp-1 italic">{item.details || '상세내역 없음'}</p>
-                      </div>
-                    </td>
-                    {isAdminView && (
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center text-[8px] font-black border border-indigo-100">
-                            {item.profiles?.full_name?.[0] || 'U'}
-                          </div>
-                          <span className="text-xs font-bold text-slate-600">{item.profiles?.full_name}</span>
-                        </div>
-                      </td>
-                    )}
-                    <td className="px-8 py-6 text-right font-black text-slate-900 tracking-tight">
-                      {Math.floor(item.amount).toLocaleString()}
-                    </td>
-                    <td className="px-8 py-6">
-                      {getStatusBadge(item.status)}
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                      {item.attachment_url ? (
-                        <a href={item.attachment_url} target="_blank" rel="noreferrer" className="inline-flex w-8 h-8 items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
-                          <Paperclip className="w-4 h-4" />
-                        </a>
-                      ) : (
-                        <span className="text-slate-100"><Paperclip className="w-4 h-4 mx-auto" /></span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Footer */}
-        <div className="p-6 border-t border-slate-100 bg-slate-50/30">
-          <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase italic">
-            TOTAL COUNT: <span className="text-slate-700 tracking-tight">{filteredExpenses.length} Entries Found</span>
-          </p>
+        <div className="bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm flex flex-col justify-center gap-1">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Entries</p>
+          <div className="flex items-end justify-between">
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{filteredExpenses.length}</h3>
+            <span className="text-xs font-bold text-emerald-600 mb-1">Items Found</span>
+          </div>
         </div>
       </div>
 
-      {/* New Request Modal */}
+      {/* 3. Search Bar */}
+      <div className="relative group">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-emerald-500 transition-colors" />
+        <input 
+          type="text" 
+          placeholder="항목, 신청자 또는 카테고리 검색..." 
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full bg-white border border-slate-100 rounded-2xl pl-14 pr-6 py-4 text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500/20 shadow-sm transition-all"
+        />
+      </div>
+
+      {/* 4. List View (Responsive) */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2.5rem] border border-slate-100">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600 mb-4"></div>
+            <p className="text-sm font-bold text-slate-400 animate-pulse uppercase tracking-widest">Loading Records...</p>
+          </div>
+        ) : filteredExpenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[2.5rem] border border-slate-100 text-center">
+            <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-6">
+              <Search className="w-10 h-10 text-slate-200" />
+            </div>
+            <h3 className="text-xl font-black text-slate-800 tracking-tight">조회 결과가 없습니다.</h3>
+            <p className="text-sm text-slate-400 mt-1 font-medium italic">검색어나 선택된 월을 확인해 주세요.</p>
+          </div>
+        ) : (
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden lg:block bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-separate border-spacing-0">
+                <thead>
+                  <tr className="bg-slate-50/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    <th className="px-8 py-6">일자 / 분류</th>
+                    <th className="px-8 py-6">항목명</th>
+                    {isAdminView && <th className="px-8 py-6">신청자</th>}
+                    <th className="px-8 py-6 text-right">금액 (KRW)</th>
+                    <th className="px-8 py-6">상태</th>
+                    <th className="px-8 py-6 text-center">증빙</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 text-[13px]">
+                  {filteredExpenses.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50/30 transition-colors group cursor-default">
+                      <td className="px-8 py-6">
+                        <div className="space-y-1">
+                          <div className="font-black text-slate-800">{item.expense_date}</div>
+                          <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-bold uppercase tracking-wider">{item.category}</span>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="max-w-md">
+                          <p className="font-black text-slate-900 mb-0.5">{item.description}</p>
+                          <p className="text-[11px] font-medium text-slate-400 line-clamp-1 italic">{item.details || 'No details provided'}</p>
+                        </div>
+                      </td>
+                      {isAdminView && (
+                        <td className="px-8 py-6 text-slate-600 font-bold">
+                          {item.profiles?.full_name}
+                        </td>
+                      )}
+                      <td className="px-8 py-6 text-right font-black text-slate-900 tracking-tight">
+                        {Math.floor(item.amount).toLocaleString()}
+                      </td>
+                      <td className="px-8 py-6">
+                        {getStatusBadge(item.status)}
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        {item.attachment_url ? (
+                          <a href={item.attachment_url} target="_blank" rel="noreferrer" className="inline-flex w-8 h-8 items-center justify-center bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                            <Paperclip className="w-4 h-4" />
+                          </a>
+                        ) : (
+                          <span className="text-slate-200"><Paperclip className="w-4 h-4 mx-auto" /></span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="lg:hidden space-y-4 px-2">
+              {filteredExpenses.map(item => (
+                <div key={item.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-black tracking-widest uppercase">{item.category}</span>
+                        <span className="text-[11px] font-bold text-slate-400">{item.expense_date}</span>
+                      </div>
+                      <h3 className="text-base font-black text-slate-900 leading-tight">{item.description}</h3>
+                    </div>
+                    {getStatusBadge(item.status)}
+                  </div>
+
+                  <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-4">
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</p>
+                      <p className="text-xl font-black text-slate-900 tracking-tighter">{Math.floor(item.amount).toLocaleString()} <span className="text-xs">KRW</span></p>
+                    </div>
+                    {item.attachment_url && (
+                      <a href={item.attachment_url} target="_blank" rel="noreferrer" className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                        <Paperclip className="w-5 h-5" />
+                      </a>
+                    )}
+                  </div>
+                  
+                  {isAdminView && item.profiles && (
+                    <div className="bg-slate-50 rounded-2xl p-3 px-4 flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-white flex items-center justify-center text-[10px] font-black text-indigo-500 border border-slate-100 uppercase">
+                        {item.profiles.full_name[0]}
+                      </div>
+                      <span className="text-xs font-bold text-slate-600">{item.profiles.full_name}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* 5. Request Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-8 md:p-10 pb-4 flex justify-between items-center border-b border-slate-50">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-8 md:p-10 flex justify-between items-center border-b border-slate-50 bg-slate-50/30">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
                   <Plus className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tighter uppercase font-sans">New Expense Request</h2>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">지출결의 신규 신청서</p>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase">New Expense</h2>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">지출결의 신청서 작성</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowModal(false)}
-                className="w-10 h-10 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                className="w-10 h-10 bg-white border border-slate-100 rounded-2xl flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors shadow-sm"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">카테고리</label>
-                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-no-repeat bg-[right_1.5rem_center]">
-                    <option className="dark:bg-slate-800">식비</option>
-                    <option className="dark:bg-slate-800">교통비</option>
-                    <option className="dark:bg-slate-800">사무용품</option>
-                    <option className="dark:bg-slate-800">접대비</option>
-                    <option className="dark:bg-slate-800">비품/소모품</option>
-                    <option className="dark:bg-slate-800">기타</option>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">카테고리</label>
+                  <select 
+                    value={category} 
+                    onChange={e => setCategory(e.target.value)} 
+                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20"
+                  >
+                    <option>식비</option>
+                    <option>교통비</option>
+                    <option>사무용품</option>
+                    <option>접대비</option>
+                    <option>비품/소모품</option>
+                    <option>기타</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">항목명</label>
-                  <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="예: 사무용품 구매, 야간 식대 등" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans" required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지출 금액 (KRW)</label>
-                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-mono" required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지출 일자</label>
-                  <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-xs" required />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">지출 일자</label>
+                  <input 
+                    type="date" 
+                    value={expenseDate} 
+                    onChange={e => setExpenseDate(e.target.value)} 
+                    className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20" 
+                    required 
+                  />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <div className="flex justify-between items-end px-1">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">상세 내역</label>
-                  <span className={`text-[9px] font-black tracking-tighter ${details.length > 1000 ? 'text-rose-500' : 'text-slate-400'}`}>{details.length.toLocaleString()} / 1,000</span>
-                </div>
-                <textarea 
-                  value={details} 
-                  onChange={e => setDetails(e.target.value)} 
-                  className="w-full p-5 bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-3xl font-medium text-sm h-32 dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 resize-none transition-all"
-                  placeholder="지출에 대한 상세 내용을 입력하세요 (1,000자 이내)"
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">지출 항목명</label>
+                <input 
+                  type="text" 
+                  value={itemName} 
+                  onChange={e => setItemName(e.target.value)} 
+                  placeholder="지출 내용을 간략히 입력하세요" 
+                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all font-sans" 
+                  required 
                 />
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 font-sans">증빙 파일 첨부 (Evidence)</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">금액 (KRW)</label>
+                <div className="relative">
+                  <input 
+                    type="number" 
+                    value={amount} 
+                    onChange={e => setAmount(e.target.value)} 
+                    placeholder="0" 
+                    className="w-full pl-5 pr-14 py-4 bg-slate-50 border-none rounded-2xl font-bold text-sm text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500/20 font-mono" 
+                    required 
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">WON</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">상세 내역 (Optional)</label>
+                <textarea 
+                  value={details} 
+                  onChange={e => setDetails(e.target.value)} 
+                  className="w-full px-5 py-4 bg-slate-50 border-none rounded-2xl font-medium text-sm text-slate-900 h-24 outline-none focus:ring-2 focus:ring-emerald-500/20 resize-none transition-all"
+                  placeholder="부연 설명이 필요한 경우 입력하세요"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">증빙 이미지/파일 (Evidence)</label>
                 <div className="relative group">
                   <input 
                     type="file" 
                     onChange={e => setFile(e.target.files?.[0] || null)}
                     className="absolute inset-0 opacity-0 cursor-pointer z-10"
                   />
-                  <div className="w-full p-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center gap-3 group-hover:bg-emerald-50 group-hover:border-emerald-200 transition-all">
-                    <Upload className="w-5 h-5 text-slate-400 group-hover:text-emerald-500" />
-                    <span className="text-xs font-bold text-slate-500 group-hover:text-emerald-600 transition-colors">
-                      {file ? file.name : '영수증 등 증빙 서류를 드래그하거나 선택하세요'}
+                  <div className="w-full p-6 bg-slate-50 border-2 border-dashed border-slate-200 rounded-3xl flex flex-col items-center justify-center gap-2 group-hover:bg-emerald-50 group-hover:border-emerald-200 transition-all">
+                    <Upload className="w-6 h-6 text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                    <span className="text-xs font-bold text-slate-400 group-hover:text-emerald-600 transition-colors">
+                      {file ? file.name : '증빙 서류를 업로드하세요'}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4 pt-4 border-t border-slate-50">
                 <button 
                   type="button" 
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-5 text-slate-400 font-black hover:bg-slate-50 rounded-2xl uppercase tracking-widest text-[11px] transition-all"
+                  className="flex-1 py-4 text-slate-400 font-black hover:bg-slate-50 rounded-2xl uppercase tracking-widest text-[11px] transition-all"
                 >
                   Cancel
                 </button>
                 <button 
                   type="submit" 
                   disabled={submitting}
-                  className="flex-[2] py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl hover:bg-slate-900 transition-all uppercase tracking-widest text-[11px] disabled:opacity-50 active:scale-95"
+                  className="flex-[2] py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-200 hover:bg-slate-900 hover:shadow-none transition-all uppercase tracking-widest text-[11px] disabled:opacity-50 active:scale-95"
                 >
                   {submitting ? 'Processing...' : 'Submit Request'}
                 </button>

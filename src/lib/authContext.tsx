@@ -162,7 +162,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: currentUser.email,
             role: metaRole,
             full_name: currentUser.user_metadata?.full_name || '사용자',
-            company_id: currentUser.user_metadata?.company_id
+            company_id: currentUser.user_metadata?.company_id || prev?.company_id || null
           } as any));
 
           // 백그라운드에서 DB 정보 업데이트 (비성능 저하 방지)
