@@ -66,14 +66,33 @@ Deno.serve(async (req: Request) => {
     if (action === 'reset-password') {
       if (!userId || !tempPassword) throw new Error('Missing userId or new password');
       
-      const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      console.log(`Resetting password for user: ${userId}`);
+      
+      const { data: updateData, error: authError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password: tempPassword,
       });
-      if (authError) throw authError;
-
-      await supabaseAdmin.from('profiles').update({ must_change_password: true }).eq('id', userId);
       
-      return new Response(JSON.stringify({ success: true, message: 'Password reset successful' }), {
+      if (authError) {
+        console.error('Auth update error:', authError);
+        throw new Error(`Auth service error: ${authError.message}`);
+      }
+
+      console.log('Auth password updated successfully');
+
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .update({ must_change_password: true })
+        .eq('id', userId);
+      
+      if (profileError) {
+        console.error('Profile update error:', profileError);
+        // Auth 업데이트는 성공했으므로 우선 진행하되 에러는 기록
+      }
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: 'Password reset successful' + (profileError ? ' but profile update failed' : '') 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
 
