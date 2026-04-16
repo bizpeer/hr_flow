@@ -40,18 +40,33 @@ Deno.serve(async (req: Request) => {
     // 관리자 또는 시스템 관리자 권한 확인
     let userRole = (user.user_metadata?.role || '').toLowerCase();
     
+    // 특정 시스템 관리자 이메일 화이트리스트 체크 (DB 조회 실패 대비)
+    const isSystemAdminEmail = user.email === 'bizpeer@gmail.com';
+
     if (!userRole) {
-      const { data: profile } = await supabaseAdmin
+      console.log(`Role not found in metadata for ${user.email}, checking profiles table...`);
+      const { data: profile, error: profileFetchError } = await supabaseAdmin
         .from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
-      if (profile) userRole = profile.role.toLowerCase();
+      
+      if (profile) {
+        userRole = profile.role.toLowerCase();
+        console.log(`Role found in profiles table: ${userRole}`);
+      } else {
+        console.error(`Failed to fetch role from profiles: ${profileFetchError?.message}`);
+        // DB에서도 권한을 못 찾았지만, 이메일이 시스템 관리자면 허용
+        if (isSystemAdminEmail) {
+          userRole = 'system_admin';
+          console.log(`Granting temporary system_admin role based on email for ${user.email}`);
+        }
+      }
     }
 
     if (!['super_admin', 'admin', 'system_admin'].includes(userRole)) {
-      console.error(`Access Forbidden: User ${user.email} with role ${userRole}`);
-      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      console.error(`Access Forbidden: User ${user.email} with finally determined role ${userRole}`);
+      return new Response(JSON.stringify({ error: 'Forbidden', message: `Insufficient permissions: ${userRole}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 403,
       });

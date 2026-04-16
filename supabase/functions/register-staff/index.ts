@@ -19,7 +19,12 @@ Deno.serve(async (req) => {
       throw new Error('Server environment configuration error');
     }
 
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
     // --- 수동 권한 검증 로직 시작 ---
     // (Gateway의 --no-verify-jwt 옵션을 위해 직접 검증)

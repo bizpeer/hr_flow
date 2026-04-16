@@ -29,7 +29,7 @@ export default function LeavesPage() {
   const [type, setType] = useState('연차');
   const [reason, setReason] = useState('');
 
-  const role = (profile?.role || 'member').trim().toLowerCase();
+  const role = (profile?.role || 'member').toString().trim().toLowerCase();
   const isAdminView = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role);
 
   const fetchLeaves = async () => {
