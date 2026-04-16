@@ -1,9 +1,10 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { supabase } from '@/lib/supabase';
 import { Clock, Calendar, CheckCircle2, AlertCircle, Plus, Search, ChevronRight, X, Clock8, Filter } from 'lucide-react';
-import { calculateOvertimeDuration, Overtime } from '@/lib/api';
+import { calculateOvertimeDuration, Overtime, createOvertime } from '@/lib/api';
 import { format } from 'date-fns';
 
 export default function OvertimePage() {
