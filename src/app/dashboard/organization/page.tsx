@@ -222,7 +222,12 @@ export default function OrganizationManagement() {
   }
 
   const unassignedMembers = members.filter(m => !m.team_id && !m.is_division_head);
-  const searchedMembers = members.filter(m => m.full_name.includes(memberSearchTerm) || m.email.includes(memberSearchTerm));
+  const searchedMembers = members.filter(m => {
+    const term = memberSearchTerm.toLowerCase();
+    const nameMatch = m.full_name?.toLowerCase().includes(term);
+    const emailMatch = m.email?.toLowerCase().includes(term);
+    return nameMatch || emailMatch;
+  });
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-6 md:space-y-10 pb-20 px-4 md:px-0">

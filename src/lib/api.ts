@@ -21,6 +21,7 @@ export interface Profile {
   family_data?: { name: string; birth: string }[];
   is_division_head?: boolean;
   is_team_leader?: boolean;
+  division_id?: string;
   phone_number?: string;
   hire_date?: string;
   additional_annual_leave?: number;
