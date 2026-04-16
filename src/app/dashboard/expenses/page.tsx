@@ -43,24 +43,23 @@ export default function ExpensesManagement() {
     if (!profile) return;
     setLoading(true);
     try {
-      const start = `${selectedMonth}-01`;
-      const end = format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd');
-
       let query = supabase
         .from('expense_requests')
-        .select('*, profiles(full_name, team_id)')
-        .eq('company_id', profile.company_id);
-
-      // system_admin은 전사 데이터를 봐야 함. 만약 company_id가 null이면 profile.company_id 대신 다른 로직이 필요할 수 있음
-      // 하지만 현재 스키마상 company_id가 필수라면 profile에 담겨있을 것.
+        .select('*, profiles(full_name, team_id)');
       
-      if (!['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role)) {
+      // 관리자급이면 회사 전체 데이터를, 일반 직원이면 본인 데이터만 쿼리합니다.
+      // RLS가 이미 적용되어 있지만, 명시적인 필터로 성능과 정확성을 확보합니다.
+      if (isAdminView) {
+        query = query.eq('company_id', profile.company_id);
+      } else {
         query = query.eq('user_id', profile.id);
       }
 
-      query = query
-        .gte('expense_date', start)
-        .lte('expense_date', end);
+      if (selectedMonth) {
+        const start = `${selectedMonth}-01`;
+        const end = format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd');
+        query = query.gte('expense_date', start).lte('expense_date', end);
+      }
 
       const { data, error } = await query
         .order('status', { ascending: false })
@@ -270,6 +269,14 @@ export default function ExpensesManagement() {
                 onChange={e => setSelectedMonth(e.target.value)} 
                 className="bg-transparent text-slate-300 text-xs font-bold outline-none flex-1" 
               />
+              {selectedMonth && (
+                <button 
+                  onClick={() => setSelectedMonth('')} 
+                  className="text-[10px] bg-white/10 px-2 py-1 rounded text-emerald-400 hover:bg-emerald-500 hover:text-white font-bold transition-all"
+                >
+                  전체
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -308,7 +315,17 @@ export default function ExpensesManagement() {
               <Search className="w-10 h-10 text-slate-200" />
             </div>
             <h3 className="text-xl font-black text-slate-800 tracking-tight">조회 결과가 없습니다.</h3>
-            <p className="text-sm text-slate-400 mt-1 font-medium italic">검색어나 선택된 월을 확인해 주세요.</p>
+            <p className="text-sm text-slate-400 mt-1 font-medium italic mb-6">
+              {selectedMonth ? `${selectedMonth} 기간에 데이터가 없습니다.` : '등록된 데이터가 없습니다.'}
+            </p>
+            {selectedMonth && (
+              <button 
+                onClick={() => setSelectedMonth('')}
+                className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black transition-all"
+              >
+                전체 기간 조회하기
+              </button>
+            )}
           </div>
         ) : (
           <>

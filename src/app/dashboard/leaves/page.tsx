@@ -36,21 +36,21 @@ export default function LeavesPage() {
     if (!profile) return;
     setLoading(true);
     try {
-      const start = `${selectedMonth}-01`;
-      const end = format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd');
-
       let query = supabase
         .from('leave_requests')
-        .select('*, profiles(full_name, team_id)')
-        .eq('company_id', profile.company_id);
-
-      if (!isAdminView) {
+        .select('*, profiles(full_name, team_id)');
+      
+      if (isAdminView) {
+        query = query.eq('company_id', profile.company_id);
+      } else {
         query = query.eq('user_id', profile.id);
       }
 
-      query = query
-        .gte('start_date', start)
-        .lte('start_date', end);
+      if (selectedMonth) {
+        const start = `${selectedMonth}-01`;
+        const end = format(endOfMonth(parseISO(`${selectedMonth}-01`)), 'yyyy-MM-dd');
+        query = query.gte('start_date', start).lte('start_date', end);
+      }
 
       const { data, error } = await query
         .order('status', { ascending: false })
@@ -219,6 +219,14 @@ export default function LeavesPage() {
                   onChange={e => setSelectedMonth(e.target.value)}
                   className="bg-transparent border-none outline-none font-black text-lg text-slate-900 tracking-tight cursor-pointer"
                 />
+                {selectedMonth && (
+                  <button 
+                    onClick={() => setSelectedMonth('')} 
+                    className="text-[10px] bg-slate-100 px-2 py-1 rounded text-indigo-600 hover:bg-indigo-600 hover:text-white font-bold transition-all"
+                  >
+                    전체
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -251,7 +259,17 @@ export default function LeavesPage() {
                 <Calendar className="w-10 h-10 text-slate-200" />
               </div>
               <h3 className="text-xl font-black text-slate-800 tracking-tight">휴가 신청 내역이 없습니다.</h3>
-              <p className="text-sm text-slate-400 mt-1 font-medium italic uppercase tracking-widest">Transaction history is empty</p>
+              <p className="text-sm text-slate-400 mt-1 font-medium italic uppercase tracking-widest mb-6">
+                {selectedMonth ? `${selectedMonth} 기간에 데이터가 없습니다.` : '등록된 데이터가 없습니다.'}
+              </p>
+              {selectedMonth && (
+                <button 
+                  onClick={() => setSelectedMonth('')}
+                  className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black transition-all"
+                >
+                  전체 기간 조회하기
+                </button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
