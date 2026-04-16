@@ -405,6 +405,17 @@ export default function ExpensesManagement() {
             <form onSubmit={handleSubmit} className="p-8 md:p-10 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">카테고리</label>
+                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-no-repeat bg-[right_1.5rem_center]">
+                    <option className="dark:bg-slate-800">식비</option>
+                    <option className="dark:bg-slate-800">교통비</option>
+                    <option className="dark:bg-slate-800">사무용품</option>
+                    <option className="dark:bg-slate-800">접대비</option>
+                    <option className="dark:bg-slate-800">비품/소모품</option>
+                    <option className="dark:bg-slate-800">기타</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">항목명</label>
                   <input type="text" value={itemName} onChange={e => setItemName(e.target.value)} placeholder="예: 사무용품 구매, 야간 식대 등" className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all font-sans" required />
                 </div>
@@ -415,17 +426,6 @@ export default function ExpensesManagement() {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">지출 일자</label>
                   <input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 text-xs" required />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">카테고리</label>
-                  <select value={category} onChange={e => setCategory(e.target.value)} className="w-full p-4 bg-slate-50 dark:bg-slate-800 border-none dark:border dark:border-slate-700 rounded-2xl font-bold text-sm dark:text-white outline-none focus:ring-2 focus:ring-emerald-500 appearance-none bg-no-repeat bg-[right_1.5rem_center]">
-                    <option className="dark:bg-slate-800">식비</option>
-                    <option className="dark:bg-slate-800">교통비</option>
-                    <option className="dark:bg-slate-800">사무용품</option>
-                    <option className="dark:bg-slate-800">접대비</option>
-                    <option className="dark:bg-slate-800">비품/소모품</option>
-                    <option className="dark:bg-slate-800">기타</option>
-                  </select>
                 </div>
               </div>
 
