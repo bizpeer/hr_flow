@@ -43,6 +43,8 @@ export default function LeavesPage() {
       if (isAdminView) {
         query = query.eq('company_id', profile.company_id);
       } else {
+        // 일반 직원은 본인의 데이터만 보여야 하지만, 대시보드와 정합성을 맞추기 위해 
+        // user_id 필터를 확실하게 적용합니다.
         query = query.eq('user_id', profile.id);
       }
 

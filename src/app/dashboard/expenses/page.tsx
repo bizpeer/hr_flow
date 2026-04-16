@@ -47,8 +47,6 @@ export default function ExpensesManagement() {
         .from('expense_requests')
         .select('*, profiles(full_name, team_id)');
       
-      // 관리자급이면 회사 전체 데이터를, 일반 직원이면 본인 데이터만 쿼리합니다.
-      // RLS가 이미 적용되어 있지만, 명시적인 필터로 성능과 정확성을 확보합니다.
       if (isAdminView) {
         query = query.eq('company_id', profile.company_id);
       } else {

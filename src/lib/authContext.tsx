@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         const formattedProfile = {
           ...data,
           role: rawRole,
-          companies: data.companies || { name: '회사 정보 없음' },
+          companies: data.companies || { name: user?.user_metadata?.company_name || '회사 정보 없음' },
           division_id
         };
         
@@ -95,7 +95,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           email: email,
           role: metaRole,
           full_name: user?.user_metadata?.full_name || '사용자',
-          company_id: user?.user_metadata?.company_id
+          company_id: user?.user_metadata?.company_id,
+          companies: { name: user?.user_metadata?.company_name || '회사 정보 없음' }
         } as any);
       }
     } catch (error) {
@@ -162,7 +163,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             email: currentUser.email,
             role: metaRole,
             full_name: currentUser.user_metadata?.full_name || '사용자',
-            company_id: currentUser.user_metadata?.company_id || prev?.company_id || null
+            company_id: currentUser.user_metadata?.company_id || prev?.company_id || null,
+            companies: prev?.companies || { name: currentUser.user_metadata?.company_name || '회사 정보 없음' }
           } as any));
 
           // 백그라운드에서 DB 정보 업데이트 (비성능 저하 방지)
