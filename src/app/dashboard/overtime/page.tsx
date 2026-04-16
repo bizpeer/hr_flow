@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/authContext';
 import { supabase } from '@/lib/supabase';
 import { Clock, Calendar, CheckCircle2, AlertCircle, Plus, Search, ChevronRight, X, Clock8, Filter } from 'lucide-react';
 import { calculateOvertimeDuration, Overtime, createOvertime } from '@/lib/api';
-import { format } from 'date-fns';
+import { format, endOfMonth } from 'date-fns';
 
 export default function OvertimePage() {
   const { profile, loading: authLoading } = useAuth();
