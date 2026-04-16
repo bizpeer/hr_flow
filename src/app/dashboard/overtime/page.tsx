@@ -25,7 +25,8 @@ export default function OvertimePage() {
   const [reason, setReason] = useState('');
   const [calculatedHours, setCalculatedHours] = useState(3);
 
-  const isAdmin = ['super_admin', 'admin', 'sub_admin'].includes(profile?.role?.toLowerCase() || '');
+  const role = profile?.role || 'member';
+  const isAdmin = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role.toLowerCase());
 
   const fetchOvertimes = async () => {
     if (!profile?.company_id) return;
@@ -34,7 +35,7 @@ export default function OvertimePage() {
       setLoading(true);
       
       const start = `${selectedMonth}-01`;
-      const end = `${selectedMonth}-31`;
+      const end = format(endOfMonth(new Date(selectedMonth)), 'yyyy-MM-dd');
 
       let query = supabase
         .from('overtime_requests')

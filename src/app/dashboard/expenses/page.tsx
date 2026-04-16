@@ -21,8 +21,15 @@ export default function ExpensesManagement() {
   const [submitting, setSubmitting] = useState(false);
 
   // Filters
-  const [startDate, setStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
+  const getYearMonthDay = (date: Date) => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const [startDate, setStartDate] = useState(getYearMonthDay(new Date(new Date().getFullYear(), new Date().getMonth(), 1)));
+  const [endDate, setEndDate] = useState(getYearMonthDay(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)));
   const [searchQuery, setSearchQuery] = useState('');
 
   // Form State
@@ -34,7 +41,7 @@ export default function ExpensesManagement() {
   const [file, setFile] = useState<File | null>(null);
 
   const role = (profile?.role || 'member').trim().toLowerCase();
-  const isAdminView = ['super_admin', 'admin', 'sub_admin'].includes(role);
+  const isAdminView = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role);
   const isSubAdmin = role === 'sub_admin';
 
   const fetchExpenses = async () => {

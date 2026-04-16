@@ -40,10 +40,10 @@ export default function LeavesPage() {
     setLoading(true);
     try {
       const role = (profile.role || 'member').toLowerCase();
-      const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
+      const isManagement = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role);
       
       const start = `${selectedMonth}-01`;
-      const end = `${selectedMonth}-31`;
+      const end = format(endOfMonth(new Date(selectedMonth)), 'yyyy-MM-dd');
 
       let query = supabase
         .from('leave_requests')

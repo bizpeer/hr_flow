@@ -18,7 +18,7 @@ export default function DashboardPage() {
   const companyName = profile?.companies?.name || '우리 회사';
   
   const role = profile?.role || 'member';
-  const isManagement = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role);
+  const isManagement = ['system_admin', 'super_admin', 'admin', 'sub_admin'].includes(role.toLowerCase());
 
   // Stats for Admin
   const [stats, setStats] = useState({
@@ -99,10 +99,18 @@ export default function DashboardPage() {
         }))
       );
 
-      // Status Counts
-      const pendingCount = flattened.filter(r => ['PENDING', 'SUB_APPROVED'].includes(r.status)).length;
-      const approvedCount = flattened.filter(r => r.status === 'APPROVED').length;
-      const rejectedCount = flattened.filter(r => r.status === 'REJECTED').length;
+      // Status Counts based on Current Month to match detail pages
+      const now = new Date();
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      const currentMonthRequests = flattened.filter(r => {
+        const reqDate = new Date(r.expense_date || r.start_date || r.date);
+        return reqDate >= firstDayOfMonth;
+      });
+
+      const pendingCount = currentMonthRequests.filter(r => ['PENDING', 'SUB_APPROVED'].includes(r.status)).length;
+      const approvedCount = currentMonthRequests.filter(r => r.status === 'APPROVED').length;
+      const rejectedCount = currentMonthRequests.filter(r => r.status === 'REJECTED').length;
 
       setMyStats({
         pending: pendingCount,
