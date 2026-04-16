@@ -42,8 +42,9 @@ export default function LeavesPage() {
       const role = (profile.role || 'member').toLowerCase();
       const isManagement = ['super_admin', 'admin', 'sub_admin'].includes(role);
       
-      console.log(`[Leaves] Fetching for role: ${role}, company: ${profile.company_id}`);
-      
+      const start = `${selectedMonth}-01`;
+      const end = `${selectedMonth}-31`;
+
       let query = supabase
         .from('leave_requests')
         .select(`
@@ -53,24 +54,35 @@ export default function LeavesPage() {
             team_id
           )
         `)
-        .eq('company_id', profile.company_id);
+        .eq('company_id', profile.company_id)
+        .gte('start_date', start)
+        .lte('start_date', end);
       
       if (!isManagement) {
         query = query.eq('user_id', profile.id);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query
+        .order('status', { ascending: false })
+        .order('start_date', { ascending: false });
       
       if (error) {
         console.error('[Leaves] Fetch error:', error);
         throw error;
       }
       
-      console.log(`[Leaves] Fetched ${data?.length || 0} records`);
-      setLeaves(data || []);
+      let finalData = data || [];
+      
+      finalData.sort((a, b) => {
+        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+        return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+      });
+      
+      console.log(`[Leaves] Fetched ${finalData?.length || 0} records`);
+      setLeaves(finalData);
     } catch (error: any) {
       console.error('Failed to fetch leaves:', error);
-      // alert('휴가 내역을 불러오는데 실패했습니다: ' + (error.message || '알 수 없는 오류'));
     } finally {
       setLoading(false);
     }
@@ -102,7 +114,7 @@ export default function LeavesPage() {
         supabase.removeChannel(channel);
       };
     }
-  }, [profile?.company_id, profile?.role, profile?.id]);
+  }, [profile?.company_id, profile?.role, profile?.id, selectedMonth]);
 
   const openAppModal = (leave?: any) => {
     if (leave) {

@@ -47,19 +47,29 @@ export default function ExpensesManagement() {
         .eq('company_id', profile.company_id);
 
       if (!isAdminView) {
-        // 일반 직원은 본인 것만 (기간 필터링 없음 또는 별도 로직)
         query = query.eq('user_id', profile.id);
       }
 
-      // 관리자는 기간 내 승인건 중심, 멤버는 기간 내 신청건 중심
-      const { data, error } = await query
-        .order('expense_date', { ascending: false })
+      // 날짜 필터링 적용
+      query = query
         .gte('expense_date', startDate)
         .lte('expense_date', endDate);
+
+      // 정렬: PENDING 우선, 그 다음 날짜 역순
+      const { data, error } = await query
+        .order('status', { ascending: false }) // PENDING이 문자열상 나중이므로 내림차순 등으로 조정하거나 프론트에서 재정렬
+        .order('expense_date', { ascending: false });
 
       if (error && error.code !== '42P01') throw error;
       
       let finalData = data || [];
+
+      // PENDING을 실제 최상단으로 올리기 위한 프론트엔드 추가 정렬 (필요시)
+      finalData.sort((a, b) => {
+        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+        return new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime();
+      });
 
       // sub_admin 필터링 (본인 본부 데이터만)
       if (isSubAdmin && (profile as any).division_id) {

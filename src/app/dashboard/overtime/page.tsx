@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { Clock, Calendar, CheckCircle2, AlertCircle, Plus, Search, ChevronRight, X, Clock8 } from 'lucide-react';
-import { getOvertimes, createOvertime, calculateOvertimeDuration, Overtime } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+import { Clock, Calendar, CheckCircle2, AlertCircle, Plus, Search, ChevronRight, X, Clock8, Filter } from 'lucide-react';
+import { calculateOvertimeDuration, Overtime } from '@/lib/api';
+import { format } from 'date-fns';
 
 export default function OvertimePage() {
   const { profile, loading: authLoading } = useAuth();
@@ -11,6 +12,10 @@ export default function OvertimePage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Date Range State
+  const today = new Date();
+  const [selectedMonth, setSelectedMonth] = useState(format(today, 'yyyy-MM'));
 
   // Form states
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -21,34 +26,76 @@ export default function OvertimePage() {
 
   const isAdmin = ['super_admin', 'admin', 'sub_admin'].includes(profile?.role?.toLowerCase() || '');
 
-  useEffect(() => {
-    if (profile?.company_id) {
-      fetchOvertimes();
-    }
-  }, [profile?.company_id]);
-
-  useEffect(() => {
-    const hours = calculateOvertimeDuration(startTime, endTime);
-    setCalculatedHours(hours);
-  }, [startTime, endTime]);
-
   const fetchOvertimes = async () => {
+    if (!profile?.company_id) return;
+    
     try {
       setLoading(true);
-      const data = await getOvertimes(profile?.company_id);
       
-      // 일반 직원은 본인 것만 필터링 (API에서 처리되지만 한 번 더 안전하게)
+      const start = `${selectedMonth}-01`;
+      const end = `${selectedMonth}-31`;
+
+      let query = supabase
+        .from('overtime_requests')
+        .select('*, profiles(full_name)')
+        .eq('company_id', profile.company_id)
+        .gte('date', start)
+        .lte('date', end);
+      
       if (!isAdmin) {
-        setOvertimes(data.filter(o => o.user_id === profile?.id));
-      } else {
-        setOvertimes(data);
+        query = query.eq('user_id', profile.id);
       }
+
+      const { data, error } = await query
+        .order('status', { ascending: false })
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      
+      let finalData = data || [];
+
+      // PENDING 우선 정렬
+      finalData.sort((a, b) => {
+        if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
+        if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
+      });
+
+      setOvertimes(finalData);
     } catch (err) {
       console.error('Error fetching overtimes:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (profile?.company_id) {
+      fetchOvertimes();
+
+      // 실시간 동기화 설정
+      const channel = supabase
+        .channel('overtime-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', 
+            schema: 'public',
+            table: 'overtime_requests',
+            filter: `company_id=eq.${profile.company_id}`
+          },
+          () => {
+            console.log('Realtime update detected in overtime');
+            fetchOvertimes();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [profile?.company_id, profile?.role, profile?.id, selectedMonth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,12 +149,26 @@ export default function OvertimePage() {
             <p className="text-sm text-slate-500 font-medium">시간 외 근무 신청 및 승인 현황을 관리합니다.</p>
           </div>
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="flex items-center justify-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all shadow-lg active:scale-95"
-        >
-          <Plus className="w-4 h-4" /> 초과근무 신청
-        </button>
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+           <div className="bg-white dark:bg-slate-900 p-1.5 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 pr-6 w-full sm:w-auto">
+              <div className="w-10 h-10 bg-slate-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-slate-400">
+                <Filter className="w-4 h-4" />
+              </div>
+              <input 
+                type="month" 
+                value={selectedMonth} 
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-transparent border-none outline-none font-black text-xs text-slate-900 dark:text-white tracking-widest uppercase cursor-pointer flex-1"
+              />
+           </div>
+           <button 
+            onClick={() => setShowModal(true)}
+            className="flex items-center justify-center gap-4 px-8 py-4 bg-slate-900 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white font-black rounded-2xl shadow-xl hover:bg-emerald-600 transition-all uppercase tracking-widest text-[11px] w-full sm:w-auto"
+           >
+              <Plus className="w-5 h-5" />
+              <span>초과근무 신청</span>
+           </button>
+        </div>
       </div>
 
       {/* Stats Table */}
@@ -143,12 +204,16 @@ export default function OvertimePage() {
         </div>
       </div>
 
-      {/* List Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden min-h-[400px]">
         <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-          <div className="flex items-center gap-2">
-            <Search className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-bold text-slate-600">근무 내역 필터링</span>
+          <div className="flex items-center gap-4">
+             <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-2xl flex items-center justify-center">
+                <Search className="w-6 h-6" />
+             </div>
+             <div>
+                <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Overtime Records</h2>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction History for {selectedMonth}</p>
+             </div>
           </div>
         </div>
         <div className="overflow-x-auto">
