@@ -1,3 +1,34 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
+import { 
+  Search, UserPlus, Shield, Trash2, Plus, Users, User, X, 
+  ArrowRight, Edit2, Save, LogOut, CheckCircle2, ChevronRight
+} from 'lucide-react';
+import { 
+  Profile, Division, Team, 
+  getDivisions, getTeams, fetchCompanyUsers, 
+  createDivision, deleteDivision, updateDivision,
+  createTeam, deleteTeam, updateTeam, updateMemberProfile, adminUpdateRole
+} from '@/lib/api';
+import { supabase } from '@/lib/supabase';
+
+export default function OrganizationManagement() {
+  const { profile, loading: authLoading, user } = useAuth();
+  const router = useRouter();
+
+  const [members, setMembers] = useState<Profile[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // 모달 상태
+  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [isMemberManageModalOpen, setIsMemberManageModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
   // 선택된 관리 타겟
   const [selectedMember, setSelectedMember] = useState<Profile | null>(null);
   const [manageRole, setManageRole] = useState('');
