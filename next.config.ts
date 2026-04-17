@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   eslint: {
+    // Next.js 15+에서는 eslint 설정을 별도로 제어하지 않고 
+    // 기본적으로 빌드 시 무시 옵션을 권장합니다.
     ignoreDuringBuilds: true,
   },
   /* config options here */

@@ -200,14 +200,14 @@ export default function HRManagement() {
     try {
       setLoading(true);
       await updateMemberProfile(selectedProfile.id, {
-        resident_number: detailForm.residentNumber,
-        address: detailForm.address,
-        phone_number: detailForm.phoneNumber,
-        hire_date: detailForm.hireDate,
-        additional_annual_leave: detailForm.additionalLeave,
-        status: detailForm.status,
-        resignation_date: detailForm.status === 'resigned' ? (detailForm.resignationDate || today) : undefined,
-        family_data: detailForm.familyData
+        resident_number: detailForm.residentNumber || '',
+        address: detailForm.address || '',
+        phone_number: detailForm.phoneNumber || '',
+        hire_date: detailForm.hireDate || today,
+        additional_annual_leave: detailForm.additionalLeave || 0,
+        status: detailForm.status || 'active',
+        resignation_date: detailForm.status === 'resigned' ? (detailForm.resignationDate || today) : '',
+        family_data: detailForm.familyData || []
       });
       alert('인사 정보가 성공적으로 반영되었습니다.');
       setIsDetailModalOpen(false);
