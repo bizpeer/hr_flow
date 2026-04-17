@@ -10,7 +10,7 @@ import {
   MoreVertical, CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { Expense } from '@/lib/api';
+import { ExpenseRequest } from '@/lib/api';
 import { format, startOfMonth, endOfMonth, parseISO, isSameMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -18,7 +18,7 @@ export default function ExpensesManagement() {
   const { profile, loading: authLoading } = useAuth();
   const router = useRouter();
   
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenses, setExpenses] = useState<ExpenseRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -145,21 +145,29 @@ export default function ExpensesManagement() {
         attachment_url = await handleFileUpload(file);
       }
 
-      const { error } = await supabase.from('expense_requests').insert([{
-        description: itemName,
+      const title = `지출결의 - ${category} (${itemName})`;
+      const detailsData: ExpenseRequest = {
         amount: Number(amount),
+        category: category,
+        description: itemName, // itemName을 description으로 사용
         expense_date: expenseDate,
-        category,
-        details,
-        attachment_url,
+        details: details,
+        attachment_url: attachment_url || undefined,
         status: 'PENDING',
         user_id: profile.id,
         company_id: profile.company_id
-      }]);
+      };
 
-      if (error) throw error;
+      // api.ts의 submitApproval 함수 사용
+      await submitApproval(
+        profile.company_id,
+        'expense',
+        profile.id,
+        title,
+        detailsData
+      );
       
-      alert('지출 결의가 신청되었습니다.');
+      alert('지출 결의가 상신되었습니다.');
       setShowModal(false);
       resetForm();
       fetchExpenses();

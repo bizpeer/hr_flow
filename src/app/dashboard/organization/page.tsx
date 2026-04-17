@@ -106,35 +106,35 @@ export default function OrganizationManagement() {
     } catch (e: any) { alert(e.message); } finally { setLoading(false); }
   };
 
+  const getLeaderName = (orgId: string, type: 'division' | 'team') => {
+    if (type === 'division') {
+      const div = divisions.find(d => d.id === orgId);
+      if (div?.head_user_id) {
+        return members.find(p => p.id === div.head_user_id)?.full_name || '임명 필요';
+      }
+    } else {
+      const team = teams.find(t => t.id === orgId);
+      if (team?.leader_user_id) {
+        return members.find(p => p.id === team.leader_user_id)?.full_name || '임명 필요';
+      }
+    }
+    return '임명 필요';
+  };
+
   // 본부장 직접 임명
   const handleAssignHead = async (memberId: string) => {
     if (!selectedDivision) return;
     try {
       setLoading(true);
       
-      // 1. 동일 본부의 기존 본부장 해임
-      const otherHeads = members.filter(m => m.is_division_head && m.division_id === selectedDivision.id);
-      for (const head of otherHeads) {
-        await supabase.from('profiles').update({ is_division_head: false }).eq('id', head.id);
-      }
-
-      // 2. 새 본부장 임명 (본부 ID 및 헤더 플래그 업데이트)
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          division_id: selectedDivision.id, 
-          is_division_head: true,
-          is_team_leader: false // 본부장은 팀장을 겸임하지 않는 것을 기본으로 함
-        })
-        .eq('id', memberId);
-
-      if (error) throw error;
+      // 설계 원칙: divisions 테이블의 head_user_id 직접 업데이트
+      await setLeader(selectedDivision.id, 'division', memberId);
 
       alert(`${members.find(m => m.id === memberId)?.full_name}님이 ${selectedDivision.name}의 본부장으로 임명되었습니다.`);
       setIsHeadAssignModalOpen(false);
       await fetchData();
     } catch (e: any) {
-      alert('본부장 임명 실패: ' + e.message + '\n데이터베이스 스키마 캐시 동기화 중일 수 있습니다.');
+      alert('본부장 임명 실패: ' + e.message);
     } finally {
       setLoading(false);
     }
@@ -157,15 +157,15 @@ export default function OrganizationManagement() {
     try {
       setLoading(true);
       
+      // 1. 역할 변경 (SaaS 설계 원칙 반영)
       if (manageRole !== selectedMember.role) {
         await adminUpdateRole(selectedMember.id, manageRole);
       }
 
+      // 2. 부서 및 팀 배정 정보 업데이트
       const updateData: any = {
         team_id: manageTeamId === '' ? null : manageTeamId,
         division_id: manageDivisionId === '' ? null : manageDivisionId,
-        is_division_head: isDivisionHead,
-        is_team_leader: isTeamLeader
       };
 
       const { error } = await supabase
@@ -174,6 +174,14 @@ export default function OrganizationManagement() {
         .eq('id', selectedMember.id);
 
       if (error) throw error;
+
+      // 3. 리더 설정 (설계 원칙에 따라 각 조직 테이블 업데이트)
+      if (isDivisionHead && manageDivisionId) {
+        await setLeader(manageDivisionId, 'division', selectedMember.id);
+      }
+      if (isTeamLeader && manageTeamId) {
+        await setLeader(manageTeamId, 'team', selectedMember.id);
+      }
 
       alert('정보가 업데이트되었습니다.');
       setIsMemberManageModalOpen(false);
@@ -358,7 +366,7 @@ export default function OrganizationManagement() {
               {teams.map(team => {
                 const teamMembers = members.filter(m => m.team_id === team.id);
                 const division = divisions.find(d => d.id === team.division_id);
-                const leader = teamMembers.find(m => m.is_team_leader);
+                const isLeader = (m: Profile) => team.leader_user_id === m.id;
 
                 return (
                   <div key={team.id} className="bg-white rounded-[3rem] border border-slate-100 p-10 flex flex-col shadow-sm group hover:border-indigo-200 hover:shadow-2xl hover:shadow-indigo-50/50 transition-all overflow-hidden relative">
@@ -376,12 +384,21 @@ export default function OrganizationManagement() {
                     
                     <div className="mb-10 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">팀 리더 (Team Leader)</label>
-                      {leader ? (
+                      {team.leader_user_id ? (
                         <div className="flex items-center justify-between">
                           <span className="text-lg font-black text-indigo-600 flex items-center gap-2">
-                            <Shield className="w-5 h-5" /> {leader.full_name}
+                            <Shield className="w-5 h-5" /> 
+                            {members.find(m => m.id === team.leader_user_id)?.full_name || '임명 필요'}
                           </span>
-                          <button onClick={() => openMemberManageModal(leader)} className="text-[10px] font-black text-slate-400 hover:text-indigo-600 underline">권한 관리</button>
+                          <button 
+                            onClick={() => {
+                              const leaderProfile = members.find(p => p.id === team.leader_user_id);
+                              if (leaderProfile) openMemberManageModal(leaderProfile);
+                            }} 
+                            className="text-[10px] font-black text-slate-400 hover:text-indigo-600 underline"
+                          >
+                            권한 관리
+                          </button>
                         </div>
                       ) : (
                         <p className="text-xs font-bold text-slate-400 italic">현재 팀장이 공석입니다.</p>
@@ -390,18 +407,18 @@ export default function OrganizationManagement() {
 
                     <div className="grid grid-cols-2 gap-3 mt-auto">
                       {teamMembers.map(m => (
-                        <button 
-                          key={m.id} 
-                          onClick={() => openMemberManageModal(m)}
-                          className={`p-4 border rounded-[1.25rem] text-[13px] font-black transition-all flex items-center justify-center gap-2 ${
-                            m.is_division_head || m.is_team_leader 
-                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' 
-                            : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-300'
-                          }`}
-                        >
-                          {m.is_team_leader && <Shield className="w-3.5 h-3.5" />}
-                          {m.full_name}
-                        </button>
+                          <button 
+                            key={m.id} 
+                            onClick={() => openMemberManageModal(m)}
+                            className={`p-4 border rounded-[1.25rem] text-[13px] font-black transition-all flex items-center justify-center gap-2 ${
+                              isLeader(m) || m.division_id === division?.id && division?.head_user_id === m.id
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' 
+                              : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-300'
+                            }`}
+                          >
+                            {isLeader(m) && <Shield className="w-3.5 h-3.5" />}
+                            {m.full_name}
+                          </button>
                       ))}
                     </div>
                   </div>

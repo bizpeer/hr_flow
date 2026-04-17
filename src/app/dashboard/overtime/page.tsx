@@ -8,13 +8,13 @@ import {
   ChevronRight, X, Clock8, Filter, CalendarDays, MoreVertical,
   ArrowRight, XCircle
 } from 'lucide-react';
-import { calculateOvertimeDuration, Overtime, createOvertime } from '@/lib/api';
+import { calculateOvertimeDuration, OvertimeRequest, submitApproval } from '@/lib/api';
 import { format, endOfMonth, parseISO, startOfMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 export default function OvertimePage() {
   const { profile, loading: authLoading } = useAuth();
-  const [overtimes, setOvertimes] = useState<Overtime[]>([]);
+  const [overtimes, setOvertimes] = useState<OvertimeRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -100,16 +100,25 @@ export default function OvertimePage() {
     
     try {
       setSubmitting(true);
-      await createOvertime({
-        date,
+      const title = `초과근무 - ${date} (${startTime}~${endTime})`;
+      const detailsJson: OvertimeRequest = {
+        work_date: date, // date를 work_date로 매핑
         start_time: startTime,
         end_time: endTime,
-        reason,
         duration_hours: calculatedHours,
+        reason,
+        status: 'PENDING',
         user_id: profile.id,
-        company_id: profile.company_id,
-        status: 'PENDING'
-      });
+        company_id: profile.company_id
+      };
+
+      await submitApproval(
+        profile.company_id,
+        'overtime',
+        profile.id,
+        title,
+        detailsJson
+      );
       
       setShowModal(false);
       setReason('');
@@ -281,7 +290,7 @@ export default function OvertimePage() {
                     <tr key={item.id} className="group hover:bg-slate-50/50 transition-colors cursor-default text-[13px]">
                       <td className="px-8 py-6">
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-black text-slate-900">{item.date}</span>
+                          <span className="font-black text-slate-900">{item.work_date}</span>
                           {isAdminView && <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-tighter">{item.profiles?.full_name}</span>}
                         </div>
                       </td>
@@ -322,7 +331,7 @@ export default function OvertimePage() {
                     <div className="flex justify-between items-start">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                           <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{item.date}</span>
+                           <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">{item.work_date}</span>
                         </div>
                         <h3 className="text-base font-black text-slate-900 leading-tight">{item.reason}</h3>
                         {isAdminView && (

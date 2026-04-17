@@ -8,13 +8,13 @@ import {
   ChevronRight, X, Briefcase, Filter, Info, 
   MapPin, Clock, XCircle, CalendarDays, MoreVertical
 } from 'lucide-react';
-import { createLeave, calculateLeaveEntitlement } from '@/lib/api';
+import { submitApproval, calculateLeaveEntitlement, LeaveRequest } from '@/lib/api';
 import { format, startOfMonth, endOfMonth, parseISO, differenceInDays } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 export default function LeavesPage() {
   const { profile, loading: authLoading } = useAuth();
-  const [leaves, setLeaves] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -99,15 +99,24 @@ export default function LeavesPage() {
     
     try {
       setSubmitting(true);
-      await createLeave({
+      const title = `휴가신청 - ${type} (${startDate} ~ ${endDate})`;
+      const detailsJson: LeaveRequest = {
         start_date: startDate,
         end_date: endDate,
-        type,
-        reason,
+        leave_type: type,
+        reason: reason,
+        status: 'PENDING',
         user_id: profile.id,
-        company_id: profile.company_id,
-        status: 'PENDING'
-      });
+        company_id: profile.company_id
+      };
+
+      await submitApproval(
+        profile.company_id,
+        'leave',
+        profile.id,
+        title,
+        detailsJson
+      );
       
       setShowModal(false);
       setReason('');
