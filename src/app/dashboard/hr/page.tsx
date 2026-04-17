@@ -238,6 +238,9 @@ export default function HRManagement() {
 
       // 2. 통합 삭제 API 호출 (Auth + DB)
       const { adminDeleteUser } = await import('@/lib/api');
+      if (typeof adminDeleteUser !== 'function') {
+        throw new Error('삭제 API 기능이 유효하지 않습니다.');
+      }
       await adminDeleteUser(selectedProfile.id);
       
       alert('사용자가 성공적으로 영구 삭제되었습니다.');
