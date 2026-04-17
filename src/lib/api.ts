@@ -6,20 +6,20 @@ export type ApprovalType = 'expense' | 'leave' | 'overtime';
 export interface Profile {
   id: string;
   full_name: string;
-  email?: string;
   role: 'system_admin' | 'super_admin' | 'admin' | 'sub_admin' | 'member';
   company_id: string;
-  department?: string;
-  position?: string;
-  must_change_password?: boolean;
-  division_id?: string;
+  department_id?: string;
   team_id?: string;
+  email?: string;
   hire_date?: string;
-  status?: 'active' | 'suspended' | 'resigned';
-  used_leave?: number; // 복구
-  annual_salary?: number; // 복구
-  salary_type?: 'ANNUAL' | 'MONTHLY'; // 복구
-  family_data?: { name: string; birth: string }[]; // 복구
+  status: 'active' | 'suspended' | 'resigned';
+  resident_number?: string;
+  address?: string;
+  phone_number?: string;
+  additional_annual_leave?: number;
+  resignation_date?: string;
+  family_data?: { name: string; birth: string }[];
+  created_at: string;
   companies?: {
     name: string;
   };
