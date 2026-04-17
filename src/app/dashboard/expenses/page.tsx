@@ -10,7 +10,7 @@ import {
   MoreVertical, CalendarDays
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { ExpenseRequest } from '@/lib/api';
+import { ExpenseRequest, submitApproval } from '@/lib/api';
 import { format, startOfMonth, endOfMonth, parseISO, isSameMonth } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -372,7 +372,7 @@ export default function ExpensesManagement() {
                         {Math.floor(item.amount).toLocaleString()}
                       </td>
                       <td className="px-8 py-6">
-                        {getStatusBadge(item.status)}
+                        {getStatusBadge(item.status || 'PENDING')}
                       </td>
                       <td className="px-8 py-6 text-center">
                         {item.attachment_url ? (
@@ -401,7 +401,7 @@ export default function ExpensesManagement() {
                       </div>
                       <h3 className="text-base font-black text-slate-900 leading-tight">{item.description}</h3>
                     </div>
-                    {getStatusBadge(item.status)}
+                    {getStatusBadge(item.status || 'PENDING')}
                   </div>
 
                   <div className="flex items-end justify-between border-t border-slate-50 pt-4 mt-4">

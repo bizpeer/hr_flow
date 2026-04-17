@@ -316,7 +316,7 @@ export default function OvertimePage() {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex justify-center">
-                          {getStatusBadge(item.status)}
+                          {getStatusBadge(item.status || 'PENDING')}
                         </div>
                       </td>
                     </tr>
@@ -338,7 +338,7 @@ export default function OvertimePage() {
                           <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest">{item.profiles?.full_name}</span>
                         )}
                       </div>
-                      {getStatusBadge(item.status)}
+                      {getStatusBadge(item.status || 'PENDING')}
                     </div>
                     
                     <div className="flex items-center justify-between bg-slate-50 rounded-2xl p-4 py-3">

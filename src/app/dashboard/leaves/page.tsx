@@ -326,7 +326,7 @@ export default function LeavesPage() {
                       )}
                       <td className="px-8 py-6">
                         <div className="flex justify-center">
-                          {getStatusBadge(item.status)}
+                          {getStatusBadge(item.status || 'PENDING')}
                         </div>
                       </td>
                     </tr>
@@ -346,7 +346,7 @@ export default function LeavesPage() {
                         </div>
                         <h3 className="text-base font-black text-slate-900 leading-tight">{item.reason}</h3>
                       </div>
-                      {getStatusBadge(item.status)}
+                      {getStatusBadge(item.status || 'PENDING')}
                     </div>
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-600 bg-slate-50 p-2 py-3 px-4 rounded-2xl">
                        <span className="font-mono">{item.start_date}</span>

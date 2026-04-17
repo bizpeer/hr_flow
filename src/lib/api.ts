@@ -59,10 +59,14 @@ export interface Approval {
 
 export interface ExpenseRequest {
   id?: string;
+  user_id?: string;
+  company_id?: string;
   approval_id?: string;
   amount: number;
   category: string;
   description: string;
+  expense_date: string;
+  details?: any;
   attachment_url?: string;
   status?: string;
   created_at?: string;
@@ -74,11 +78,14 @@ export interface ExpenseRequest {
 
 export interface LeaveRequest {
   id?: string;
+  user_id?: string;
+  company_id?: string;
   approval_id?: string;
   leave_type: string;
   start_date: string;
   end_date: string;
   reason: string;
+  details?: any;
   status?: string;
   created_at?: string;
   rejection_reason?: string;
@@ -93,12 +100,15 @@ export interface LeaveRequest {
 
 export interface OvertimeRequest {
   id?: string;
+  user_id?: string;
+  company_id?: string;
   approval_id?: string;
   work_date: string;
   start_time: string;
   end_time: string;
   duration_hours: number;
   reason: string;
+  details?: any;
   status?: string;
   created_at?: string;
   rejection_reason?: string;

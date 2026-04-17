@@ -146,8 +146,6 @@ export default function OrganizationManagement() {
     setManageRole(m.role);
     setManageTeamId(m.team_id || '');
     setManageDivisionId(m.division_id || '');
-    setIsDivisionHead(m.is_division_head || false);
-    setIsTeamLeader(m.is_team_leader || false);
     setIsMemberManageModalOpen(true);
   };
 
@@ -229,7 +227,17 @@ export default function OrganizationManagement() {
     );
   }
 
-  const unassignedMembers = members.filter(m => !m.team_id && !m.is_division_head);
+  // 본부장이나 팀장이 아니고, 팀에 소속되지 않은 멤버들 (신규 할당용)
+  const unassignedMembers = useMemo(() => {
+    const divisionHeads = divisions.map(d => d.head_user_id).filter(Boolean);
+    const teamLeaders = teams.map(t => t.leader_user_id).filter(Boolean);
+    
+    return members.filter(m => 
+      !m.team_id && 
+      !divisionHeads.includes(m.id) && 
+      !teamLeaders.includes(m.id)
+    );
+  }, [members, divisions, teams]);
   const searchedMembers = members.filter(m => {
     const term = memberSearchTerm.toLowerCase();
     const nameMatch = m.full_name?.toLowerCase().includes(term);
@@ -278,7 +286,7 @@ export default function OrganizationManagement() {
 
           <div className="space-y-4 overflow-y-auto max-h-[800px] pr-2 custom-scrollbar">
             {divisions.map(div => {
-              const head = members.find(m => m.is_division_head && m.division_id === div.id);
+              const head = members.find(m => m.id === div.head_user_id);
               return (
                 <div key={div.id} className="bg-white rounded-[2rem] border border-slate-100 p-8 group hover:border-indigo-400 transition-all shadow-sm">
                   <div className="flex items-center justify-between mb-6">
