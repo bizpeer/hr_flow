@@ -467,7 +467,8 @@ export const EmployeeManagement: React.FC = () => {
                       className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
                     >
                       {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldAlert className="w-5 h-5" />}
-                      ?¸ì‚¬ ?•ë³´ ?€?¥í•˜ê¸?                    </button>
+                      ?¸ì‚¬ ?•ë³´ ?€?¥í•˜ê¸?
+                    </button>
                   )}
                   
                   {!isAdmin && (

@@ -414,7 +414,7 @@ export const AttendanceDashboard: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {(userData?.role === 'ADMIN') && (
+              {(userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN') && (
                 <select
                   id="attendance-user-selector"
                   value={selectedUserId}
