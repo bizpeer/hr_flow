@@ -3,7 +3,7 @@
 이 문서는 프로젝트의 빌드 환경 및 핵심 개발 정책을 명시하여 개발 시 항상 반영되도록 합니다.
 
 ## 1. 빌드 및 배포 환경
-- **Node.js**: `v22` 이상 필수 (GitHub Actions `deploy.yml`과 일치)
+- **Node.js**: `v22` 이상 필수 (GitHub Actions `deploy.yml`과 일치, Node.js 20 이하 사용 금지)
 - **PackageManager**: `npm`
 - **Frontend Framework**: `React v18` + `Vite`
 - **CI/CD**: GitHub Actions (GitHub Pages 배포)
