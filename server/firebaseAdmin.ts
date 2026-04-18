@@ -20,7 +20,10 @@ try {
   console.warn('Proceeding without Firebase Admin authentication. Please check your serviceAccount.json file.');
 }
 
-// 데이터베이스 ID(weberp)를 명시하여 기본(default) 데이터베이스가 아닌 특정 데이터베이스를 사용합니다.
-export const adminDb = admin.firestore('weberp');
+// 데이터베이스 ID(weberp)를 상수로 정의하여 (default) 사용을 원천 차단합니다.
+const DATABASE_ID = 'weberp';
+
+// 데이터베이스 ID를 명시하여 기본(default) 데이터베이스가 아닌 특정 데이터베이스를 사용합니다.
+export const adminDb = admin.firestore(DATABASE_ID);
 export const adminAuth = admin.auth();
 export default admin;

@@ -12,10 +12,10 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
   const { user, userData, companyData, logout, setLoginModalOpen } = useAuthStore();
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
-  const isHR = userRole === 'ADMIN' || userRole === 'SUB_ADMIN';
-  const isFinance = userRole === 'ADMIN' || userRole === 'SUB_ADMIN';
+  const isHR = userRole === 'ADMIN'; // 매트릭스에 따라 SUB_ADMIN은 인사관리 제외
+  const isFinance = userRole === 'ADMIN'; // 매트릭스에 따라 SUB_ADMIN은 재무통계 제외
   const isDirector = userRole === 'ADMIN';
-  const isManagement = isHR || isFinance || isDirector;
+  const isManagement = userRole === 'ADMIN' || userRole === 'SUB_ADMIN'; // 결재함은 둘 다 가능
 
   const NavItem = ({ to, icon: Icon, label, colorClass = 'indigo' }: { to: string, icon: any, label: string, colorClass?: string }) => (
     <NavLink 

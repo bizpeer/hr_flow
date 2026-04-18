@@ -3,7 +3,8 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-/**
+// (default) 데이터베이스 사용을 금지하기 위한 상수 정의
+const DATABASE_ID = 'weberp';
  * 관리자 권한으로 사용자의 비밀번호를 초기화합니다.
  * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
  */
@@ -28,7 +29,7 @@ exports.adminResetPassword = onCall(async (request) => {
 
   try {
     // 3. 권한 및 소속 확인 (Firestore UserProfile 조회)
-    const db = admin.firestore('weberp');
+    const db = admin.firestore(DATABASE_ID);
     const callerRef = db.collection("UserProfile").doc(request.auth.uid);
     const targetRef = db.collection("UserProfile").doc(uid);
     

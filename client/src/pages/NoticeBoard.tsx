@@ -23,7 +23,7 @@ interface Notice {
 }
 
 interface NoticeBoardProps {
-  userRole: 'ADMIN' | 'SUB_ADMIN' | 'EMPLOYEE' | string;
+  userRole: 'ADMIN' | 'SUB_ADMIN' | 'MEMBER' | string;
   currentUserId: string;
 }
 

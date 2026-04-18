@@ -66,7 +66,7 @@ function App() {
               {/* Sidebar (Responsive Drawer) */}
               <div className={`print:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-500 ease-in-out premium-shadow 
                 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0`}>
-                <Sidebar userRole={userData?.role || 'EMPLOYEE'} />
+                <Sidebar userRole={userData?.role || 'MEMBER'} />
               </div>
 
               {/* Mobile Overlay */}
@@ -94,14 +94,14 @@ function App() {
                     
                     <Route path="/leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
                     <Route path="/expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                    <Route path="/board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'EMPLOYEE'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+                    <Route path="/board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
                     <Route path="/admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
                     <Route path="/admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
-                    <Route path="/admin/finance-stats" element={<ProtectedRoute requireAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                    <Route path="/admin/employees" element={<ProtectedRoute requireAdmin><EmployeeManagement /></ProtectedRoute>} />
+                    <Route path="/admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
+                    <Route path="/admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
                     <Route path="/admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                    <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettings /></ProtectedRoute>} />
+                    <Route path="/admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
