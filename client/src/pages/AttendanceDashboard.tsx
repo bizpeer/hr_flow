@@ -4,7 +4,7 @@ import {
   KeyRound 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
@@ -19,7 +19,7 @@ interface AttendanceRecord {
 
 export const AttendanceDashboard: React.FC = () => {
   const { 
-    user, userData, setLoginModalOpen, getDisplayEmail,
+    user, userData, getDisplayEmail,
     openPasswordChange 
   } = useAuthStore();
   const [kstTime, setKstTime] = useState<string>('');
@@ -140,7 +140,7 @@ export const AttendanceDashboard: React.FC = () => {
 
   const handleAttendance = async (type: 'IN' | 'OUT') => {
     if (!user) {
-      setLoginModalOpen(true);
+      alert("로그인이 필요합니다.");
       return;
     }
 
@@ -213,6 +213,8 @@ export const AttendanceDashboard: React.FC = () => {
     );
     return onSnapshot(q, (snap) => {
       setLeaveRequests(snap.docs.map(doc => doc.data()));
+    }, (err) => {
+      console.error("Leave Snapshot Error:", err);
     });
   }, [user?.uid]);
 

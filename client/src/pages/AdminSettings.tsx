@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
-import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { updatePassword } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
+import { query, where } from 'firebase/firestore';
 
 export const AdminSettings: React.FC = () => {
   // Password Reset State
@@ -16,6 +17,7 @@ export const AdminSettings: React.FC = () => {
   const [verifyPassword, setVerifyPassword] = useState('');
   
   const { userData } = useAuthStore();
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
@@ -110,6 +112,8 @@ export const AdminSettings: React.FC = () => {
       await verifyAdmin();
 
       // 2. 도메인 설정 저장 (회사 문서 업데이트)
+      if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
+      
       await setDoc(doc(db, 'companies', userData.companyId), {
         domain: tempDomain.replace('@', ''), // @ 기호 제거
         updatedAt: new Date().toISOString(),
@@ -140,6 +144,8 @@ export const AdminSettings: React.FC = () => {
       await verifyAdmin();
 
       // 2. 해당 회사 사용자 프로필 조회 및 일괄 업데이트 (Batch)
+      if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
+      
       const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
       const querySnapshot = await getDocs(q);
       const batch = writeBatch(db);
