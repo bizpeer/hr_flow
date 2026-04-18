@@ -3,10 +3,10 @@
 이 문서는 프로젝트의 빌드 환경 및 핵심 개발 정책을 명시하여 개발 시 항상 반영되도록 합니다.
 
 ## 1. 빌드 및 배포 환경
-- **Node.js**: `v22` 이상 필수 (GitHub Actions `deploy.yml`과 일치, Node.js 20 이하 사용 금지)
+- **Node.js**: `v24` 이상 권장 (Node.js 24 런타임 네이티브 지원 및 GitHub Actions 최신 규격 준수)
 - **PackageManager**: `npm`
 - **Frontend Framework**: `React v18` + `Vite`
-- **CI/CD**: GitHub Actions (GitHub Pages 배포)
+- **CI/CD**: GitHub Actions (Node.js 24 최적화 배포)
 
 ## 2. 데이터베이스 및 보안 (SaaS 아키텍처)
 - **Firebase Database**: Firestore (Database ID: `weberp`)
@@ -22,6 +22,7 @@
 - ** Frontend: React + TypeScript + Tailwind CSS + Zustand (상태 관리)
 - ** Backend/DB: Firebase Auth (인증) + Firestore (DB ID: weberp)
 - **Serverless Logic: Firebase Cloud Functions (비밀번호 강제 초기화 등 관리자 기능)
+
 ## 5. 권한별 접근 메뉴 (RBAC Matrix)
 구분	메뉴명	SUPER_ADMIN	ADMIN (Owner)	SUB_ADMIN	MEMBER
 플랫폼	플랫폼 관리 (기업 관리)	✅	❌	❌	❌
