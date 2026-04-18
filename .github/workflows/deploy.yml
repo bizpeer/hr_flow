@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: client/package-lock.json
 
@@ -52,26 +52,13 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-
-
-
-      # Firebase Hosting 배포
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}'
-          channelId: live
-          projectId: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
-          firebaseToolsVersion: latest
-
-      # Firestore & Storage Rules 배포 (서비스 계정 권한 활용)
-      - name: Deploy Firebase Rules (Firestore & Storage)
+      # Firebase Hosting 및 Rules 통합 배포 (직접 CLI 호출로 Node 20 경고 제거)
+      - name: Deploy to Firebase (Hosting & Rules)
         run: |
           mkdir -p .firebase
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
           export GOOGLE_APPLICATION_CREDENTIALS=.firebase/service-account.json
-          npx firebase-tools deploy --only firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
           rm .firebase/service-account.json
         continue-on-error: true # 룰 배포 실패가 전체 빌드를 멈추지 않도록 함
 
