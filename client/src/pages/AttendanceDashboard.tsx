@@ -46,7 +46,7 @@ export const AttendanceDashboard: React.FC = () => {
 
   // 관리자일 경우 전체 사용자 목록 페칭
   useEffect(() => {
-    if (isManagementRole && userData?.companyId) {
+    if (isManagement && userData?.companyId) {
       const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
       const unsubscribe = onSnapshot(q, (snap) => {
         setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
