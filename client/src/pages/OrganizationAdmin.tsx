@@ -58,11 +58,13 @@ export const OrganizationAdmin: React.FC = () => {
   const [selectedDivision, setSelectedDivision] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // 모달 ?�어??  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+  // 모달 ?�어??
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
 
-  // ?�력 ?�드??  const [newDivName, setNewDivName] = useState('');
+  // ?�력 ?�드??
+  const [newDivName, setNewDivName] = useState('');
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
@@ -71,13 +73,15 @@ export const OrganizationAdmin: React.FC = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // ?�력 조회 �???��??  const [selectedEmpForLogs, setSelectedEmpForLogs] = useState<Employee | null>(null);
+  // ?�력 조회 �???��??
+  const [selectedEmpForLogs, setSelectedEmpForLogs] = useState<Employee | null>(null);
   const [showLogDeleteConfirm, setShowLogDeleteConfirm] = useState(false);
   const [deleteLogsPassword, setDeleteLogsPassword] = useState('');
   const [isProcessingLogs, setIsProcessingLogs] = useState(false);
   const [logSearchResults, setLogSearchResults] = useState<AuditLog[] | null>(null);
 
-  // 부관리자(SUB_ADMIN) ?�근 차단 리다?�렉??  useEffect(() => {
+  // 부관리자(SUB_ADMIN) ?�근 차단 리다?�렉??
+  useEffect(() => {
     if (userData && userData.role === 'SUB_ADMIN') {
       alert('조직 관�?메뉴???�???�근 권한???�습?�다.');
       navigate('/attendance');
