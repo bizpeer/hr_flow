@@ -79,7 +79,7 @@ export const Landing: React.FC = () => {
               <ShieldCheck className="w-7 h-7" />
             </div>
             <h3 className="text-xl font-bold mb-4">보안 중심 설계</h3>
-            <p className="text-gray-500 leading-relaxed">강력한 권한 분리(ADMIN, SUB_ADMIN, EMPLOYEE)를 통해 민감한 인사 데이터를 안전하게 보호합니다.</p>
+            <p className="text-gray-500 leading-relaxed">강력한 권한 분리(ADMIN, SUB_ADMIN, MEMBER)를 통해 민감한 인사 데이터를 안전하게 보호합니다.</p>
           </div>
         </div>
       </section>

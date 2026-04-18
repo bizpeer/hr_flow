@@ -27,6 +27,7 @@ export const AttendanceDashboard: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const isManagement = userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN';
 
   // 캘린더 및 관리자 조회용 상태
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
@@ -413,7 +414,7 @@ export const AttendanceDashboard: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              {(userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN') && (
+              {(userData?.role === 'ADMIN') && (
                 <select
                   id="attendance-user-selector"
                   value={selectedUserId}

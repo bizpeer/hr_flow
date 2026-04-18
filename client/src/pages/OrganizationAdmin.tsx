@@ -58,37 +58,33 @@ export const OrganizationAdmin: React.FC = () => {
   const [selectedDivision, setSelectedDivision] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // 모달 제어용
-  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+  // 모달 ?�어??  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [showDivisionModal, setShowDivisionModal] = useState(false);
   const [showTeamModal, setShowTeamModal] = useState(false);
 
-  // 입력 필드용
-  const [newDivName, setNewDivName] = useState('');
+  // ?�력 ?�드??  const [newDivName, setNewDivName] = useState('');
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
 
-  // 정보 수정용 (임명/이동)
+  // ?�보 ?�정??(?�명/?�동)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
-  // 이력 조회 및 삭제용
-  const [selectedEmpForLogs, setSelectedEmpForLogs] = useState<Employee | null>(null);
+  // ?�력 조회 �???��??  const [selectedEmpForLogs, setSelectedEmpForLogs] = useState<Employee | null>(null);
   const [showLogDeleteConfirm, setShowLogDeleteConfirm] = useState(false);
   const [deleteLogsPassword, setDeleteLogsPassword] = useState('');
   const [isProcessingLogs, setIsProcessingLogs] = useState(false);
   const [logSearchResults, setLogSearchResults] = useState<AuditLog[] | null>(null);
 
-  // 부관리자(SUB_ADMIN) 접근 차단 리다이렉트
-  useEffect(() => {
+  // 부관리자(SUB_ADMIN) ?�근 차단 리다?�렉??  useEffect(() => {
     if (userData && userData.role === 'SUB_ADMIN') {
-      alert('조직 관리 메뉴에 대한 접근 권한이 없습니다.');
+      alert('조직 관�?메뉴???�???�근 권한???�습?�다.');
       navigate('/attendance');
     }
   }, [userData, navigate]);
 
-  // Firestore 데이터 실시간 구독 (companyId 기반 격리)
+  // Firestore ?�이???�시�?구독 (companyId 기반 격리)
   useEffect(() => {
     if (!userData?.companyId) return;
     const companyId = userData.companyId;
@@ -133,7 +129,7 @@ export const OrganizationAdmin: React.FC = () => {
       await addDoc(collection(db, 'AuditLogs'), {
         timestamp: new Date().toISOString(),
         actionType: type,
-        performedBy: userData?.name || '시스템',
+        performedBy: userData?.name || '?�스??,
         targetId, targetName, details,
         companyId: userData?.companyId || ''
       });
@@ -153,10 +149,10 @@ export const OrganizationAdmin: React.FC = () => {
     if (!newDivName.trim()) return;
     try {
       const docRef = await addDoc(collection(db, 'divisions'), { name: newDivName, headId: '', companyId: userData?.companyId || '' });
-      await logAction('CREATE_DIVISION', docRef.id, newDivName, '새 본부 생성');
+      await logAction('CREATE_DIVISION', docRef.id, newDivName, '??본�? ?�성');
       setNewDivName(''); setShowDivisionModal(false);
     } catch (err) {
-      alert("본부 생성 실패: " + (err as Error).message);
+      alert("본�? ?�성 ?�패: " + (err as Error).message);
     }
   };
 
@@ -165,11 +161,11 @@ export const OrganizationAdmin: React.FC = () => {
     if (!newTeamName.trim() || !newTeamDivId) return;
     try {
       const docRef = await addDoc(collection(db, 'teams'), { divisionId: newTeamDivId, name: newTeamName, leaderId: '', companyId: userData?.companyId || '' });
-      const divName = divisions.find(d => d.id === newTeamDivId)?.name || '알 수 없음';
-      await logAction('CREATE_TEAM', docRef.id, newTeamName, `${divName} 소속 팀 생성`);
+      const divName = divisions.find(d => d.id === newTeamDivId)?.name || '?????�음';
+      await logAction('CREATE_TEAM', docRef.id, newTeamName, `${divName} ?�속 ?� ?�성`);
       setNewTeamName(''); setNewTeamDivId(''); setShowTeamModal(false);
     } catch (err) {
-      alert("팀 생성 실패: " + (err as Error).message);
+      alert("?� ?�성 ?�패: " + (err as Error).message);
     }
   };
 
@@ -179,12 +175,12 @@ export const OrganizationAdmin: React.FC = () => {
       const loginInput = newEmp.email.trim().toLowerCase();
       const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${systemDomain}`;
 
-      // 1. 중복 아이디 체크
+      // 1. 중복 ?�이??체크
       const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail), where('companyId', '==', userData?.companyId || ''));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
-        alert(`[중복 오류] '${finalEmail}' 아이디는 이미 등록되어 있습니다.\n다른 아이디를 사용해 주세요.`);
+        alert(`[중복 ?�류] '${finalEmail}' ?�이?�는 ?��? ?�록?�어 ?�습?�다.\n?�른 ?�이?��? ?�용??주세??`);
         return;
       }
 
@@ -195,7 +191,7 @@ export const OrganizationAdmin: React.FC = () => {
       await setDoc(doc(db, 'UserProfile', tempId), {
         name: newEmp.name,
         email: finalEmail,
-        role: 'EMPLOYEE',
+        role: 'MEMBER',
         teamId: newEmp.teamId || '',
         divisionId,
         teamHistory: [],
@@ -205,22 +201,22 @@ export const OrganizationAdmin: React.FC = () => {
         companyId: userData?.companyId || ''
       });
       
-      await logAction('CREATE_EMPLOYEE', tempId, newEmp.name, `직원 등록 (${finalEmail}) / 임비 123456`);
-      alert(`[안내] 신규 직원 데이터가 등록되었습니다.\n아이디: ${finalEmail.split('@')[0]}\n임시 비밀번호: 123456\n(표시 이메일: ${getDisplayEmail(finalEmail)})`);
+      await logAction('CREATE_MEMBER', tempId, newEmp.name, `직원 ?�록 (${finalEmail}) / ?�비 123456`);
+      alert(`[?�내] ?�규 직원 ?�이?��? ?�록?�었?�니??\n?�이?? ${finalEmail.split('@')[0]}\n?�시 비�?번호: 123456\n(?�시 ?�메?? ${getDisplayEmail(finalEmail)})`);
       setShowEmployeeModal(false);
       setNewEmp({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
     } catch (err) {
-      alert("직원 등록 실패: " + (err as Error).message);
+      alert("직원 ?�록 ?�패: " + (err as Error).message);
     }
   };
 
   const handleDeleteEmployee = async (uid: string, name: string) => {
-    if (!window.confirm(`'${name}' 직원을 삭제하시겠습니까?`)) return;
+    if (!window.confirm(`'${name}' 직원????��?�시겠습?�까?`)) return;
     try {
       await deleteDoc(doc(db, 'UserProfile', uid));
-      await logAction('DELETE_EMPLOYEE', uid, name, '직원 삭제(영구)');
+      await logAction('DELETE_EMPLOYEE', uid, name, '직원 ??��(?�구)');
     } catch (err) {
-      alert("삭제 실패: " + (err as Error).message);
+      alert("??�� ?�패: " + (err as Error).message);
     }
   };
 
@@ -229,7 +225,7 @@ export const OrganizationAdmin: React.FC = () => {
       const userRef = doc(db, 'UserProfile', emp.uid);
       const selectedTeam = teams.find(t => t.id === newTeamId);
       const divisionId = selectedTeam?.divisionId || '';
-      const teamName = selectedTeam?.name || '미배정';
+      const teamName = selectedTeam?.name || '미배??;
       
       const newHistory = [...(emp.teamHistory || []), {
         teamId: newTeamId, teamName, joinedAt: new Date().toISOString(), role: newRole
@@ -242,66 +238,66 @@ export const OrganizationAdmin: React.FC = () => {
         teamHistory: newHistory
       });
       
-      await logAction('UPDATE_EMPLOYEE', emp.uid, emp.name, `${teamName} 로 이동 / 역할: ${newRole}`);
-      alert(`${emp.name}님의 소속/역할이 ${newRole} 등급으로 변경되었습니다.`);
+      await logAction('UPDATE_EMPLOYEE', emp.uid, emp.name, `${teamName} �??�동 / ??��: ${newRole}`);
+      alert(`${emp.name}?�의 ?�속/??��??${newRole} ?�급?�로 변경되?�습?�다.`);
       setShowEditModal(false);
       setEditingEmployee(null);
     } catch (err) {
-      alert("변경 실패: " + (err as Error).message);
+      alert("변�??�패: " + (err as Error).message);
     }
   };
 
   const handleAppointHead = async (divisionId: string, userId: string) => {
     try {
       await setDoc(doc(db, 'divisions', divisionId), { headId: userId }, { merge: true });
-      const empName = employees.find(e => e.uid === userId)?.name || '미임명';
+      const empName = employees.find(e => e.uid === userId)?.name || '미임�?;
       const divName = divisions.find(d => d.id === divisionId)?.name || '';
-      await logAction('APPOINT_HEAD', divisionId, divName, `본부장 임명: ${empName}`);
-      alert("본부장이 임명되었습니다.");
+      await logAction('APPOINT_HEAD', divisionId, divName, `본�????�명: ${empName}`);
+      alert("본�??�이 ?�명?�었?�니??");
     } catch (err) {
-      alert("임명 실패: " + (err as Error).message);
+      alert("?�명 ?�패: " + (err as Error).message);
     }
   };
 
   const handleAppointLeader = async (teamId: string, userId: string) => {
     try {
       await setDoc(doc(db, 'teams', teamId), { leaderId: userId }, { merge: true });
-      const empName = employees.find(e => e.uid === userId)?.name || '미임명';
+      const empName = employees.find(e => e.uid === userId)?.name || '미임�?;
       const teamName = teams.find(t => t.id === teamId)?.name || '';
-      await logAction('APPOINT_LEADER', teamId, teamName, `팀장 임명: ${empName}`);
-      alert("팀장이 임명되었습니다.");
+      await logAction('APPOINT_LEADER', teamId, teamName, `?�???�명: ${empName}`);
+      alert("?�?�이 ?�명?�었?�니??");
     } catch (err) {
-      alert("임명 실패: " + (err as Error).message);
+      alert("?�명 ?�패: " + (err as Error).message);
     }
   };
 
   const handleDeleteDivision = async (id: string, name: string) => {
     const hasTeams = teams.some(t => t.divisionId === id);
     if (hasTeams) {
-      alert("소속된 팀이 있는 본부는 삭제할 수 없습니다.");
+      alert("?�속???�???�는 본�?????��?????�습?�다.");
       return;
     }
-    if (!window.confirm(`'${name}' 본부를 삭제하시겠습니까?`)) return;
+    if (!window.confirm(`'${name}' 본�?�???��?�시겠습?�까?`)) return;
     try {
       await deleteDoc(doc(db, 'divisions', id));
-      await logAction('DELETE_DIVISION', id, name, '본부 삭제');
+      await logAction('DELETE_DIVISION', id, name, '본�? ??��');
     } catch (err) {
-      alert("삭제 실패: " + (err as Error).message);
+      alert("??�� ?�패: " + (err as Error).message);
     }
   };
 
   const handleDeleteTeam = async (id: string, name: string) => {
     const hasEmployees = employees.some(e => e.teamId === id);
     if (hasEmployees) {
-      alert("이 팀에 소속된 직원이 있습니다.");
+      alert("???�???�속??직원???�습?�다.");
       return;
     }
-    if (!window.confirm(`'${name}' 팀을 삭제하시겠습니까?`)) return;
+    if (!window.confirm(`'${name}' ?�????��?�시겠습?�까?`)) return;
     try {
       await deleteDoc(doc(db, 'teams', id));
-      await logAction('DELETE_TEAM', id, name, '팀 삭제');
+      await logAction('DELETE_TEAM', id, name, '?� ??��');
     } catch (err) {
-      alert("삭제 실패: " + (err as Error).message);
+      alert("??�� ?�패: " + (err as Error).message);
     }
   };
 
@@ -315,7 +311,7 @@ export const OrganizationAdmin: React.FC = () => {
       try {
         await signInWithEmailAndPassword(auth, userData?.email || '', deleteLogsPassword);
       } catch (err) {
-        throw new Error('비밀번호가 일치하지 않습니다.');
+        throw new Error('비�?번호가 ?�치?��? ?�습?�다.');
       }
 
       const { writeBatch, getDocs, collection } = await import('firebase/firestore');
@@ -324,11 +320,11 @@ export const OrganizationAdmin: React.FC = () => {
       snap.forEach(d => batch.delete(d.ref));
       
       await batch.commit();
-      alert('모든 조직 변경 이력이 삭제되었습니다.');
+      alert('모든 조직 변�??�력????��?�었?�니??');
       setShowLogDeleteConfirm(false);
       setDeleteLogsPassword('');
     } catch (err) {
-      alert('삭제 중 오류: ' + (err as Error).message);
+      alert('??�� �??�류: ' + (err as Error).message);
     } finally {
       setIsProcessingLogs(false);
     }
@@ -355,7 +351,7 @@ export const OrganizationAdmin: React.FC = () => {
       <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
         <div className="flex flex-col items-center gap-6">
           <div className="w-16 h-16 border-4 border-indigo-100 border-t-indigo-600 rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-black tracking-tight text-lg">조직 엔진 최적화 중...</p>
+          <p className="text-slate-500 font-black tracking-tight text-lg">조직 ?�진 최적??�?..</p>
         </div>
       </div>
     );
@@ -372,16 +368,16 @@ export const OrganizationAdmin: React.FC = () => {
               <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
                 <Users className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">전사 조직 관리 시스템</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">?�사 조직 관�??�스??/h1>
             </div>
-            <p className="text-slate-500 font-medium">본부 및 팀의 구조를 설계하고 인사 정보를 통합 관리합니다.</p>
+            <p className="text-slate-500 font-medium">본�? �??�??구조�??�계?�고 ?�사 ?�보�??�합 관리합?�다.</p>
           </div>
 
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 relative group hidden xl:flex">
               <input 
                 type="text" 
-                placeholder="구성원 이름 검색..." 
+                placeholder="구성???�름 검??.." 
                 value={searchQuery}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSearchLogs(); }}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -391,7 +387,7 @@ export const OrganizationAdmin: React.FC = () => {
               <button 
                 onClick={handleSearchLogs}
                 className="p-3.5 bg-white border-2 border-slate-100 text-indigo-600 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all shadow-sm flex items-center justify-center group/btn"
-                title="해당 인원 이력 검색"
+                title="?�당 ?�원 ?�력 검??
               >
                 <History className="w-6 h-6 group-hover/btn:rotate-12 transition-transform" />
               </button>
@@ -401,7 +397,7 @@ export const OrganizationAdmin: React.FC = () => {
               className="flex items-center gap-2.5 px-6 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 shrink-0"
             >
               <UserPlus className="w-5 h-5" />
-              <span>직원 등록</span>
+              <span>직원 ?�록</span>
             </button>
           </div>
         </div>
@@ -415,8 +411,8 @@ export const OrganizationAdmin: React.FC = () => {
                   <ShieldCheck className="w-8 h-8 text-indigo-400" />
                 </div>
                 <div>
-                  <h3 className="text-white font-black text-xl flex items-center gap-2 tracking-tight">시스템 마스터 제어판</h3>
-                  <p className="text-slate-400 text-sm font-medium mt-1">부관리자 임명 및 시스템 전역 보안 설정을 관리할 수 있습니다.</p>
+                  <h3 className="text-white font-black text-xl flex items-center gap-2 tracking-tight">?�스??마스???�어??/h3>
+                  <p className="text-slate-400 text-sm font-medium mt-1">부관리자 ?�명 �??�스???�역 보안 ?�정??관리할 ???�습?�다.</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -425,14 +421,14 @@ export const OrganizationAdmin: React.FC = () => {
                   className="bg-rose-500/10 text-rose-400 px-6 py-3.5 rounded-2xl border border-rose-500/20 font-black hover:bg-rose-500 hover:text-white transition-all text-xs flex items-center gap-2"
                 >
                   <Trash2 className="w-4 h-4" />
-                  전체 이력 삭제
+                  ?�체 ?�력 ??��
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* 이력 검색 결과 섹션 */}
+        {/* ?�력 검??결과 ?�션 */}
         {logSearchResults && (
           <div className="bg-white rounded-[2.5rem] shadow-2xl border-2 border-indigo-100 overflow-hidden animate-in slide-in-from-top-4 duration-500">
             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-indigo-50/30">
@@ -441,8 +437,8 @@ export const OrganizationAdmin: React.FC = () => {
                   <History className="w-5 h-5" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-tight">"{searchQuery}" 이력 검색 결과</h2>
-                  <p className="text-xs font-bold text-indigo-500 mt-0.5">총 {logSearchResults.length}건의 기록이 발견되었습니다.</p>
+                  <h2 className="text-xl font-black text-slate-800 tracking-tight">"{searchQuery}" ?�력 검??결과</h2>
+                  <p className="text-xs font-bold text-indigo-500 mt-0.5">�?{logSearchResults.length}건의 기록??발견?�었?�니??</p>
                 </div>
               </div>
               <button 
@@ -456,11 +452,11 @@ export const OrganizationAdmin: React.FC = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/50">
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">일시</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">수행자</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">변경 분류</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">대상 객체</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">상세 변경 내용</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">?�시</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">?�행??/th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">변�?분류</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">?�??객체</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">?�세 변�??�용</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
@@ -484,7 +480,7 @@ export const OrganizationAdmin: React.FC = () => {
                     </tr>
                   ))}
                   {logSearchResults.length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-24 text-slate-400 font-bold">검색 결과가 없습니다.</td></tr>
+                    <tr><td colSpan={5} className="text-center py-24 text-slate-400 font-bold">검??결과가 ?�습?�다.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -492,9 +488,9 @@ export const OrganizationAdmin: React.FC = () => {
           </div>
         )}
 
-        {/* 조직 엔진 (Main Grid) */}
+        {/* 조직 ?�진 (Main Grid) */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-          {/* 본부 리스트 */}
+          {/* 본�? 리스??*/}
           <div className="xl:col-span-4 space-y-6">
             <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
               <div className="p-8 border-b border-slate-50 flex items-center justify-between">
@@ -502,7 +498,7 @@ export const OrganizationAdmin: React.FC = () => {
                   <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
                     <Building className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-tight">본부 구성</h2>
+                  <h2 className="text-xl font-black text-slate-800 tracking-tight">본�? 구성</h2>
                 </div>
                 <button 
                   onClick={() => setShowDivisionModal(true)}
@@ -539,14 +535,14 @@ export const OrganizationAdmin: React.FC = () => {
                        </div>
                        <div className={`flex items-center gap-2 p-1.5 rounded-xl transition-colors ${selectedDivision === div.id ? 'bg-white/10' : 'bg-slate-50'}`}>
                           <ShieldCheck className="w-4 h-4 text-slate-400" />
-                          <span className="text-xs font-bold text-slate-400">본부장:</span>
+                          <span className="text-xs font-bold text-slate-400">본�???</span>
                           <select 
                             className={`flex-1 text-xs font-black bg-transparent border-none focus:ring-0 p-0 appearance-none ${selectedDivision === div.id ? 'text-white' : 'text-indigo-600'}`}
                             value={div.headId || ''}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => handleAppointHead(div.id, e.target.value)}
                           >
-                            <option value="" className="text-slate-900">미임명</option>
+                            <option value="" className="text-slate-900">미임�?/option>
                             {employees.map(emp => <option key={emp.uid} value={emp.uid} className="text-slate-900">{emp.name} ({getDisplayEmail(emp.email)})</option>)}
                           </select>
                           <ChevronRight className="w-4 h-4 text-slate-300" />
@@ -558,23 +554,23 @@ export const OrganizationAdmin: React.FC = () => {
             </div>
           </div>
 
-          {/* 팀 및 구성원 */}
+          {/* ?� �?구성??*/}
           <div className="xl:col-span-8 space-y-8">
             <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[600px]">
               <div className="p-4 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">소속 팀 관리</h2>
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">?�속 ?� 관�?/h2>
                 <button 
                   onClick={() => { if (selectedDivision) setNewTeamDivId(selectedDivision); setShowTeamModal(true); }}
                   className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-black rounded-xl shadow-xl hover:bg-emerald-700 transition-all"
                 >
-                  <PlusCircle className="w-4 h-4" /> <span>팀 생성</span>
+                  <PlusCircle className="w-4 h-4" /> <span>?� ?�성</span>
                 </button>
               </div>
 
               <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {unassignedEmployees.length > 0 && !selectedDivision && (
                   <div className="p-4 rounded-3xl border-2 border-amber-100 bg-amber-50/20">
-                    <h4 className="text-lg font-black text-amber-800 mb-3">미배정 구성원</h4>
+                    <h4 className="text-lg font-black text-amber-800 mb-3">미배??구성??/h4>
                     <div className="flex flex-wrap gap-2">
                        {unassignedEmployees.map(emp => (
                          <div key={emp.uid} className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-2xl shadow-sm cursor-pointer" onClick={() => { setEditingEmployee(emp); setShowEditModal(true); }}>
@@ -597,15 +593,15 @@ export const OrganizationAdmin: React.FC = () => {
                     
                     <div className="space-y-3">
                        <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-100">
-                          <span className="text-xs font-black text-slate-500">팀 리더</span>
+                          <span className="text-xs font-black text-slate-500">?� 리더</span>
                           <select className="text-xs font-black text-emerald-600 bg-transparent border-none p-0 text-right" value={team.leaderId || ''} onChange={(e) => handleAppointLeader(team.id, e.target.value)}>
-                            <option value="">미지정</option>
+                            <option value="">미�???/option>
                             {getEmployeesInTeam(team.id).map(emp => <option key={emp.uid} value={emp.uid}>{emp.name} ({getDisplayEmail(emp.email)})</option>)}
                           </select>
                        </div>
                        <div className="space-y-2">
                           <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase">구성원 ({getEmployeesInTeam(team.id).length})</span>
+                            <span className="text-[10px] font-black text-slate-400 uppercase">구성??({getEmployeesInTeam(team.id).length})</span>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             {getEmployeesInTeam(team.id).map(emp => (
@@ -626,100 +622,100 @@ export const OrganizationAdmin: React.FC = () => {
         </div>
       </div>
 
-      {/* 모달 필터 */}
+      {/* 모달 ?�터 */}
       {(showDivisionModal || showTeamModal || showEmployeeModal || showEditModal || selectedEmpForLogs || showLogDeleteConfirm) && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100]" />
       )}
 
-      {/* 본부 생성 모달 */}
+      {/* 본�? ?�성 모달 */}
       {showDivisionModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-12 w-full max-w-lg shadow-2xl animate-modal-pop">
             <div className="flex justify-between items-center mb-10">
-              <h2 className="text-3xl font-black text-slate-900">신규 본부 설립</h2>
+              <h2 className="text-3xl font-black text-slate-900">?�규 본�? ?�립</h2>
               <button onClick={() => setShowDivisionModal(false)}><X className="w-6 h-6" /></button>
             </div>
             <form onSubmit={handleCreateDivision} className="space-y-8">
-              <input type="text" autoFocus required value={newDivName} onChange={(e) => setNewDivName(e.target.value)} placeholder="본부 명칭" className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black text-lg" />
-              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">본부 생성</button>
+              <input type="text" autoFocus required value={newDivName} onChange={(e) => setNewDivName(e.target.value)} placeholder="본�? 명칭" className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black text-lg" />
+              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">본�? ?�성</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 팀 생성 모달 */}
+      {/* ?� ?�성 모달 */}
       {showTeamModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-12 w-full max-w-lg shadow-2xl animate-modal-pop">
-            <h2 className="text-3xl font-black text-slate-900 mb-10">신규 팀 구축</h2>
+            <h2 className="text-3xl font-black text-slate-900 mb-10">?�규 ?� 구축</h2>
             <form onSubmit={handleCreateTeam} className="space-y-6">
               <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newTeamDivId} onChange={(e) => setNewTeamDivId(e.target.value)}>
-                <option value="">본부 선택</option>
+                <option value="">본�? ?�택</option>
                 {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
-              <input type="text" required value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="팀 명칭" className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
-              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">팀 생성</button>
+              <input type="text" required value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="?� 명칭" className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">?� ?�성</button>
               <button type="button" onClick={() => setShowTeamModal(false)} className="w-full p-4 text-slate-400 font-bold">취소</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 직원 등록 모달 */}
+      {/* 직원 ?�록 모달 */}
       {showEmployeeModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-12 w-full max-w-xl shadow-2xl animate-modal-pop">
-            <h2 className="text-3xl font-black text-slate-900 mb-10">신규 직원 등록</h2>
+            <h2 className="text-3xl font-black text-slate-900 mb-10">?�규 직원 ?�록</h2>
             <form onSubmit={handleCreateEmployee} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <input type="text" required placeholder="이름" value={newEmp.name} onChange={(e) => setNewEmp({...newEmp, name: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
-                <input type="text" required placeholder="아이디(이메일)" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+                <input type="text" required placeholder="?�름" value={newEmp.name} onChange={(e) => setNewEmp({...newEmp, name: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+                <input type="text" required placeholder="?�이???�메??" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
               </div>
               <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newEmp.teamId} onChange={(e) => setNewEmp({...newEmp, teamId: e.target.value})}>
-                <option value="">팀 선택(선택사항)</option>
+                <option value="">?� ?�택(?�택?�항)</option>
                 {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
-              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">등록 완료</button>
+              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">?�록 ?�료</button>
               <button type="button" onClick={() => setShowEmployeeModal(false)} className="w-full p-4 text-slate-400 font-bold">취소</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* 역할/팀 수정 모달 */}
+      {/* ??��/?� ?�정 모달 */}
       {showEditModal && editingEmployee && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-12 w-full max-w-lg shadow-2xl animate-modal-pop">
-            <h2 className="text-2xl font-black text-slate-900 mb-6">{editingEmployee.name} 정보 수정</h2>
+            <h2 className="text-2xl font-black text-slate-900 mb-6">{editingEmployee.name} ?�보 ?�정</h2>
             <div className="space-y-6">
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 ml-1">소속 팀 변경</label>
+                 <label className="text-xs font-black text-slate-400 ml-1">?�속 ?� 변�?/label>
                  <select value={editingEmployee.teamId || ''} onChange={(e) => setEditingEmployee({...editingEmployee, teamId: e.target.value})} className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black">
-                   <option value="">미배정</option>
+                   <option value="">미배??/option>
                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                  </select>
                </div>
                <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 ml-1">권한 등급</label>
+                 <label className="text-xs font-black text-slate-400 ml-1">권한 ?�급</label>
                  <select value={editingEmployee.role} onChange={(e) => setEditingEmployee({...editingEmployee, role: e.target.value})} className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black">
-                   <option value="EMPLOYEE">일반 직원 (EMPLOYEE)</option>
+                   <option value="EMPLOYEE">?�반 직원 (EMPLOYEE)</option>
                    <option value="SUB_ADMIN">부관리자 (SUB_ADMIN)</option>
                    <option value="ADMIN">최고 관리자 (ADMIN)</option>
                  </select>
                </div>
-               <button onClick={() => handleUpdateRole(editingEmployee, editingEmployee.teamId || '', editingEmployee.role)} className="w-full p-5 text-white bg-indigo-600 rounded-2xl font-black shadow-lg">상태 저장하기</button>
-               <button onClick={() => setShowEditModal(false)} className="w-full p-4 text-slate-400 font-bold">닫기</button>
+               <button onClick={() => handleUpdateRole(editingEmployee, editingEmployee.teamId || '', editingEmployee.role)} className="w-full p-5 text-white bg-indigo-600 rounded-2xl font-black shadow-lg">?�태 ?�?�하�?/button>
+               <button onClick={() => setShowEditModal(false)} className="w-full p-4 text-slate-400 font-bold">?�기</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* 직원 이력 상세 모달 */}
+      {/* 직원 ?�력 ?�세 모달 */}
       {selectedEmpForLogs && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-10 w-full max-w-2xl shadow-2xl animate-modal-pop max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-8 shrink-0">
-               <h2 className="text-2xl font-black text-slate-900">{selectedEmpForLogs.name} 변경 이력</h2>
+               <h2 className="text-2xl font-black text-slate-900">{selectedEmpForLogs.name} 변�??�력</h2>
                <button onClick={() => setSelectedEmpForLogs(null)} className="p-3 bg-slate-50 rounded-2xl"><X className="w-6 h-6" /></button>
             </div>
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
@@ -730,26 +726,26 @@ export const OrganizationAdmin: React.FC = () => {
                        <span className="text-[11px] font-bold text-slate-400">{new Date(log.timestamp).toLocaleString()}</span>
                     </div>
                     <p className="text-sm font-bold text-slate-700">{log.details}</p>
-                    <p className="text-[10px] text-slate-400 mt-2">처리자: {log.performedBy}</p>
+                    <p className="text-[10px] text-slate-400 mt-2">처리?? {log.performedBy}</p>
                  </div>
                ))}
                {auditLogs.filter(l => l.targetId === selectedEmpForLogs.uid).length === 0 && (
-                 <div className="py-20 text-center text-slate-400 font-bold">이력이 존재하지 않습니다.</div>
+                 <div className="py-20 text-center text-slate-400 font-bold">?�력??존재?��? ?�습?�다.</div>
                )}
             </div>
           </div>
         </div>
       )}
 
-      {/* 이력 삭제 확인 모달 */}
+      {/* ?�력 ??�� ?�인 모달 */}
       {showLogDeleteConfirm && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
           <div className="bg-white rounded-[3rem] p-12 w-full max-w-lg shadow-2xl animate-modal-pop">
-            <h2 className="text-2xl font-black text-rose-600 mb-4 tracking-tight">전체 이력 영구 삭제</h2>
-            <p className="text-slate-500 font-medium mb-8">보안을 위해 비밀번호를 입력해주세요.</p>
+            <h2 className="text-2xl font-black text-rose-600 mb-4 tracking-tight">?�체 ?�력 ?�구 ??��</h2>
+            <p className="text-slate-500 font-medium mb-8">보안???�해 비�?번호�??�력?�주?�요.</p>
             <input 
               type="password" 
-              placeholder="관리자 비밀번호"
+              placeholder="관리자 비�?번호"
               value={deleteLogsPassword}
               onChange={(e) => setDeleteLogsPassword(e.target.value)}
               className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black mb-6"
@@ -761,7 +757,7 @@ export const OrganizationAdmin: React.FC = () => {
                   disabled={!deleteLogsPassword || isProcessingLogs}
                   className="flex-[2] p-5 text-white bg-rose-600 rounded-2xl font-black disabled:opacity-50"
                 >
-                  {isProcessingLogs ? '삭제 중...' : '데이터 말소'}
+                  {isProcessingLogs ? '??�� �?..' : '?�이??말소'}
                </button>
             </div>
           </div>

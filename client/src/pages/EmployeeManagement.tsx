@@ -91,7 +91,7 @@ export const EmployeeManagement: React.FC = () => {
       if (!acc[email]) {
         acc[email] = emp;
       } else {
-        const roleOrder: Record<string, number> = { 'ADMIN': 3, 'SUB_ADMIN': 2, 'EMPLOYEE': 1 };
+        const roleOrder: Record<string, number> = { 'ADMIN': 3, 'SUB_ADMIN': 2, 'MEMBER': 1 };
         const currentPrio = roleOrder[acc[email].role] || 0;
         const newPrio = roleOrder[emp.role] || 0;
         if (newPrio > currentPrio) {
