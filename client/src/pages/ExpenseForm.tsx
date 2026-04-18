@@ -154,7 +154,8 @@ export const ExpenseForm: React.FC = () => {
         // 신규 등록
         await addDoc(collection(db, 'expenses'), {
           ...payload,
-          createdAt: new Date().toISOString()
+          createdAt: new Date().toISOString(),
+          companyId: userData?.companyId || ''
         });
         setIsSuccess(true);
       }

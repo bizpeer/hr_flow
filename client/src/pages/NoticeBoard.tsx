@@ -3,7 +3,7 @@ import {
   Megaphone, Plus, Search, ChevronDown, Bell, Clock, User, ArrowRight, 
   Trash2, Edit3, X, UploadCloud, Loader2, FileText, CheckCircle
 } from 'lucide-react';
-import { collection, onSnapshot, query, addDoc, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, query, addDoc, doc, updateDoc, deleteDoc, orderBy, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, storage } from '../firebase';
 import { format } from 'date-fns';
@@ -47,20 +47,21 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
   const isManager = userRole === 'ADMIN' || userRole === 'SUB_ADMIN';
 
   useEffect(() => {
-    const q = query(collection(db, 'notices'), orderBy('createdAt', 'desc'));
+    if (!userData?.companyId) return;
+    const q = query(collection(db, 'notices'), where('companyId', '==', userData.companyId));
     const unsubscribe = onSnapshot(q, (snap) => {
-      setNotices(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notice)));
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notice));
+      setNotices(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       setLoading(false);
     }, (err) => {
       console.error("Notice Fetch Error:", err);
-      // 권한 에러(Permission Denied) 등이 발생할 경우 사용자에게 알림
       if (err.code === 'permission-denied') {
         alert("공지사항을 읽을 권한이 없습니다. 관리자에게 문의하세요.");
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [userData?.companyId]);
 
   const handleNoticeClick = (noticeId: string) => {
     setExpandedNoticeId(prev => prev === noticeId ? null : noticeId);
@@ -113,7 +114,8 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
           authorId: currentUserId,
           authorName: userData?.name || '관리자',
           createdAt: new Date().toISOString(),
-          readBy: []
+          readBy: [],
+          companyId: userData?.companyId || ''
         });
       }
 

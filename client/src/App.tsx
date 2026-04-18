@@ -17,9 +17,11 @@ import { LeaveApplication } from './pages/LeaveApplication';
 import { LoadingSplash } from './components/LoadingSplash';
 import { EmployeeManagement } from './pages/EmployeeManagement';
 import { SalaryManagement } from './pages/SalaryManagement';
+import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
+import { LandingPage } from './pages/LandingPage';
 
 function App() {
-  const { initAuth, userData, loading } = useAuthStore();
+  const { initAuth, userData, user, loading } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -37,61 +39,76 @@ function App() {
     <HashRouter>
       <LoginModal />
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={
+          !user ? <LandingPage /> : <Navigate to={userData?.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace />
+        } />
+        <Route path="/login" element={
+          user ? <Navigate to={userData?.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace /> : <Login />
+        } />
         
         <Route path="/*" element={
-          <div className="flex h-screen bg-slate-50 overflow-hidden relative font-sans">
-            {/* Mobile Header */}
-            <div className="md:hidden print:hidden flex items-center justify-between bg-slate-900 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-lg border-b border-indigo-500/20">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white italic">HF</div>
-                <div className="text-xl font-black tracking-tight text-white">HR <span className="text-indigo-400">FLOW</span></div>
+          !user ? <Navigate to="/login" replace /> : (
+            <div className="flex h-screen bg-slate-50 overflow-hidden relative font-sans">
+              {/* Mobile Header */}
+              <div className="md:hidden print:hidden flex items-center justify-between bg-slate-900 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-lg border-b border-indigo-500/20">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center font-black text-white italic">HF</div>
+                  <div className="text-xl font-black tracking-tight text-white">HR <span className="text-indigo-400">FLOW</span></div>
+                </div>
+                <button 
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="p-2 hover:bg-slate-800 rounded-xl transition-all active:scale-95"
+                >
+                  {isMobileMenuOpen ? <X className="w-6 h-6 text-indigo-400" /> : <Menu className="w-6 h-6" />}
+                </button>
               </div>
-              <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="p-2 hover:bg-slate-800 rounded-xl transition-all active:scale-95"
-              >
-                {isMobileMenuOpen ? <X className="w-6 h-6 text-indigo-400" /> : <Menu className="w-6 h-6" />}
-              </button>
-            </div>
 
-            {/* Sidebar (Responsive Drawer) */}
-            <div className={`print:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-500 ease-in-out premium-shadow 
-              ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0`}>
-              <Sidebar userRole={userData?.role || 'EMPLOYEE'} />
-            </div>
+              {/* Sidebar (Responsive Drawer) */}
+              <div className={`print:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-500 ease-in-out premium-shadow 
+                ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0`}>
+                <Sidebar userRole={userData?.role || 'EMPLOYEE'} />
+              </div>
 
-            {/* Mobile Overlay */}
-            {isMobileMenuOpen && (
-              <div 
-                className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-500" 
-                onClick={() => setIsMobileMenuOpen(false)} 
-              />
-            )}
-            
-            {/* Main Content Area */}
-            <div className="flex-1 h-full overflow-y-auto mt-[64px] md:mt-0 bg-slate-50 transition-all duration-300">
-              <div className="max-w-7xl mx-auto min-h-full">
-                <Routes>
-                  <Route path="/" element={<AttendanceDashboard />} />
-                  <Route path="/dashboard" element={<AttendanceDashboard />} />
-                  
-                  <Route path="/leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
-                  <Route path="/expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                  <Route path="/board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'EMPLOYEE'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+              {/* Mobile Overlay */}
+              {isMobileMenuOpen && (
+                <div 
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 md:hidden transition-opacity duration-500" 
+                  onClick={() => setIsMobileMenuOpen(false)} 
+                />
+              )}
+              
+              {/* Main Content Area */}
+              <div className="flex-1 h-full overflow-y-auto mt-[64px] md:mt-0 bg-slate-50 transition-all duration-300">
+                <div className="max-w-7xl mx-auto min-h-full">
+                  <Routes>
+                    {/* SUPER_ADMIN 전용 */}
+                    <Route path="/super-admin" element={<ProtectedRoute requireSuperAdmin><SuperAdminDashboard /></ProtectedRoute>} />
 
-                  <Route path="/admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                  <Route path="/admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
-                  <Route path="/admin/finance-stats" element={<ProtectedRoute requireAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                  <Route path="/admin/employees" element={<ProtectedRoute requireAdmin><EmployeeManagement /></ProtectedRoute>} />
-                  <Route path="/admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                  <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettings /></ProtectedRoute>} />
+                    {/* 일반 사용자 */}
+                    <Route path="/" element={
+                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
+                    } />
+                    <Route path="/dashboard" element={
+                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
+                    } />
+                    
+                    <Route path="/leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
+                    <Route path="/expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                    <Route path="/board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'EMPLOYEE'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                    <Route path="/admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
+                    <Route path="/admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
+                    <Route path="/admin/finance-stats" element={<ProtectedRoute requireAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
+                    <Route path="/admin/employees" element={<ProtectedRoute requireAdmin><EmployeeManagement /></ProtectedRoute>} />
+                    <Route path="/admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
+                    <Route path="/admin/settings" element={<ProtectedRoute requireAdmin><AdminSettings /></ProtectedRoute>} />
+
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </div>
               </div>
             </div>
-          </div>
+          )
         } />
       </Routes>
     </HashRouter>

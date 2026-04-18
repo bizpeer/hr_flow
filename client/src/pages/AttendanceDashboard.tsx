@@ -22,7 +22,6 @@ export const AttendanceDashboard: React.FC = () => {
     user, userData, setLoginModalOpen, getDisplayEmail,
     openPasswordChange 
   } = useAuthStore();
-  const { fetchSystemDomain } = useAuthStore();
   const [kstTime, setKstTime] = useState<string>('');
   const [kstDate, setKstDate] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,23 +42,20 @@ export const AttendanceDashboard: React.FC = () => {
     }
   }, [user?.uid, selectedUserId]);
 
-  // 도메인 동기화
-  useEffect(() => {
-    fetchSystemDomain();
-  }, [fetchSystemDomain]);
+
 
   // 관리자일 경우 전체 사용자 목록 페칭
   useEffect(() => {
     const isManagementRole = userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN';
 
-    if (isManagementRole) {
-      const q = query(collection(db, 'UserProfile'));
+    if (isManagementRole && userData?.companyId) {
+      const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
       const unsubscribe = onSnapshot(q, (snap) => {
         setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       });
       return () => unsubscribe();
     }
-  }, [userData?.role]);
+  }, [userData?.role, userData?.companyId]);
 
   // 선택된 사용자의 월별 근태 기록 구독
   useEffect(() => {
@@ -72,6 +68,7 @@ export const AttendanceDashboard: React.FC = () => {
 
     const q = query(
       collection(db, 'attendance'),
+      where('companyId', '==', userData?.companyId),
       where('userId', '==', selectedUserId),
       where('timestamp', '>=', start),
       where('timestamp', '<=', end)
@@ -110,6 +107,7 @@ export const AttendanceDashboard: React.FC = () => {
     // 인덱스 오류 및 타임존 문자열 비교 문제를 피하기 위해 사용자 ID로만 쿼리 후 로컬 필터링
     const q = query(
       collection(db, 'attendance'),
+      where('companyId', '==', userData?.companyId),
       where('userId', '==', user.uid)
     );
 
@@ -169,7 +167,8 @@ export const AttendanceDashboard: React.FC = () => {
         type: type,
         timestamp: timestamp,
         location: '본사',
-        createdAt: timestamp
+        createdAt: timestamp,
+        companyId: userData?.companyId || ''
       };
       
       const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
@@ -207,7 +206,11 @@ export const AttendanceDashboard: React.FC = () => {
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(collection(db, 'leaves'), where('userId', '==', user.uid));
+    const q = query(
+      collection(db, 'leaves'), 
+      where('companyId', '==', userData?.companyId || 'UNKNOWN'),
+      where('userId', '==', user.uid)
+    );
     return onSnapshot(q, (snap) => {
       setLeaveRequests(snap.docs.map(doc => doc.data()));
     });

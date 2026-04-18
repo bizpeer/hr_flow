@@ -1,134 +1,381 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AlertCircle, LogIn, UserPlus, Building2, Mail, Lock, User, Globe, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 
+type TabMode = 'login' | 'register';
+
 export const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [mode, setMode] = useState<TabMode>('login');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-  const { systemDomain } = useAuthStore();
 
-  const from = location.state?.from?.pathname || '/dashboard';
+  // 로그인 폼
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // 회원가입 폼
+  const [regEmail, setRegEmail] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [regConfirmPassword, setRegConfirmPassword] = useState('');
+  const [regName, setRegName] = useState('');
+  const [regOrgKo, setRegOrgKo] = useState('');
+  const [regOrgEn, setRegOrgEn] = useState('');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // bizpeer 아이디를 내부 이메일 형식으로 변환
-    let loginEmail = email;
-    if (email === 'bizpeer') {
-      loginEmail = `bizpeer@${systemDomain}`;
-    }
-
     try {
-      await signInWithEmailAndPassword(auth, loginEmail, password);
-      navigate(from, { replace: true });
+      await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setError('아이디(이메일) 혹은 비밀번호가 틀렸거나 문제가 발생했습니다.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 마스터 어드민 시딩 (최초 1회용 자동생성)
-  const handleSeedMasterAdmin = async () => {
-    const adminId = "bizpeer";
-    const adminEmail = `bizpeer@${systemDomain}`;
-    const adminPassword = "123456";
-
-    try {
-      setLoading(true);
-      const userCredential = await createUserWithEmailAndPassword(auth, adminEmail, adminPassword);
-      const uid = userCredential.user.uid;
-      
-      await setDoc(doc(db, 'UserProfile', uid), {
-        uid,
-        email: adminEmail,
-        name: '최고 관리자',
-        role: 'ADMIN',
-        mustChangePassword: true,
-        teamHistory: []
-      });
-      alert(`초기 마스터 관리자 계정이 생성되었습니다.\nID: ${adminId}\nPW: ${adminPassword}`);
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
-        alert("이미 관리자 계정이 생성되어 있습니다.");
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        setError('이메일 또는 비밀번호가 올바르지 않습니다.');
+      } else if (err.code === 'auth/too-many-requests') {
+        setError('보안 정책상 잠시 후 다시 시도해주세요.');
       } else {
-        alert("생성 실패: " + err.message);
+        setError('로그인 중 오류가 발생했습니다: ' + err.message);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
-      <div className="max-w-md w-full space-y-8 bg-white p-10 rounded-xl shadow-lg border border-gray-100">
-        <div>
-          <h2 className="mt-2 text-center text-3xl font-extrabold text-gray-900 border-b pb-4">
-            <span className="text-indigo-600">HR Flow</span> 로그인
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-md flex items-center gap-2 text-sm font-medium">
-              <AlertCircle className="w-5 h-5 shrink-0" />
-              {error}
-            </div>
-          )}
-          <div className="rounded-md shadow-sm space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">아이디 또는 이메일</label>
-              <input
-                type="text"
-                required
-                className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm mt-1"
-                placeholder="bizpeer 또는 email@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">비밀번호</label>
-              <input
-                type="password"
-                required
-                className="appearance-none rounded relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm mt-1"
-                placeholder="비밀번호를 입력하세요"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-colors"
-            >
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-          </div>
-        </form>
-      </div>
+    // 유효성 검증
+    if (regPassword !== regConfirmPassword) {
+      setError('비밀번호가 일치하지 않습니다.');
+      return;
+    }
+    if (regPassword.length < 6) {
+      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+      return;
+    }
+    if (!regOrgKo.trim() || !regOrgEn.trim()) {
+      setError('조직 이름(한글, 영문)을 모두 입력해주세요.');
+      return;
+    }
+    if (!regEmail.includes('@') || !regEmail.includes('.')) {
+      setError('유효한 이메일 주소를 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const normalizedEmail = regEmail.trim().toLowerCase();
       
-      {/* 개발 및 초기 운영 지원을 위한 숨겨진 마스터 생성 버튼 (실제 운영시 삭제) */}
-      <button 
-        onClick={handleSeedMasterAdmin}
-        className="absolute bottom-4 right-4 text-xs text-gray-300 hover:text-gray-500 focus:outline-none"
-      >
-        마스터 설정
-      </button>
+      // 1. Firebase Auth 계정 생성
+      const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, regPassword);
+      const uid = userCredential.user.uid;
+
+      // 2. 이메일에서 도메인 추출 → company_id로 사용
+      const domain = normalizedEmail.split('@')[1];
+      const companyId = domain.replace(/\./g, '_'); // aeterno.co.kr → aeterno_co_kr
+
+      // 3. 회사 문서 생성
+      await setDoc(doc(db, 'companies', companyId), {
+        nameKo: regOrgKo.trim(),
+        nameEn: regOrgEn.trim(),
+        domain: domain,
+        adminUid: uid,
+        createdAt: new Date().toISOString(),
+        status: 'ACTIVE',
+        plan: 'FREE'
+      });
+
+      // 4. UserProfile 생성 (ADMIN 권한)
+      await setDoc(doc(db, 'UserProfile', uid), {
+        uid,
+        email: normalizedEmail,
+        name: regName.trim(),
+        role: 'ADMIN',
+        companyId: companyId,
+        teamHistory: [],
+        mustChangePassword: false,
+        status: 'ACTIVE',
+        createdAt: new Date().toISOString()
+      });
+
+      // 5. 회사별 config 문서 생성
+      await setDoc(doc(db, 'config', companyId), {
+        defaultDomain: domain,
+        updatedAt: new Date().toISOString(),
+        updatedBy: uid
+      });
+
+      console.log("[Register] Company and Admin created:", companyId);
+      setRegisterSuccess(true);
+      
+      // 2초 후 대시보드로 이동
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 2000);
+
+    } catch (err: any) {
+      if (err.code === 'auth/email-already-in-use') {
+        setError('이미 등록된 이메일입니다. 로그인을 시도해주세요.');
+      } else {
+        setError('회원가입 중 오류가 발생했습니다: ' + err.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (registerSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+        <div className="text-center animate-in zoom-in duration-500">
+          <div className="w-24 h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-8 border-2 border-emerald-500/30">
+            <CheckCircle2 className="w-12 h-12 text-emerald-400" />
+          </div>
+          <h2 className="text-3xl font-black text-white mb-3">조직 생성 완료!</h2>
+          <p className="text-slate-400 font-medium">대시보드로 이동합니다...</p>
+          <Loader2 className="w-6 h-6 text-indigo-400 animate-spin mx-auto mt-6" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 relative overflow-hidden">
+      {/* 백그라운드 장식 */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-violet-600/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-indigo-500/5 rounded-full blur-3xl" />
+      </div>
+
+      <div className="w-full max-w-md mx-4 relative z-10">
+        {/* 로고 */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-xl italic shadow-xl shadow-indigo-900/50">HF</div>
+            <div className="text-3xl font-black text-white tracking-tighter">HR <span className="text-indigo-400">FLOW</span></div>
+          </div>
+          <p className="text-slate-400 font-medium text-sm">조직의 성장을 가속화하는 지능형 HR 솔루션</p>
+        </div>
+
+        {/* 탭 전환 */}
+        <div className="flex bg-slate-800/50 backdrop-blur-sm rounded-2xl p-1.5 mb-6 border border-slate-700/50">
+          <button
+            onClick={() => { setMode('login'); setError(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+              mode === 'login' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <LogIn className="w-4 h-4" />
+            로그인
+          </button>
+          <button
+            onClick={() => { setMode('register'); setError(''); }}
+            className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl font-bold text-sm transition-all duration-300 ${
+              mode === 'register' 
+                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' 
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <UserPlus className="w-4 h-4" />
+            회원가입
+          </button>
+        </div>
+
+        {/* 에러 메시지 */}
+        {error && (
+          <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-4 rounded-2xl flex items-center gap-3 text-sm font-medium mb-6 backdrop-blur-sm">
+            <AlertCircle className="w-5 h-5 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* 카드 */}
+        <div className="bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-700/50 overflow-hidden shadow-2xl">
+          {mode === 'login' ? (
+            /* 로그인 폼 */
+            <form onSubmit={handleLogin} className="p-8 space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">이메일</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="admin@company.com"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">비밀번호</label>
+                  <div className="relative">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="password"
+                      required
+                      value={loginPassword}
+                      onChange={(e) => setLoginPassword(e.target.value)}
+                      placeholder="비밀번호 입력"
+                      className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/30 active:scale-[0.98] disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
+                {loading ? '로그인 중...' : '로그인'}
+              </button>
+            </form>
+          ) : (
+            /* 회원가입 폼 */
+            <form onSubmit={handleRegister} className="p-8 space-y-5">
+              <div className="text-center mb-2">
+                <p className="text-slate-400 text-xs font-medium">가입 즉시 조직 관리자(ADMIN) 권한이 부여됩니다</p>
+              </div>
+
+              <div className="space-y-4">
+                {/* 관리자 정보 */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">관리자 이름</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={regName}
+                      onChange={(e) => setRegName(e.target.value)}
+                      placeholder="홍길동"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">이메일 (로그인 ID)</label>
+                  <div className="relative">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="email"
+                      required
+                      value={regEmail}
+                      onChange={(e) => setRegEmail(e.target.value)}
+                      placeholder="admin@company.com"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 ml-1">이메일 도메인이 회사 ID로 자동 생성됩니다</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">비밀번호</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="password"
+                        required
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="6자 이상"
+                        className="w-full pl-11 pr-3 py-3.5 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium text-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">비밀번호 확인</label>
+                    <div className="relative">
+                      <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <input
+                        type="password"
+                        required
+                        value={regConfirmPassword}
+                        onChange={(e) => setRegConfirmPassword(e.target.value)}
+                        placeholder="재입력"
+                        className={`w-full pl-11 pr-3 py-3.5 bg-slate-900/50 border rounded-2xl text-white placeholder-slate-500 focus:ring-2 outline-none transition-all font-medium text-sm ${
+                          regConfirmPassword && regPassword !== regConfirmPassword 
+                            ? 'border-rose-500/50 focus:border-rose-500 focus:ring-rose-500/20' 
+                            : 'border-slate-600/50 focus:border-indigo-500 focus:ring-indigo-500/20'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* 구분선 */}
+                <div className="flex items-center gap-3 pt-2">
+                  <div className="flex-1 h-px bg-slate-700" />
+                  <Building2 className="w-4 h-4 text-slate-500" />
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">조직 정보</span>
+                  <div className="flex-1 h-px bg-slate-700" />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">조직명 (한글)</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={regOrgKo}
+                      onChange={(e) => setRegOrgKo(e.target.value)}
+                      placeholder="에테르노"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">조직명 (영문)</label>
+                  <div className="relative">
+                    <Globe className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={regOrgEn}
+                      onChange={(e) => setRegOrgEn(e.target.value)}
+                      placeholder="Aeterno"
+                      className="w-full pl-12 pr-4 py-3.5 bg-slate-900/50 border border-slate-600/50 rounded-2xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-900/30 active:scale-[0.98] disabled:opacity-50 mt-2"
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
+                {loading ? '등록 중...' : '조직 생성 및 가입'}
+              </button>
+            </form>
+          )}
+        </div>
+
+        {/* 하단 */}
+        <p className="text-center text-slate-600 text-xs mt-8 font-medium">
+          © 2026 HR Flow SaaS Platform. All rights reserved.
+        </p>
+      </div>
     </div>
   );
 };

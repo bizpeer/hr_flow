@@ -124,10 +124,11 @@ export const LeaveApplication: React.FC = () => {
         endDate: formData.endDate || '',
         reason: formData.reason || '',
         attachmentName: formData.fileName || '',
-        attachmentUrl: attachmentUrl, // URL 저장
+        attachmentUrl: attachmentUrl,
         status: 'PENDING',
         requestDays: days || 0,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        companyId: userData?.companyId || ''
       });
       
       alert("휴가 신청이 완료되었습니다.");

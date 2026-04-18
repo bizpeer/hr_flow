@@ -88,8 +88,10 @@ export const OrganizationAdmin: React.FC = () => {
     }
   }, [userData, navigate]);
 
-  // Firestore 데이터 실시간 구독
+  // Firestore 데이터 실시간 구독 (companyId 기반 격리)
   useEffect(() => {
+    if (!userData?.companyId) return;
+    const companyId = userData.companyId;
     setLoading(true);
 
     const handleError = (error: any) => {
@@ -97,21 +99,21 @@ export const OrganizationAdmin: React.FC = () => {
       setLoading(false);
     };
 
-    const unsubDivs = onSnapshot(collection(db, 'divisions'), (snap) => {
+    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
       setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Division)));
       setLoading(false);
     }, handleError);
 
-    const unsubTeams = onSnapshot(collection(db, 'teams'), (snap) => {
+    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Team)));
     }, handleError);
 
-    const unsubUsers = onSnapshot(collection(db, 'UserProfile'), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'UserProfile'), where('companyId', '==', companyId)), (snap) => {
       setEmployees(snap.docs.map(d => ({ uid: d.id, ...d.data() } as Employee)));
       setLoading(false);
     }, handleError);
 
-    const unsubLogs = onSnapshot(collection(db, 'AuditLogs'), (snap) => {
+    const unsubLogs = onSnapshot(query(collection(db, 'AuditLogs'), where('companyId', '==', companyId)), (snap) => {
       const logs = snap.docs.map(d => ({ id: d.id, ...d.data() } as AuditLog));
       setAuditLogs(logs.sort((a, b) => b.timestamp.localeCompare(a.timestamp)));
     }, handleError);
@@ -124,7 +126,7 @@ export const OrganizationAdmin: React.FC = () => {
       unsubDivs(); unsubTeams(); unsubUsers(); unsubLogs();
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [userData?.companyId]);
 
   const logAction = async (type: string, targetId: string, targetName: string, details: string) => {
     try {
@@ -132,7 +134,8 @@ export const OrganizationAdmin: React.FC = () => {
         timestamp: new Date().toISOString(),
         actionType: type,
         performedBy: userData?.name || '시스템',
-        targetId, targetName, details
+        targetId, targetName, details,
+        companyId: userData?.companyId || ''
       });
     } catch (err) {
       console.error("Log failed:", err);
@@ -149,7 +152,7 @@ export const OrganizationAdmin: React.FC = () => {
     e.preventDefault();
     if (!newDivName.trim()) return;
     try {
-      const docRef = await addDoc(collection(db, 'divisions'), { name: newDivName, headId: '' });
+      const docRef = await addDoc(collection(db, 'divisions'), { name: newDivName, headId: '', companyId: userData?.companyId || '' });
       await logAction('CREATE_DIVISION', docRef.id, newDivName, '새 본부 생성');
       setNewDivName(''); setShowDivisionModal(false);
     } catch (err) {
@@ -161,7 +164,7 @@ export const OrganizationAdmin: React.FC = () => {
     e.preventDefault();
     if (!newTeamName.trim() || !newTeamDivId) return;
     try {
-      const docRef = await addDoc(collection(db, 'teams'), { divisionId: newTeamDivId, name: newTeamName, leaderId: '' });
+      const docRef = await addDoc(collection(db, 'teams'), { divisionId: newTeamDivId, name: newTeamName, leaderId: '', companyId: userData?.companyId || '' });
       const divName = divisions.find(d => d.id === newTeamDivId)?.name || '알 수 없음';
       await logAction('CREATE_TEAM', docRef.id, newTeamName, `${divName} 소속 팀 생성`);
       setNewTeamName(''); setNewTeamDivId(''); setShowTeamModal(false);
@@ -177,7 +180,7 @@ export const OrganizationAdmin: React.FC = () => {
       const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${systemDomain}`;
 
       // 1. 중복 아이디 체크
-      const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail));
+      const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail), where('companyId', '==', userData?.companyId || ''));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
@@ -198,7 +201,8 @@ export const OrganizationAdmin: React.FC = () => {
         teamHistory: [],
         joinDate: newEmp.joinDate,
         mustChangePassword: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        companyId: userData?.companyId || ''
       });
       
       await logAction('CREATE_EMPLOYEE', tempId, newEmp.name, `직원 등록 (${finalEmail}) / 임비 123456`);

@@ -27,21 +27,46 @@ exports.adminResetPassword = onCall(async (request) => {
   }
 
   try {
-    // 3. 관리자 권한 여부 확인 (Firestore UserProfile 조회)
-    const adminRef = admin.firestore('weberp').collection("UserProfile").doc(request.auth.uid);
-    const adminSnap = await adminRef.get();
+    // 3. 권한 및 소속 확인 (Firestore UserProfile 조회)
+    const db = admin.firestore('weberp');
+    const callerRef = db.collection("UserProfile").doc(request.auth.uid);
+    const targetRef = db.collection("UserProfile").doc(uid);
     
-    if (!adminSnap.exists || adminSnap.data().role !== "ADMIN") {
+    const [callerSnap, targetSnap] = await Promise.all([callerRef.get(), targetRef.get()]);
+    
+    if (!callerSnap.exists) {
+      throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
+    }
+
+    const callerData = callerSnap.data();
+    
+    // SUPER_ADMIN은 모든 권한 허용
+    if (callerData.role === "SUPER_ADMIN") {
+      console.log(`[AdminReset] SUPER_ADMIN ${request.auth.uid} is resetting password for ${uid}`);
+    } else if (callerData.role === "ADMIN") {
+      // 일반 ADMIN인 경우 소속 회사 확인
+      if (!targetSnap.exists) {
+        throw new HttpsError("not-found", "대상을 찾을 수 없습니다.");
+      }
+      
+      const targetData = targetSnap.data();
+      if (callerData.companyId !== targetData.companyId) {
+        throw new HttpsError(
+          "permission-denied",
+          "타사 직원의 정보는 관리할 수 없습니다."
+        );
+      }
+    } else {
       throw new HttpsError(
         "permission-denied",
-        "관리자 권한이 없습니다."
+        "비밀번호를 초기화할 권한이 없습니다."
       );
     }
 
     // 4. 비밀번호 강제 업데이트
     await admin.auth().updateUser(uid, { password });
     
-    console.log(`[AdminReset] Password for user ${uid} reset to '${password}' by ${request.auth.uid}`);
+    console.log(`[AdminReset] Password for user ${uid} reset by ${request.auth.uid} (Company: ${callerData.companyId})`);
 
     return { 
       success: true, 

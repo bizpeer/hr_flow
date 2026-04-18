@@ -6,6 +6,7 @@ import {
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
+import { useAuthStore } from '../store/authStore';
 
 interface Expense {
   id: string;
@@ -19,6 +20,7 @@ interface Expense {
 }
 
 export const ExpenseAdminDashboard: React.FC = () => {
+  const { userData } = useAuthStore();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -29,12 +31,14 @@ export const ExpenseAdminDashboard: React.FC = () => {
   const [startDate, setStartDate] = useState<string>(initialStart);
   const [endDate, setEndDate] = useState<string>(initialEnd);
 
-  // Firestore 실시간 데이터 패칭
+  // Firestore 실시간 데이터 패칭 (companyId 기반 격리)
   useEffect(() => {
+    if (!userData?.companyId) return;
     setLoading(true);
     const q = query(
       collection(db, 'expenses'),
-      where('status', '==', 'APPROVED')
+      where('status', '==', 'APPROVED'),
+      where('companyId', '==', userData.companyId)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -43,7 +47,6 @@ export const ExpenseAdminDashboard: React.FC = () => {
         ...doc.data()
       })) as Expense[];
       
-      // 클라이언트 사이드 정렬 (인덱스 에러 방지)
       const sortedData = expenseData.sort((a, b) => b.date.localeCompare(a.date));
       
       setExpenses(sortedData);
@@ -54,7 +57,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [userData?.companyId]);
 
   // 시작 날짜 변경 시 종료 날짜 자동 1개월 뒤로 설정
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {

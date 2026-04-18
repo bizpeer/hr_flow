@@ -11,30 +11,32 @@ export const AdminSettings: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Domain Config State
-  const { fetchSystemDomain, systemDomain } = useAuthStore();
+  const { fetchCompanyDomain, companyData } = useAuthStore();
   const [tempDomain, setTempDomain] = useState('');
   const [verifyPassword, setVerifyPassword] = useState('');
   
-  const [loading, setLoading] = useState(false);
+  const { userData } = useAuthStore();
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
     const fetchConfig = async () => {
-      try {
-        await fetchSystemDomain();
-      } catch (err) {
-        console.error("Error fetching config:", err);
+      if (userData?.companyId) {
+        try {
+          await fetchCompanyDomain(userData.companyId);
+        } catch (err) {
+          console.error("Error fetching config:", err);
+        }
       }
     };
     fetchConfig();
-  }, [fetchSystemDomain]);
+  }, [fetchCompanyDomain, userData?.companyId]);
 
   // 시스템 도메인이 로드되면 입력창의 임시 상태 초기화
   useEffect(() => {
-    if (systemDomain) {
-      setTempDomain(systemDomain);
+    if (companyData?.domain) {
+      setTempDomain(companyData.domain);
     }
-  }, [systemDomain]);
+  }, [companyData]);
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,17 +109,17 @@ export const AdminSettings: React.FC = () => {
       // 1. 비밀번호 재검증 (공통 로직 사용)
       await verifyAdmin();
 
-      // 2. 도메인 설정 저장
-      await setDoc(doc(db, 'config', 'system'), {
-        defaultDomain: tempDomain.replace('@', ''), // @ 기호 제거
+      // 2. 도메인 설정 저장 (회사 문서 업데이트)
+      await setDoc(doc(db, 'companies', userData.companyId), {
+        domain: tempDomain.replace('@', ''), // @ 기호 제거
         updatedAt: new Date().toISOString(),
         updatedBy: auth.currentUser?.uid || 'unknown'
-      });
+      }, { merge: true });
 
       // 3. 스토어 갱신
-      await fetchSystemDomain();
+      await fetchCompanyDomain(userData.companyId);
       
-      setMessage({ type: 'success', text: `시스템 기본 도메인이 @${tempDomain}으로 변경되었습니다.` });
+      setMessage({ type: 'success', text: `회원가입 기본 도메인이 @${tempDomain}으로 변경되었습니다.` });
       setVerifyPassword('');
     } finally {
       setLoading(false);
@@ -137,8 +139,9 @@ export const AdminSettings: React.FC = () => {
       // 1. 비밀번호 재검증 (공통 로직 사용)
       await verifyAdmin();
 
-      // 2. 전체 사용자 프로필 조회 및 일괄 업데이트 (Batch)
-      const querySnapshot = await getDocs(collection(db, 'UserProfile'));
+      // 2. 해당 회사 사용자 프로필 조회 및 일괄 업데이트 (Batch)
+      const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
+      const querySnapshot = await getDocs(q);
       const batch = writeBatch(db);
       let count = 0;
 

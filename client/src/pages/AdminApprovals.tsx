@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, orderBy, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { 
   CheckCircle, XCircle, Clock, FileText, Calendar, Filter, User, 
@@ -61,25 +61,30 @@ export const AdminApprovals: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
 
   useEffect(() => {
-    // 1. 신청 내역 구독
-    const qLeave = query(collection(db, 'leaves'), orderBy('createdAt', 'desc'));
+    if (!userData?.companyId) return;
+    const companyId = userData.companyId;
+
+    // 1. 신청 내역 구독 (companyId 기반 격리)
+    const qLeave = query(collection(db, 'leaves'), where('companyId', '==', companyId));
     const unsubLeave = onSnapshot(qLeave, (snap) => {
-      setLeaveRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest)));
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
+      setLeaveRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
 
-    const qExpense = query(collection(db, 'expenses'), orderBy('createdAt', 'desc'));
+    const qExpense = query(collection(db, 'expenses'), where('companyId', '==', companyId));
     const unsubExpense = onSnapshot(qExpense, (snap) => {
-      setExpenseRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest)));
+      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest));
+      setExpenseRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
 
     // 2. 조직/사용자 데이터 구독 (조인을 위함)
-    const unsubDivs = onSnapshot(collection(db, 'divisions'), (snap) => {
+    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
       setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubTeams = onSnapshot(collection(db, 'teams'), (snap) => {
+    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubUsers = onSnapshot(collection(db, 'UserProfile'), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'UserProfile'), where('companyId', '==', companyId)), (snap) => {
       setEmployees(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
     });
 
@@ -87,7 +92,7 @@ export const AdminApprovals: React.FC = () => {
       unsubLeave(); unsubExpense();
       unsubDivs(); unsubTeams(); unsubUsers();
     };
-  }, []);
+  }, [userData?.companyId]);
   const handleUpdateStatus = async (collectionName: string, id: string, newStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'SUB_APPROVED') => {
     try {
       const userRole = employees.find(e => e.uid === userData?.uid)?.role || userData?.role;

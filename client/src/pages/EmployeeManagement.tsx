@@ -59,23 +59,27 @@ export const EmployeeManagement: React.FC = () => {
   const isAdmin = userData?.role === 'ADMIN';
 
   useEffect(() => {
-    // 1. Fetch Organization Data
-    const unsubDivs = onSnapshot(collection(db, 'divisions'), (snap) => {
+    if (!userData?.companyId) return;
+    const companyId = userData.companyId;
+
+    // 1. Fetch Organization Data (companyId 기반 격리)
+    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
       setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubTeams = onSnapshot(collection(db, 'teams'), (snap) => {
+    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
     // 2. Subscribe to Employees
-    const q = query(collection(db, 'UserProfile'), orderBy('name', 'asc'));
+    const q = query(collection(db, 'UserProfile'), where('companyId', '==', companyId));
     const unsubEmployees = onSnapshot(q, (snap) => {
-      setEmployees(snap.docs.map(d => ({ uid: d.id, ...d.data() } as Employee)));
+      const emps = snap.docs.map(d => ({ uid: d.id, ...d.data() } as Employee));
+      setEmployees(emps.sort((a, b) => a.name.localeCompare(b.name)));
       setLoading(false);
     });
 
     return () => { unsubDivs(); unsubTeams(); unsubEmployees(); };
-  }, []);
+  }, [userData?.companyId]);
 
   // Filtered List with De-duplication
   const filteredEmployees = (() => {

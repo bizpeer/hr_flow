@@ -9,48 +9,72 @@ service cloud.firestore {
     }
     
     // Firestore 문서의 role 필드를 조회하여 권한을 확인합니다.
-    function getRole() { 
+    function getUserData() { 
       let path = /databases/$(database)/documents/UserProfile/$(request.auth.uid);
-      return exists(path) ? get(path).data.role : 'GUEST';
+      return exists(path) ? get(path).data : null;
     }
     
-    // 마스터 계정 확인 (최고 관리자) - bizpeer@ 로 시작하는 모든 도메인 허용
-    function isMaster() {
-      return isAuthenticated() && request.auth.token.email.matches('^bizpeer@.*');
+    function getRole() { 
+      let data = getUserData();
+      return data != null ? data.role : 'GUEST';
+    }
+    
+    function getCompanyId() {
+      let data = getUserData();
+      return data != null ? data.companyId : '';
+    }
+    
+    // SUPER_ADMIN 확인 (플랫폼 최고 관리자)
+    function isSuperAdmin() {
+      return isAuthenticated() && getRole() == 'SUPER_ADMIN';
     }
     
     function isAdmin() { return isAuthenticated() && getRole() == 'ADMIN'; }
     function isSubAdmin() { return isAuthenticated() && getRole() == 'SUB_ADMIN'; }
     function isManagement() { return isAdmin() || isSubAdmin(); }
-
-    // 본부 관리 (divisions)
-    match /divisions/{divisionId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isMaster();
+    
+    // 같은 회사 소속인지 확인 (문서의 companyId와 사용자의 companyId 비교)
+    function isSameCompany(docCompanyId) {
+      return getCompanyId() == docCompanyId;
     }
 
-    // 팀 관리 (teams)
-    match /teams/{teamId} {
+    // 회사 관리 (companies)
+    match /companies/{companyId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || isMaster();
+      allow create: if isAuthenticated(); // 회원가입 시 생성
+      allow update: if isSuperAdmin() || (isAdmin() && isSameCompany(companyId));
+      allow delete: if isSuperAdmin();
+    }
+
+    // 본부 관리 (divisions) - 같은 회사만 접근
+    match /divisions/{divisionId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
+      allow create: if isAuthenticated() && (isAdmin() || isSuperAdmin());
+      allow update, delete: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
+    }
+
+    // 팀 관리 (teams) - 같은 회사만 접근
+    match /teams/{teamId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
+      allow create: if isAuthenticated() && (isAdmin() || isSuperAdmin());
+      allow update, delete: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
     }
 
     // 유저/직원 프로필 관리 (UserProfile)
     match /UserProfile/{userId} {
       allow read: if isAuthenticated();
       
-      allow create: if isAuthenticated() && (isMaster() || isAdmin());
+      allow create: if isAuthenticated();
 
       allow update: if isAuthenticated() && (
-        isMaster() || isAdmin() ||
+        isSuperAdmin() || isAdmin() ||
         ( 
           (request.auth.uid == userId) && 
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn'])
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId'])
         )
       );
 
-      // 마스터/어드민은 직원 삭제(resignation 등)가 가능하게 함
-      allow delete: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.email == request.auth.token.email);
+      allow delete: if isAuthenticated() && (isSuperAdmin() || isAdmin());
     }
 
     // 결재 승인 관련 유틸리티 함수
@@ -67,9 +91,9 @@ service cloud.firestore {
       );
     }
 
-    // 경비 신청 (expenses)
+    // 경비 신청 (expenses) - 같은 회사만
     match /expenses/{expenseId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
@@ -78,9 +102,9 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
     }
 
-    // 휴가 신청 (leaves)
+    // 휴가 신청 (leaves) - 같은 회사만
     match /leaves/{leaveId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
       allow create: if isAuthenticated();
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
@@ -89,35 +113,37 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
     }
 
-    // 근태 기록 (attendance)
+    // 근태 기록 (attendance) - 같은 회사만
     match /attendance/{atId} {
-      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isManagement());
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid);
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }
     
-    // 공지사항 (notices)
+    // 공지사항 (notices) - 같은 회사만
     match /notices/{noticeId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
       allow write: if isManagement();
       allow delete: if isAdmin();
     }
 
-    // 시스템 설정 (config) - 인증 여부와 관계없이 모든 사용자가 도메인 정보를 읽을 수 있어야 함
-    match /config/system {
-      allow read: if true;
-      allow write: if isAdmin() || isMaster();
+    // 감사 로그 (AuditLogs) - 같은 회사만
+    match /AuditLogs/{logId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
+      allow create: if isAuthenticated();
+      allow delete: if isAdmin() || isSuperAdmin();
     }
 
-    match /config/{document=**} {
+    // 시스템 설정 (config) - 회사별 설정
+    match /config/{configId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || isMaster();
+      allow write: if isAdmin() || isSuperAdmin();
     }
 
-    // 기본 규칙: 그 외 모든 컬렉션은 가급적 어드민만 접근 가능하게 방어
+    // 기본 규칙: 그 외 모든 컬렉션은 SUPER_ADMIN 또는 ADMIN만 접근
     match /{document=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if isSuperAdmin() || isAdmin();
     }
   }
 }

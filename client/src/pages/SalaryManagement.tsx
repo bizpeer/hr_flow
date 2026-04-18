@@ -5,7 +5,7 @@ import {
   Plus, Minus, Printer, X, Users
 } from 'lucide-react';
 import { 
-  collection, query, onSnapshot, doc, updateDoc, orderBy 
+  collection, query, onSnapshot, doc, updateDoc, orderBy, where 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
@@ -101,8 +101,7 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }) => {
 
 export const SalaryManagement: React.FC = () => {
   const { user, userData } = useAuthStore();
-  const isMaster = user?.email?.toLowerCase().trim().startsWith('bizpeer@');
-  const isAdminOrMaster = isMaster || userData?.role === 'ADMIN';
+  const isAdminOrMaster = userData?.role === 'SUPER_ADMIN' || userData?.role === 'ADMIN';
   const [employees, setEmployees] = useState<UserData[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
@@ -119,17 +118,20 @@ export const SalaryManagement: React.FC = () => {
   const [selectedDetails, setSelectedDetails] = useState<UserData | null>(null);
 
   useEffect(() => {
-    const unsubDivs = onSnapshot(collection(db, 'divisions'), (snap) => {
+    if (!userData?.companyId) return;
+    const companyId = userData.companyId;
+
+    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
       setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubTeams = onSnapshot(collection(db, 'teams'), (snap) => {
+    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
 
-    const q = query(collection(db, 'UserProfile'), orderBy('name', 'asc'));
+    const q = query(collection(db, 'UserProfile'), where('companyId', '==', companyId));
     const unsubEmployees = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserData));
-      setEmployees(data);
+      setEmployees(data.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       
       const initialEdits: Record<string, Partial<UserData>> = {};
       data.forEach(emp => {
@@ -147,7 +149,7 @@ export const SalaryManagement: React.FC = () => {
     });
 
     return () => { unsubDivs(); unsubTeams(); unsubEmployees(); };
-  }, []);
+  }, [userData?.companyId]);
 
   const handleUpdateField = (uid: string, field: keyof UserData, value: any) => {
     setEditingData(prev => ({

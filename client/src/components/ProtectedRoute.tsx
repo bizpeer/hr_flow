@@ -6,12 +6,14 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requireAdmin?: boolean; // ADMIN 또는 SUB_ADMIN 만
   requireMasterAdmin?: boolean; // ADMIN 만
+  requireSuperAdmin?: boolean; // SUPER_ADMIN 만
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
   children, 
   requireAdmin = false,
-  requireMasterAdmin = false
+  requireMasterAdmin = false,
+  requireSuperAdmin = false
 }) => {
   const { user, userData, loading, setLoginModalOpen } = useAuthStore();
   const location = useLocation();
@@ -20,28 +22,30 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
-  const isMaster = user?.email?.toLowerCase().trim().startsWith('bizpeer@');
+  const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
 
   if (!user) {
-    // 아예 로그인이 안 된 경우 (Auth 없음)
-    setTimeout(() => setLoginModalOpen(true), 100);
-    return <Navigate to="/" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 마스터 계정은 무조건 통과
-  if (isMaster) {
-    return <>{children}</>;
+  // SUPER_ADMIN은 플랫폼 관리 페이지만 접근 가능
+  if (requireSuperAdmin && !isSuperAdmin) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // SUPER_ADMIN은 회사별 메뉴에 접근 불필요하므로 자체 대시보드로 리디렉트
+  if (isSuperAdmin && !requireSuperAdmin) {
+    return <Navigate to="/super-admin" replace />;
   }
 
   if (!userData) {
-    // 로그인은 되었으나 Firestore 프로필(userData)이 아직 없거나 로드되지 않음
     if (requireAdmin || requireMasterAdmin) {
       return <Navigate to="/dashboard" replace />;
     }
     return <>{children}</>;
   }
 
-  if (requireMasterAdmin && !isMaster && userData?.role !== 'ADMIN') {
+  if (requireMasterAdmin && userData.role !== 'ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 
