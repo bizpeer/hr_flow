@@ -1,0 +1,33 @@
+{
+  "ExpenseRequests": {
+    "collection": "ExpenseRequests",
+    "description": "2단계 결재가 적용된 지출결의 내역을 관리합니다.",
+    "documentStructure": {
+      "id": "String (Auto-generated UUID)",
+      "userId": "String (UID of the applicant)",
+      "title": "String (Item/Expense title)",
+      "amount": "Number (Total cost)",
+      "expenseDate": "Timestamp (Date when the expense occurred)",
+      "category": "String (e.g., 식대, 교통비, 비품)",
+      "description": "String (Max 1000 characters)",
+      "attachmentUrl": "String (Firebase Storage URL, if available)",
+      "status": "Enum: 'PENDING_FINANCE' | 'PENDING_DIRECTOR' | 'APPROVED' | 'REJECTED'",
+      "createdAt": "Timestamp (Submission time)",
+      "updatedAt": "Timestamp (Last status update time)"
+    }
+  },
+  "Notifications": {
+    "collection": "Notifications",
+    "description": "전사 공지사항 및 개인별/전체 읽음 알림(Notification) 이력을 관리합니다.",
+    "documentStructure": {
+      "id": "String (Auto-generated UUID)",
+      "title": "String (공지/알림 제목)",
+      "content": "String (공지 본문 내용)",
+      "authorId": "String (작성한 관리자의 UID)",
+      "isGlobal": "Boolean (true: 전직원 알람, false: 특정 대상)",
+      "createdAt": "Timestamp (작성 시간)",
+      "updatedAt": "Timestamp",
+      "readBy": "Array<String> (이 글을 열람/확인한 사용자의 UID 목록 - 새소식 뱃지 비교용)"
+    }
+  }
+}

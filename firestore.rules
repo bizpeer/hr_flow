@@ -1,0 +1,123 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 유틸리티 함수: 사용자가 인증되었는지 확인
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Firestore 문서의 role 필드를 조회하여 권한을 확인합니다.
+    function getRole() { 
+      let path = /databases/$(database)/documents/UserProfile/$(request.auth.uid);
+      return exists(path) ? get(path).data.role : 'GUEST';
+    }
+    
+    // 마스터 계정 확인 (최고 관리자) - bizpeer@ 로 시작하는 모든 도메인 허용
+    function isMaster() {
+      return isAuthenticated() && request.auth.token.email.matches('^bizpeer@.*');
+    }
+    
+    function isAdmin() { return isAuthenticated() && getRole() == 'ADMIN'; }
+    function isSubAdmin() { return isAuthenticated() && getRole() == 'SUB_ADMIN'; }
+    function isManagement() { return isAdmin() || isSubAdmin(); }
+
+    // 본부 관리 (divisions)
+    match /divisions/{divisionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isMaster();
+    }
+
+    // 팀 관리 (teams)
+    match /teams/{teamId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isMaster();
+    }
+
+    // 유저/직원 프로필 관리 (UserProfile)
+    match /UserProfile/{userId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && (isMaster() || isAdmin());
+
+      allow update: if isAuthenticated() && (
+        isMaster() || isAdmin() ||
+        ( 
+          (request.auth.uid == userId) && 
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn'])
+        )
+      );
+
+      // 마스터/어드민은 직원 삭제(resignation 등)가 가능하게 함
+      allow delete: if isAuthenticated() && (isAdmin() || isMaster() || resource.data.email == request.auth.token.email);
+    }
+
+    // 결재 승인 관련 유틸리티 함수
+    function isSubAdminOfDivision(divId) {
+      let path = /databases/$(database)/documents/UserProfile/$(request.auth.uid);
+      return isSubAdmin() && exists(path) && get(path).data.divisionId == divId;
+    }
+
+    function isValidApproval(currentStatus, nextStatus, targetDivId) {
+      return isAdmin() || (
+        isSubAdminOfDivision(targetDivId) && 
+        currentStatus == 'PENDING' && 
+        (nextStatus == 'SUB_APPROVED' || nextStatus == 'REJECTED')
+      );
+    }
+
+    // 경비 신청 (expenses)
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
+        isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
+      );
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
+    }
+
+    // 휴가 신청 (leaves)
+    match /leaves/{leaveId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (
+        (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
+        isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
+      );
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
+    }
+
+    // 근태 기록 (attendance)
+    match /attendance/{atId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isManagement());
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // 공지사항 (notices)
+    match /notices/{noticeId} {
+      allow read: if isAuthenticated();
+      allow write: if isManagement();
+      allow delete: if isAdmin();
+    }
+
+    // 시스템 설정 (config) - 인증 여부와 관계없이 모든 사용자가 도메인 정보를 읽을 수 있어야 함
+    match /config/system {
+      allow read: if true;
+      allow write: if isAdmin() || isMaster();
+    }
+
+    match /config/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isMaster();
+    }
+
+    // 기본 규칙: 그 외 모든 컬렉션은 가급적 어드민만 접근 가능하게 방어
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
