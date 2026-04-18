@@ -20,8 +20,6 @@ concurrency:
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout Repo
         uses: actions/checkout@v4
@@ -36,12 +34,11 @@ jobs:
       - name: Install dependencies (Client)
         run: |
           cd client
-          npm install
+          npm ci
 
       - name: Build (Client)
         run: |
           cd client
-          echo "Building client application..."
           npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -51,7 +48,7 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
-          CI: false
+          CI: true
 
 
 
