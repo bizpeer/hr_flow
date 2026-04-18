@@ -46,12 +46,12 @@ export const AttendanceDashboard: React.FC = () => {
 
   // 관리자일 경우 전체 사용자 목록 페칭
   useEffect(() => {
-    const isManagementRole = userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN';
-
     if (isManagementRole && userData?.companyId) {
       const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
       const unsubscribe = onSnapshot(q, (snap) => {
         setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, (err) => {
+        console.error("Management User List Error:", err);
       });
       return () => unsubscribe();
     }
@@ -98,16 +98,15 @@ export const AttendanceDashboard: React.FC = () => {
 
   // 오늘 근태 기록 실시간 구독
   useEffect(() => {
-    if (!user?.uid) {
+    if (!user?.uid || !userData?.companyId) {
       setLoading(false);
       return;
     }
 
     // [버그 수정 및 보강] KST 기준 오늘 날짜 기록 페칭
-    // 인덱스 오류 및 타임존 문자열 비교 문제를 피하기 위해 사용자 ID로만 쿼리 후 로컬 필터링
     const q = query(
       collection(db, 'attendance'),
-      where('companyId', '==', userData?.companyId),
+      where('companyId', '==', userData.companyId),
       where('userId', '==', user.uid)
     );
 
