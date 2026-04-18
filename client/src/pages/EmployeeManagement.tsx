@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { 
   collection, query, where, onSnapshot, doc, updateDoc, 
-  getDocs, orderBy, writeBatch 
+  getDocs, writeBatch 
 } from 'firebase/firestore';
 import { auth, db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';

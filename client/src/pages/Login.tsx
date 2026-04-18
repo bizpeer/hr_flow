@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, LogIn, UserPlus, Building2, Mail, Lock, User, Globe, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
-import { useAuthStore } from '../store/authStore';
+import { CheckCircle2, Loader2, LogIn, UserPlus, AlertCircle, Mail, Lock, User, Building2, Globe, ArrowRight } from 'lucide-react';
 
 type TabMode = 'login' | 'register';
 

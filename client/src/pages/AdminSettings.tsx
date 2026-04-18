@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users } from 'lucide-react';
 import { auth, db } from '../firebase';
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
-import { updatePassword } from 'firebase/auth';
+import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
 import { query, where } from 'firebase/firestore';
 

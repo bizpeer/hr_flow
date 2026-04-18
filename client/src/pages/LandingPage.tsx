@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, CheckCircle2, Clock, FileText, Users, 
-  ShieldCheck, Smartphone, Zap, Building2, ChevronRight,
+  ShieldCheck, Smartphone, Zap, ChevronRight,
   Globe, LayoutDashboard, Database
 } from 'lucide-react';
 

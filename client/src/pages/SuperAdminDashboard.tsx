@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { useAuthStore, CompanyData, UserData } from '../store/authStore';
+import { useAuthStore } from '../store/authStore';
+import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
   ToggleLeft, ToggleRight, Crown, Calendar,
@@ -46,9 +47,6 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const getUsersForCompany = (companyId: string) => 
     allUsers.filter(u => u.companyId === companyId);
-
-  const getAdminForCompany = (companyId: string) => 
-    allUsers.find(u => u.companyId === companyId && u.role === 'ADMIN');
 
   const filteredCompanies = companies.filter(c => 
     !searchQuery || 
@@ -161,7 +159,6 @@ export const SuperAdminDashboard: React.FC = () => {
             <div className="divide-y divide-slate-50">
               {filteredCompanies.map((company) => {
                 const companyUsers = getUsersForCompany(company.id);
-                const admin = getAdminForCompany(company.id);
                 const isExpanded = selectedCompany === company.id;
 
                 return (

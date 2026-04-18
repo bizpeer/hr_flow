@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireMasterAdmin = false,
   requireSuperAdmin = false
 }) => {
-  const { user, userData, loading, setLoginModalOpen } = useAuthStore();
+  const { user, userData, loading } = useAuthStore();
   const location = useLocation();
 
   if (loading) {

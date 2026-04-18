@@ -5,7 +5,7 @@ import {
   Plus, Minus, Printer, X, Users
 } from 'lucide-react';
 import { 
-  collection, query, onSnapshot, doc, updateDoc, orderBy, where 
+  collection, query, onSnapshot, doc, updateDoc, where 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
@@ -100,7 +100,7 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }) => {
 };
 
 export const SalaryManagement: React.FC = () => {
-  const { user, userData } = useAuthStore();
+  const { userData } = useAuthStore();
   const isAdminOrMaster = userData?.role === 'SUPER_ADMIN' || userData?.role === 'ADMIN';
   const [employees, setEmployees] = useState<UserData[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);

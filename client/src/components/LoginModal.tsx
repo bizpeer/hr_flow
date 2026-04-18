@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  updatePassword
-} from 'firebase/auth';
+import { updatePassword } from 'firebase/auth';
 import { 
   doc, updateDoc, addDoc, collection
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
-import { AlertCircle, X, Loader2, KeyRound, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, X, KeyRound, CheckCircle2 } from 'lucide-react';
 
 export const LoginModal: React.FC = () => {
   const { 

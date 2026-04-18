@@ -17,5 +17,26 @@
 - `VITE_FIREBASE_DATABASE_ID=weberp`
 - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN` 등 (GitHub Secrets에 등록됨)
 
+## 4. 본 시스템은 단일 코드 베이스로 여러 기업을 서비스하는 
+- **Multi-tenant SaaS 모델을 채택하고 있습니다. 모든 데이터는 companyId를 기준으로 물리적/논리적으로 격리되어 보안을 보장합니다.
+- ** Frontend: React + TypeScript + Tailwind CSS + Zustand (상태 관리)
+- ** Backend/DB: Firebase Auth (인증) + Firestore (DB ID: weberp)
+- **Serverless Logic: Firebase Cloud Functions (비밀번호 강제 초기화 등 관리자 기능)
+## 5. 권한별 접근 메뉴 (RBAC Matrix)
+구분	메뉴명	SUPER_ADMIN	ADMIN (Owner)	SUB_ADMIN	MEMBER
+플랫폼	플랫폼 관리 (기업 관리)	✅	❌	❌	❌
+공통	대시보드	❌	✅	✅	✅
+	내 휴가 및 근태	❌	✅	✅	✅
+	지출결의 신청	❌	✅	✅	✅
+	공지사항 게시판	❌	✅	✅	✅
+관리자	결재/승인 관리함	❌	✅	✅	❌
+	조직관리	❌	✅	❌	❌
+	급여 및 연봉 관리	❌	✅	❌	❌
+	지출결의 통합 조회	❌	✅	❌	❌
+	인사관리 (직원 등록/수정)	❌	✅	❌	❌
+	시스템 설정 (도메인 등)	❌	✅	❌	❌
+NOTE
+SUPER_ADMIN은 플랫폼 전체를 관리하며, 특정 회사에 소속되지 않고 플랫폼 대시보드(/super-admin)에만 접근합니다.
+
 ---
 *이 가이드는 시스템의 무결성과 안정적인 배포를 위해 반드시 준수되어야 합니다.*
