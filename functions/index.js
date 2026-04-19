@@ -1,7 +1,12 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
 
-admin.initializeApp();
+// Lazy initialization helper to prevent 10s timeout during deployment analysis
+function initAdmin() {
+  if (admin.apps.length === 0) {
+    admin.initializeApp();
+  }
+}
 
 // (default) 데이터베이스 사용을 금지하기 위한 상수 정의
 const DATABASE_ID = 'weberp';
@@ -11,6 +16,7 @@ const DATABASE_ID = 'weberp';
  * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
  */
 exports.adminResetPassword = onCall(async (request) => {
+  initAdmin();
   // 1. 인증 정보 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
@@ -85,6 +91,7 @@ exports.adminResetPassword = onCall(async (request) => {
  * 호출자는 반드시 'ADMIN' 또는 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
  */
 exports.adminCreateMember = onCall(async (request) => {
+  initAdmin();
   // 1. 인증 정보 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
@@ -171,6 +178,7 @@ exports.adminCreateMember = onCall(async (request) => {
  * 호출자는 반드시 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
  */
 exports.adminDeleteCompanyData = onCall(async (request) => {
+  initAdmin();
   // 1. 인증 및 권한 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
@@ -288,6 +296,7 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
  * 백엔드 함수의 배포 상태 및 버전을 확인하기 위한 헬퍼 함수입니다.
  */
 exports.checkDeploymentStatus = onCall(async (request) => {
+  initAdmin();
   return {
     version: "2.2.0",
     deployedAt: new Date().toISOString(),
