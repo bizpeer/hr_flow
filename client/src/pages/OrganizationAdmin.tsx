@@ -8,7 +8,8 @@ import {
   query, where, getDocs 
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { db } from '../firebase';
+import { db, functions } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 
 interface Division {
@@ -67,7 +68,7 @@ export const OrganizationAdmin: React.FC = () => {
   const [newDivName, setNewDivName] = useState('');
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
-  const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
+  const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', password: '', joinDate: new Date().toISOString().split('T')[0] });
 
   // 정보 수정용 (임명/이동)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -175,11 +176,16 @@ export const OrganizationAdmin: React.FC = () => {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newEmp.password.length < 6) {
+      alert("임시 비밀번호는 최소 6자 이상이어야 합니다.");
+      return;
+    }
+
     try {
       const loginInput = newEmp.email.trim().toLowerCase();
       const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${systemDomain}`;
 
-      // 1. 중복 아이디 체크
+      // 1. 중복 아이디 체크 (UX 차원)
       const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail), where('companyId', '==', userData?.companyId || ''));
       const querySnapshot = await getDocs(q);
       
@@ -188,29 +194,28 @@ export const OrganizationAdmin: React.FC = () => {
         return;
       }
 
-      const tempId = `temp_${Date.now()}`;
-      const selectedTeam = teams.find(t => t.id === newEmp.teamId);
-      const divisionId = selectedTeam?.divisionId || '';
-
-      await setDoc(doc(db, 'UserProfile', tempId), {
+      // 2. Cloud Function 호출 (계정 + 프로필 동시 생성)
+      const createMemberFn = httpsCallable(functions, 'adminCreateMember');
+      const result = await createMemberFn({
         name: newEmp.name,
         email: finalEmail,
-        role: 'MEMBER',
-        teamId: newEmp.teamId || '',
-        divisionId,
-        teamHistory: [],
-        joinDate: newEmp.joinDate,
-        mustChangePassword: true,
-        createdAt: new Date().toISOString(),
-        companyId: userData?.companyId || ''
+        password: newEmp.password,
+        teamId: newEmp.teamId,
+        joinDate: newEmp.joinDate
       });
+
+      const data = result.data as { success: boolean, uid: string, message: string };
+      const newUid = data.uid;
       
-      await logAction('CREATE_MEMBER', tempId, newEmp.name, `직원 등록 (${finalEmail}) / 임비 123456`);
-      alert(`[안내] 신규 직원 데이터가 등록되었습니다.\n아이디: ${finalEmail.split('@')[0]}\n임시 비밀번호: 123456\n(표시 이메일: ${getDisplayEmail(finalEmail)})`);
+      // 3. 로그 기록 및 알림
+      await logAction('CREATE_MEMBER', newUid, newEmp.name, `직원 등록 (${finalEmail}) / 임비: ${newEmp.password}`);
+      alert(`[안내] 신규 직원 계정이 생성되었습니다.\n아이디: ${finalEmail}\n임시 비밀번호: ${newEmp.password}\n\n* 해당 직원은 첫 로그인 시 비밀번호를 의무적으로 변경해야 합니다.`);
+      
       setShowEmployeeModal(false);
-      setNewEmp({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
-    } catch (err) {
-      alert("직원 등록 실패: " + (err as Error).message);
+      setNewEmp({ name: '', email: '', teamId: '', password: '', joinDate: new Date().toISOString().split('T')[0] });
+    } catch (err: any) {
+      console.error("Employee Registration Error:", err);
+      alert("직원 등록 실패: " + (err.message || String(err)));
     }
   };
 
@@ -675,10 +680,13 @@ export const OrganizationAdmin: React.FC = () => {
                 <input type="text" required placeholder="이름" value={newEmp.name} onChange={(e) => setNewEmp({...newEmp, name: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
                 <input type="text" required placeholder="아이디(이메일)" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
               </div>
-              <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newEmp.teamId} onChange={(e) => setNewEmp({...newEmp, teamId: e.target.value})}>
-                <option value="">팀 선택(선택사항)</option>
-                {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <div className="grid grid-cols-2 gap-4">
+                <input type="password" required placeholder="임시 비밀번호" value={newEmp.password} onChange={(e) => setNewEmp({...newEmp, password: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+                <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newEmp.teamId} onChange={(e) => setNewEmp({...newEmp, teamId: e.target.value})}>
+                  <option value="">팀 선택(선택사항)</option>
+                  {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+              </div>
               <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">등록 완료</button>
               <button type="button" onClick={() => setShowEmployeeModal(false)} className="w-full p-4 text-slate-400 font-bold">취소</button>
             </form>
