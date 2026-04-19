@@ -147,9 +147,9 @@ service cloud.firestore {
       allow write: if isAdmin() || isSuperAdmin();
     }
 
-    // 기본 규칙: 그 외 모든 컬렉션은 SUPER_ADMIN 또는 ADMIN만 접근
+    // 기본 규칙: 그 외 명시되지 않은 모든 컬렉션은 SUPER_ADMIN만 접근 가능
     match /{document=**} {
-      allow read, write: if isSuperAdmin() || isAdmin();
+      allow read, write: if isSuperAdmin();
     }
   }
 }

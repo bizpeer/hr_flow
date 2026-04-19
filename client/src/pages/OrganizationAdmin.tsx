@@ -231,8 +231,10 @@ export const OrganizationAdmin: React.FC = () => {
 
   const handleUpdateRole = async (emp: Employee, newTeamId: string, newRole: string) => {
     try {
+      const originalEmp = employees.find(e => e.uid === emp.uid);
+      
       // 본인 권한 변경 시도 차단
-      if (emp.uid === userData?.uid && emp.role !== newRole) {
+      if (emp.uid === userData?.uid && originalEmp && originalEmp.role !== newRole) {
         alert("운영 실수 방지를 위해 본인의 권한은 직접 변경할 수 없습니다.");
         return;
       }
