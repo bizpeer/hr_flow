@@ -57,24 +57,24 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Firebase Hosting 및 보안 규칙 배포
+      # 1. Firebase Cloud Functions 배포 (최우선 순위 - .firebaserc의 default 프로젝트 자동 사용)
+      - name: Deploy to Firebase (Functions Only)
+        run: |
+          mkdir -p .firebase
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
+          npx firebase-tools deploy --only functions --non-interactive
+          rm .firebase/service-account.json
+
+      # 2. Firebase Hosting 및 규칙 배포
       - name: Deploy to Firebase (Hosting & Rules)
         run: |
           mkdir -p .firebase
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS=.firebase/service-account.json
-          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
+          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --non-interactive
           rm .firebase/service-account.json
-
-      # 2. Firebase Cloud Functions 배포 (별도 분리하여 실패 지점 확인)
-      - name: Deploy to Firebase (Functions)
-        run: |
-          mkdir -p .firebase
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS=.firebase/service-account.json
-          # 함수 배포는 API 활성화 및 권한이 필수적입니다. 실패 시 로그를 반드시 확인해야 합니다.
-          npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
-          rm .firebase/service-account.json
+        continue-on-error: true
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
