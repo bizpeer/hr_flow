@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { updatePassword } from 'firebase/auth';
+import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { 
   doc, updateDoc, addDoc, collection
 } from 'firebase/firestore';
@@ -16,6 +16,7 @@ export const LoginModal: React.FC = () => {
   // 비밀번호 변경 관련
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changeSuccess, setChangeSuccess] = useState(false);
@@ -66,6 +67,23 @@ export const LoginModal: React.FC = () => {
       const user = auth.currentUser;
       if (!user) throw new Error("인증 세션이 만료되었습니다.");
 
+      // 수동 변경 모드 진행 시 보안을 위해 현재 비밀번호로 재인증 처리
+      if (isManualChangeMode) {
+        if (!currentPassword) {
+          setError('현재 비밀번호를 입력해 주세요.');
+          setLoading(false);
+          return;
+        }
+        try {
+          const credential = EmailAuthProvider.credential(user.email!, currentPassword);
+          await reauthenticateWithCredential(user, credential);
+        } catch (authErr: any) {
+          setError('현재 비밀번호가 일치하지 않습니다.');
+          setLoading(false);
+          return;
+        }
+      }
+
       await updatePassword(user, newPassword);
 
       try {
@@ -80,7 +98,7 @@ export const LoginModal: React.FC = () => {
           performedBy: userData?.name || '시스템',
           targetId: user.uid,
           targetName: userData?.name || '',
-          details: '최초 로그인 비밀번호 변경 완료 (계정 활성화)',
+          details: isManualChangeMode ? '기존 비밀번호 재인증 후 비밀번호 변경 완료' : '최초 로그인 비밀번호 변경 완료 (계정 활성화)',
           companyId: userData?.companyId || ''
         });
       } catch (dbErr) {
@@ -96,6 +114,7 @@ export const LoginModal: React.FC = () => {
       setTimeout(() => {
         setLoginModalOpen(false);
         setChangeSuccess(false);
+        setCurrentPassword('');
       }, 2000);
     } catch (err: any) {
       if (err.code === 'auth/requires-recent-login') {
@@ -154,6 +173,20 @@ export const LoginModal: React.FC = () => {
                       {error}
                     </div>
                   )}
+                  {isManualChangeMode && (
+                    <div className="text-left mb-4">
+                      <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1.5">현재 비밀번호</label>
+                      <input
+                        type="password"
+                        required
+                        className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                        placeholder="현재 비밀번호 입력"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                      />
+                    </div>
+                  )}
+
                   <div className="text-left">
                     <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1.5">새 비밀번호 (1차 입력)</label>
                     <input
