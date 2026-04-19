@@ -57,24 +57,25 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Firebase Cloud Functions 배포 (권한 문제 시 프론트엔드 배포를 방해하지 않도록 처리)
+      # 1. Firebase Cloud Functions 배포 (최우선 안정화)
       - name: Deploy to Firebase (Functions Only)
         run: |
           mkdir -p .firebase
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
+          # 절대 경로를 사용해 인증 파일을 확실히 인식시킵니다.
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
-          # .firebaserc의 default 프로젝트를 자동 사용합니다.
-          npx firebase-tools deploy --only functions --non-interactive || echo "Functions deploy failed, moving to static assets..."
+          echo "Deploying Functions to: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}"
+          npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug
           rm .firebase/service-account.json
         continue-on-error: true
 
-      # 2. Firebase Hosting 및 규칙 배포
+      # 2. Firebase Hosting 및 규칙 배포 (본격 반영)
       - name: Deploy to Firebase (Hosting & Rules)
         run: |
           mkdir -p .firebase
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
-          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --non-interactive
+          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
           rm .firebase/service-account.json
 
       # GitHub Pages 배포 전 아티팩트 업로드

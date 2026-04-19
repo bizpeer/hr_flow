@@ -175,16 +175,18 @@ export const EmployeeManagement: React.FC = () => {
       const emp = deleteConfirmEmp;
       const batch = writeBatch(db);
 
+      const companyId = userData?.companyId || '';
+
       // 1. Delete Attendance
-      const attSnap = await getDocs(query(collection(db, 'attendance'), where('userId', '==', emp.uid)));
+      const attSnap = await getDocs(query(collection(db, 'attendance'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
       attSnap.forEach(d => batch.delete(d.ref));
 
       // 2. Delete Leaves
-      const leaveSnap = await getDocs(query(collection(db, 'leaves'), where('userId', '==', emp.uid)));
+      const leaveSnap = await getDocs(query(collection(db, 'leaves'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
       leaveSnap.forEach(d => batch.delete(d.ref));
 
       // 3. Delete Expenses
-      const expSnap = await getDocs(query(collection(db, 'expenses'), where('userId', '==', emp.uid)));
+      const expSnap = await getDocs(query(collection(db, 'expenses'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
       expSnap.forEach(d => batch.delete(d.ref));
 
       // 4. Delete Profile
