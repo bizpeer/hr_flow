@@ -64,33 +64,19 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. Google 공식 인증 액션을 통한 서비스 계정 로드
-      - id: 'auth'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}
-
-      # 2. 인증 상태 사전 검증 (공식 인증 경로 확인)
+      # 1. Firebase 인증 상태 확인
       - name: Verify Firebase Auth Status
         run: |
-          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools projects:list --non-interactive
+          npx firebase-tools projects:list --non-interactive --token ${{ secrets.FIREBASE_TOKEN }}
           npx firebase-tools --version
-        env:
-          GOOGLE_CLOUD_PROJECT: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
 
-      # 3. Firebase Cloud Functions 배포 (디버그 모드 활성화)
+      # 2. Firebase Cloud Functions 배포
       - name: Deploy to Firebase (Functions Only)
-        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug
+        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token ${{ secrets.FIREBASE_TOKEN }}
 
-      # 4. Firebase Hosting 및 규칙 배포
+      # 3. Firebase Hosting 및 규칙 배포
       - name: Deploy to Firebase (Hosting & Rules)
-        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug
-
-      # 클린업
-      - name: Cleanup Auth File
-        run: rm -f .firebase/service-account.json
-        if: always()
+        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token ${{ secrets.FIREBASE_TOKEN }}
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
