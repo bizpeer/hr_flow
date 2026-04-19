@@ -57,16 +57,21 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Firebase 인증 및 서비스 계정 권한 로드 (환경 변수 영구화)
+      # 1. Firebase 인증 및 서비스 계정 권한 로드 (가장 강건한 Heredoc 방식 적용)
       - name: Authenticate with Firebase
         run: |
           mkdir -p .firebase
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
+          cat <<'EOF' > .firebase/service-account.json
+          ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}
+          EOF
           echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
+          echo "GOOGLE_CLOUD_PROJECT=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> $GITHUB_ENV
 
-      # 2. 인증 상태 사전 검증 (실패 시 여기서 중단되어 원인 파악 용이)
-      - name: Verify Firebase Auth
-        run: npx firebase-tools projects:list --non-interactive
+      # 2. 인증 상태 사전 검증 및 디버깅 정보 출력
+      - name: Verify Firebase Auth Status
+        run: |
+          npx firebase-tools projects:list --non-interactive || echo "[WARN] 프로젝트 리스트 조회 실패. IAM 권한(Viewer/Editor)을 확인해 주세요."
+          npx firebase-tools --version
 
       # 3. Firebase Cloud Functions 배포 (최종 변경내용 반영)
       - name: Deploy to Firebase (Functions Only)
@@ -76,7 +81,7 @@ jobs:
       - name: Deploy to Firebase (Hosting & Rules)
         run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
 
-      # 클린업 (보안을 위해 인증 파일 삭제)
+      # 클린업
       - name: Cleanup Auth File
         run: rm -f .firebase/service-account.json
         if: always()
