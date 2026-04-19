@@ -57,23 +57,29 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Firebase Cloud Functions 배포
-      - name: Deploy to Firebase (Functions Only)
+      # 1. Firebase 인증 및 서비스 계정 설정
+      - name: Authenticate with Firebase
         run: |
           mkdir -p .firebase
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
-          npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
-          rm .firebase/service-account.json
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
 
-      # 2. Firebase Hosting 및 규칙 배포
+      # 2. 인증 상태 사전 검증 (실패 시 여기서 중단되어 원인 파악 용이)
+      - name: Verify Firebase Auth
+        run: npx firebase-tools projects:list --non-interactive
+
+      # 3. Firebase Cloud Functions 배포
+      - name: Deploy to Firebase (Functions Only)
+        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+
+      # 4. Firebase Hosting 및 규칙 배포
       - name: Deploy to Firebase (Hosting & Rules)
-        run: |
-          mkdir -p .firebase
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
-          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json
-          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
-          rm .firebase/service-account.json
+        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+
+      # 클린업 (보안을 위해 인증 파일 삭제)
+      - name: Cleanup Auth File
+        run: rm -f .firebase/service-account.json
+        if: always()
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
