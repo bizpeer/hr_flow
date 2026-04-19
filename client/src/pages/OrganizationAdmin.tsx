@@ -46,7 +46,7 @@ interface AuditLog {
 }
 
 export const OrganizationAdmin: React.FC = () => {
-  const { userData, systemDomain, getDisplayEmail } = useAuthStore();
+  const { userData, companyData, systemDomain, getDisplayEmail } = useAuthStore();
   const navigate = useNavigate();
   const isMasterAdmin = userData?.role === 'ADMIN';
 
@@ -233,6 +233,12 @@ export const OrganizationAdmin: React.FC = () => {
     try {
       const originalEmp = employees.find(e => e.uid === emp.uid);
       
+      // 최초 회사를 생성한 최고 관리자(Owner) 권한 강등 보호
+      if (emp.uid === companyData?.adminUid && newRole !== 'ADMIN') {
+        alert("최초 회사를 생성한 최고 관리자(Owner)의 권한은 변경할 수 없습니다.");
+        return;
+      }
+
       // 본인 권한 변경 시도 차단
       if (emp.uid === userData?.uid && originalEmp && originalEmp.role !== newRole) {
         alert("운영 실수 방지를 위해 본인의 권한은 직접 변경할 수 없습니다.");
@@ -717,13 +723,15 @@ export const OrganizationAdmin: React.FC = () => {
                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 ml-1">
-                    권한 등급 {editingEmployee.uid === userData?.uid && "(본인 변경 불가)"}
+                    권한 등급 
+                    {editingEmployee.uid === companyData?.adminUid ? " (사내 최고 관리자 - 변경 불가)" : 
+                     editingEmployee.uid === userData?.uid ? " (본인 변경 불가)" : ""}
                   </label>
                   <select 
                     value={editingEmployee.role} 
                     onChange={(e) => setEditingEmployee({...editingEmployee, role: e.target.value})} 
                     className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black disabled:bg-slate-100 disabled:text-slate-400"
-                    disabled={editingEmployee.uid === userData?.uid}
+                    disabled={editingEmployee.uid === userData?.uid || editingEmployee.uid === companyData?.adminUid}
                   >
                     <option value="MEMBER">일반 직원 (MEMBER)</option>
                     <option value="SUB_ADMIN">부관리자 (SUB_ADMIN)</option>

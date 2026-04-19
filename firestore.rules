@@ -38,6 +38,12 @@ service cloud.firestore {
       return getCompanyId() == docCompanyId;
     }
 
+    // 최초 회사 생성자(Owner) 여부 확인
+    function isDocCompanyOwner(docCompanyId, targetUid) {
+      let companyPath = /databases/$(database)/documents/companies/$(docCompanyId);
+      return exists(companyPath) && get(companyPath).data.adminUid == targetUid;
+    }
+
     // 회사 관리 (companies)
     match /companies/{companyId} {
       allow read: if isAuthenticated();
@@ -69,12 +75,16 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isSuperAdmin() || 
         (isAdmin() && (
-          // 본인 문서가 아닌 경우: 모든 필드 수정 허용 (SaaS 관리 기능)
-          (request.auth.uid != userId) || 
-          // 본인 문서인 경우: role과 companyId 필드 수정 금지 (자가 보호)
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId'])
+          // 1. 본인 문서인 경우: role과 companyId 필드 수정 금지 (자가 보호)
+          (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId'])) ||
+          // 2. 타인 문서인 경우: 대상자가 Owner인 경우 role 덮어쓰기 금지, 그 외엔 무제한 수정 허용
+          (request.auth.uid != userId && (
+             !isDocCompanyOwner(resource.data.companyId, userId) || 
+             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+          ))
         )) ||
         ( 
+          // 3. MEMBER / SUB_ADMIN 의 본인 단순 정보 수정 (민감 및 권한 정보 불가)
           (request.auth.uid == userId) && 
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId'])
         )
