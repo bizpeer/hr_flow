@@ -57,15 +57,24 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # Firebase Hosting, Rules, Functions 통합 배포
-      - name: Deploy to Firebase
+      # 1. Firebase Hosting 및 보안 규칙 배포
+      - name: Deploy to Firebase (Hosting & Rules)
         run: |
           mkdir -p .firebase
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
           export GOOGLE_APPLICATION_CREDENTIALS=.firebase/service-account.json
-          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules,functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+          npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
           rm .firebase/service-account.json
-        continue-on-error: true
+
+      # 2. Firebase Cloud Functions 배포 (별도 분리하여 실패 지점 확인)
+      - name: Deploy to Firebase (Functions)
+        run: |
+          mkdir -p .firebase
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}' > .firebase/service-account.json
+          export GOOGLE_APPLICATION_CREDENTIALS=.firebase/service-account.json
+          # 함수 배포는 API 활성화 및 권한이 필수적입니다. 실패 시 로그를 반드시 확인해야 합니다.
+          npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+          rm .firebase/service-account.json
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages

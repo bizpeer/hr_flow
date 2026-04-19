@@ -30,6 +30,21 @@ export const SuperAdminDashboard: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null); // companyId
   const [adminPassword, setAdminPassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [backendStatus, setBackendStatus] = useState<{ version: string; deployedAt: string } | null>(null);
+
+  useEffect(() => {
+    checkBackend();
+  }, []);
+
+  const checkBackend = async () => {
+    try {
+      const checkFn = httpsCallable(functions, 'checkDeploymentStatus');
+      const result = await checkFn();
+      setBackendStatus(result.data as any);
+    } catch (e) {
+      console.warn("Backend status check failed:", e);
+    }
+  };
 
   const calculateDDay = (createdAt: string) => {
     if (!createdAt) return 'D+0';
@@ -157,7 +172,14 @@ export const SuperAdminDashboard: React.FC = () => {
               <div className="p-2.5 bg-violet-600 rounded-2xl text-white shadow-xl shadow-violet-100">
                 <Shield className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">플랫폼 관리 센터</h1>
+              <div>
+                <h1 className="text-3xl font-black text-slate-900 tracking-tight">플랫폼 관리 센터</h1>
+                {backendStatus && (
+                  <p className="text-[10px] font-bold text-violet-500 mt-0.5">
+                    Backend v{backendStatus.version} • Deployed: {new Date(backendStatus.deployedAt).toLocaleString()}
+                  </p>
+                )}
+              </div>
             </div>
             <p className="text-slate-500 font-medium">전체 조직 및 테넌트를 관리합니다. • SUPER_ADMIN</p>
           </div>

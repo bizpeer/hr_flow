@@ -273,3 +273,16 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
     throw new HttpsError("internal", detailedMessage || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
   }
 });
+
+/**
+ * 백엔드 함수의 배포 상태 및 버전을 확인하기 위한 헬퍼 함수입니다.
+ */
+exports.checkDeploymentStatus = onCall(async (request) => {
+  return {
+    version: "2.1.0",
+    deployedAt: "2026-04-19T11:10:00Z", // 수동 기록 또는 빌드 시 자동화 가능
+    environment: "production",
+    databaseId: DATABASE_ID,
+    status: "healthy"
+  };
+});
