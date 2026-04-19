@@ -1,4 +1,6 @@
 import admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth, Auth } from 'firebase-admin/auth';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -21,7 +23,6 @@ try {
   }
 } catch (error) {
   console.error('Failed to initialize Firebase Admin SDK:', error);
-  // 서비스 계정 키가 없는 경우에도 서버가 죽지 않게 처리 (환경 변수 또는 파일 확인 유도)
   console.warn('Proceeding without Firebase Admin authentication. Please check your serviceAccount.json file.');
 }
 
@@ -29,6 +30,6 @@ try {
 const DATABASE_ID = 'weberp';
 
 // 데이터베이스 ID를 명시하여 기본(default) 데이터베이스가 아닌 특정 데이터베이스를 사용합니다.
-export const adminDb = admin.firestore(DATABASE_ID);
-export const adminAuth = admin.auth();
+export const adminDb = getFirestore(DATABASE_ID);
+export const adminAuth: Auth = getAuth();
 export default admin;
