@@ -171,7 +171,7 @@ exports.adminCreateMember = onCall(async (request) => {
  * 특정 조직(Company) 및 해당 조직과 관련된 모든 데이터를 일괄 삭제합니다.
  * 호출자는 반드시 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
  */
-exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
+exports.adminDeleteCompanyData = onCall(async (request) => {
   // 1. 인증 및 권한 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
