@@ -170,7 +170,7 @@ exports.adminCreateMember = onCall(async (request) => {
  * 특정 조직(Company) 및 해당 조직과 관련된 모든 데이터를 일괄 삭제합니다.
  * 호출자는 반드시 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
  */
-exports.adminDeleteCompanyData = onCall(async (request) => {
+exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
   // 1. 인증 및 권한 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
@@ -209,43 +209,56 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
       "UserProfile"
     ];
 
-    // 4. 일괄 삭제 수행 (병렬 처리)
-    const deletionPromises = collectionsToWipe.map(async (collectionName) => {
-      const qSnap = await db.collection(collectionName).where("companyId", "==", companyId).get();
-      const batch = db.batch();
-      
-      // 만약 UserProfile인 경우 Auth 계정도 삭제 대상 식별 (옵션)
-      if (collectionName === "UserProfile") {
-        for (const doc of qSnap.docs) {
+    // 4. 일괄 삭제 헬퍼 함수 (Batch Chunking 적용)
+    const deleteCollectionDocs = async (collectionName) => {
+      let totalDeleted = 0;
+      while (true) {
+        // 한 번에 500개씩 가져와서 삭제 (Firestore Batch 제한 보호)
+        const qSnap = await db.collection(collectionName)
+          .where("companyId", "==", companyId)
+          .limit(500)
+          .get();
+
+        if (qSnap.empty) break;
+
+        // UserProfile의 경우 Auth 계정 일괄 삭제 병행
+        if (collectionName === "UserProfile") {
+          const uidsToDelete = qSnap.docs.map(d => d.id);
+          // deleteUsers는 한 번에 1000명까지 처리 가능
           try {
-            await admin.auth().deleteUser(doc.id);
-            console.log(`[AdminDeleteCompany] Deleted Auth user: ${doc.id}`);
-          } catch (e) {
-            console.warn(`[AdminDeleteCompany] Failed to delete Auth user ${doc.id}:`, e.message);
+            await admin.auth().deleteUsers(uidsToDelete);
+            console.log(`[AdminDeleteCompany] Deleted ${uidsToDelete.length} Auth users`);
+          } catch (authErr) {
+            console.error(`[AdminDeleteCompany] Auth deletion partially failed:`, authErr);
           }
         }
-      }
 
-      qSnap.docs.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      
-      if (qSnap.size > 0) {
+        const batch = db.batch();
+        qSnap.docs.forEach((doc) => batch.delete(doc.ref));
         await batch.commit();
-        console.log(`[AdminDeleteCompany] Deleted ${qSnap.size} documents from ${collectionName}`);
-      }
-    });
 
-    await Promise.all(deletionPromises);
+        totalDeleted += qSnap.size;
+        console.log(`[AdminDeleteCompany] Deleted ${qSnap.size} docs from ${collectionName} (Total: ${totalDeleted})`);
+        
+        // 데이터가 500개 미만이면 더 이상 루프를 돌 필요 없음
+        if (qSnap.size < 500) break;
+      }
+      return totalDeleted;
+    };
+
+    // 순차적 혹은 병렬 삭제 수행
+    for (const collectionName of collectionsToWipe) {
+      await deleteCollectionDocs(collectionName);
+    }
 
     // 5. 최종적으로 회사 문서 삭제
     await db.collection("companies").doc(companyId).delete();
     
-    console.log(`[AdminDeleteCompany] Successfully wiped all data for ${companyId}`);
+    console.log(`[AdminDeleteCompany] Successfully wiped all data for company: ${companyId}`);
 
     return {
       success: true,
-      message: "조직의 모든 데이터가 영구적으로 삭제되었습니다."
+      message: "조직의 모든 데이터 및 구성원 계정이 영구적으로 삭제되었습니다."
     };
 
   } catch (error) {

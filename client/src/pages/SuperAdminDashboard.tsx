@@ -124,8 +124,13 @@ export const SuperAdminDashboard: React.FC = () => {
       setDeleteTarget(null);
       setAdminPassword('');
     } catch (err: any) {
-      let msg = err.message;
-      if (err.code === 'auth/wrong-password') msg = '비밀번호가 일치하지 않습니다.';
+      console.error('[AdminDeleteCompanyData Error]', err);
+      let msg = err.message || '알 수 없는 오류가 발생했습니다.';
+      if (err.code === 'auth/wrong-password' || err.message?.includes('password')) {
+        msg = '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
+      } else if (err.code === 'functions/internal' || err.message === 'internal') {
+        msg = '서버 내부 오류가 발생했습니다. 데이터량이 너무 많거나 권한 문제일 수 있습니다.';
+      }
       alert('데이터 삭제 실패: ' + msg);
     } finally {
       setIsDeleting(false);
