@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { functions, auth } from '../firebase';
-import { signInWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 export const SuperAdminDashboard: React.FC = () => {
   const { userData } = useAuthStore();
@@ -336,7 +336,10 @@ export const SuperAdminDashboard: React.FC = () => {
                                       <button 
                                         onClick={(e) => { e.stopPropagation(); setResetTarget({uid: user.uid, name: user.name || ''}); setShowResetModal(true); }}
                                         className="p-1 px-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-all flex items-center gap-1 text-[9px] font-bold"
-                                        title="비밀번호 초기화"
+                                        /**
+                                         * 관리자 권한으로 사용자의 비밀번호를 초기화합니다.
+                                         * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
+                                         */
                                       >
                                         <Key className="w-2.5 h-2.5" /> PW 초기화
                                       </button>

@@ -1,8 +1,13 @@
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+// ESM 환경에서 __dirname 대체물 생성
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 서비스 계정 키 파일 경로 (상대 경로 또는 환경 변수)
 const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(__dirname, 'serviceAccount.json');
