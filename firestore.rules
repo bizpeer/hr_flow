@@ -67,7 +67,13 @@ service cloud.firestore {
       allow create: if isAuthenticated();
 
       allow update: if isAuthenticated() && (
-        isSuperAdmin() || isAdmin() ||
+        isSuperAdmin() || 
+        (isAdmin() && (
+          // 본인 문서가 아닌 경우: 모든 필드 수정 허용 (SaaS 관리 기능)
+          (request.auth.uid != userId) || 
+          // 본인 문서인 경우: role과 companyId 필드 수정 금지 (자가 보호)
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId'])
+        )) ||
         ( 
           (request.auth.uid == userId) && 
           !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId'])

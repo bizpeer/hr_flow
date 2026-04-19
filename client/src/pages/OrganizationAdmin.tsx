@@ -231,6 +231,12 @@ export const OrganizationAdmin: React.FC = () => {
 
   const handleUpdateRole = async (emp: Employee, newTeamId: string, newRole: string) => {
     try {
+      // 본인 권한 변경 시도 차단
+      if (emp.uid === userData?.uid && emp.role !== newRole) {
+        alert("운영 실수 방지를 위해 본인의 권한은 직접 변경할 수 없습니다.");
+        return;
+      }
+
       const userRef = doc(db, 'UserProfile', emp.uid);
       const selectedTeam = teams.find(t => t.id === newTeamId);
       const divisionId = selectedTeam?.divisionId || '';
@@ -707,14 +713,21 @@ export const OrganizationAdmin: React.FC = () => {
                    {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                  </select>
                </div>
-               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 ml-1">권한 등급</label>
-                 <select value={editingEmployee.role} onChange={(e) => setEditingEmployee({...editingEmployee, role: e.target.value})} className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black">
-                   <option value="MEMBER">일반 직원 (MEMBER)</option>
-                   <option value="SUB_ADMIN">부관리자 (SUB_ADMIN)</option>
-                   <option value="ADMIN">최고 관리자 (ADMIN)</option>
-                 </select>
-               </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-slate-400 ml-1">
+                    권한 등급 {editingEmployee.uid === userData?.uid && "(본인 변경 불가)"}
+                  </label>
+                  <select 
+                    value={editingEmployee.role} 
+                    onChange={(e) => setEditingEmployee({...editingEmployee, role: e.target.value})} 
+                    className="w-full p-5 bg-slate-50 rounded-2xl outline-none font-black disabled:bg-slate-100 disabled:text-slate-400"
+                    disabled={editingEmployee.uid === userData?.uid}
+                  >
+                    <option value="MEMBER">일반 직원 (MEMBER)</option>
+                    <option value="SUB_ADMIN">부관리자 (SUB_ADMIN)</option>
+                    <option value="ADMIN">최고 관리자 (ADMIN)</option>
+                  </select>
+                </div>
                <button onClick={() => handleUpdateRole(editingEmployee, editingEmployee.teamId || '', editingEmployee.role)} className="w-full p-5 text-white bg-indigo-600 rounded-2xl font-black shadow-lg">상태 저장하기</button>
                <button onClick={() => setShowEditModal(false)} className="w-full p-4 text-slate-400 font-bold">닫기</button>
             </div>
