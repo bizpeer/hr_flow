@@ -1,5 +1,6 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
+const { getFirestore } = require("firebase-admin/firestore");
 
 admin.initializeApp();
 
@@ -30,7 +31,7 @@ exports.adminResetPassword = onCall(async (request) => {
 
   try {
     // 3. 권한 및 소속 확인 (Firestore UserProfile 조회)
-    const db = admin.firestore(DATABASE_ID);
+    const db = getFirestore(DATABASE_ID);
     const callerRef = db.collection("UserProfile").doc(request.auth.uid);
     const targetRef = db.collection("UserProfile").doc(uid);
     
@@ -99,7 +100,7 @@ exports.adminCreateMember = onCall(async (request) => {
   }
 
   try {
-    const db = admin.firestore(DATABASE_ID);
+    const db = getFirestore(DATABASE_ID);
     
     // 3. 호출자(관리자) 정보 및 권한 조회
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
@@ -182,7 +183,7 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
   }
 
   try {
-    const db = admin.firestore(DATABASE_ID);
+    const db = getFirestore(DATABASE_ID);
     
     // 2. 호출자(관리자) 정보 조회
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
