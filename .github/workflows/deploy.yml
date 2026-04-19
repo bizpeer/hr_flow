@@ -57,18 +57,18 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Google Cloud 인증 (공식 액션 사용) - 서비스 계정 JSON 로드
-      - id: 'auth'
-        name: 'Authenticate to Google Cloud'
-        uses: 'google-github-actions/auth@v2'
-        with:
-          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}'
+      # 1. Firebase 인증 및 서비스 계정 권한 로드 (환경 변수 영구화)
+      - name: Authenticate with Firebase
+        run: |
+          mkdir -p .firebase
+          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
 
       # 2. 인증 상태 사전 검증 (실패 시 여기서 중단되어 원인 파악 용이)
       - name: Verify Firebase Auth
         run: npx firebase-tools projects:list --non-interactive
 
-      # 3. Firebase Cloud Functions 배포
+      # 3. Firebase Cloud Functions 배포 (최종 변경내용 반영)
       - name: Deploy to Firebase (Functions Only)
         run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
 

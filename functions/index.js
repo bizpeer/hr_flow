@@ -184,29 +184,31 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
 
   try {
     const db = getFirestore(DATABASE_ID);
+    console.log(`[AdminDeleteCompany] Checking permissions for user ${request.auth.uid} (${request.auth.token.email})`);
 
-    // 1. 권한 이중 확인 (Auth Token Claims + Firestore Profile)
-    // Auth Custom Claims를 1순위로 확인하여 성능과 보안 강화
+    // 1. 권한 확인 (Auth Token Claims + Email Fallback + Firestore Profile)
     const isSuperAdminByToken = request.auth.token.role === "SUPER_ADMIN";
+    const isSuperAdminByEmail = request.auth.token.email === "bizpeer@gmail.com";
     
-    // Firestore Profile을 2순위(안전망)로 확인
+    // Firestore Profile 보호 레이어
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
     const isSuperAdminByProfile = callerSnap.exists && callerSnap.data().role === "SUPER_ADMIN";
 
-    if (!isSuperAdminByToken && !isSuperAdminByProfile) {
-      console.error(`[AdminDeleteCompany] Unauthorized attempt by user ${request.auth.uid}`);
+    if (!isSuperAdminByToken && !isSuperAdminByEmail && !isSuperAdminByProfile) {
+      console.warn(`[AdminDeleteCompany] Unauthorized access attempt: ${request.auth.token.email}`);
       throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
     }
 
-    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} verified. Starting deletion for company ${companyId}`);
+    console.log(`[AdminDeleteCompany] Verified SUPER_ADMIN. Starting wipe for companyId: ${companyId}`);
 
     // 조직 정보 확인
     const companySnap = await db.collection("companies").doc(companyId).get();
     if (!companySnap.exists) {
+      console.warn(`[AdminDeleteCompany] Organization not found: ${companyId}`);
       throw new HttpsError("not-found", "해당 조직을 찾을 수 없습니다.");
     }
 
-    // 3. 삭제할 컬렉션 목록 (gemini.md 지침에 따른 모든 연관 데이터)
+    // 3. 삭제할 컬렉션 목록
     const collectionsToWipe = [
       "attendance",
       "divisions",
@@ -215,7 +217,7 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
       "expenses",
       "AuditLogs",
       "UserProfile",
-      "config" // 회사별 설정 포함
+      "config"
     ];
 
     // 4. 일괄 삭제 헬퍼 함수 (Batch Chunking 적용)
