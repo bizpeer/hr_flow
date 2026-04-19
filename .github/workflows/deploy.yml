@@ -64,20 +64,18 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. Firebase 인증 및 서비스 계정 권한 로드 (가장 강건한 Heredoc 방식 적용)
+      # 1. Firebase 인증 및 서비스 계정 권한 로드 (printf 방식으로 무결성 확보)
       - name: Authenticate with Firebase
         run: |
           mkdir -p .firebase
-          cat <<'EOF' > .firebase/service-account.json
-          ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}
-          EOF
+          printf "%s" "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
           echo "GOOGLE_CLOUD_PROJECT=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> $GITHUB_ENV
 
-      # 2. 인증 상태 사전 검증 및 디버깅 정보 출력
+      # 2. 인증 상태 사전 검증 (실패 시 즉시 중단하여 원인 파악)
       - name: Verify Firebase Auth Status
         run: |
-          npx firebase-tools projects:list --non-interactive || echo "[WARN] 프로젝트 리스트 조회 실패. IAM 권한(Viewer/Editor)을 확인해 주세요."
+          npx firebase-tools projects:list --non-interactive
           npx firebase-tools --version
 
       # 3. Firebase Cloud Functions 배포 (디버그 모드 활성화)

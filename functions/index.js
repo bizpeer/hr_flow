@@ -1,11 +1,11 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const admin = require("firebase-admin");
-const { getFirestore } = require("firebase-admin/firestore");
 
 admin.initializeApp();
 
 // (default) 데이터베이스 사용을 금지하기 위한 상수 정의
 const DATABASE_ID = 'weberp';
+
 /**
  * 관리자 권한으로 사용자의 비밀번호를 초기화합니다.
  * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
@@ -13,13 +13,11 @@ const DATABASE_ID = 'weberp';
 exports.adminResetPassword = onCall(async (request) => {
   // 1. 인증 정보 확인
   if (!request.auth) {
-    throw new HttpsError(
-      "unauthenticated",
-      "인증이 필요한 요청입니다."
-    );
+    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
   }
 
   const { uid, password } = request.data;
+  const { getFirestore } = require("firebase-admin/firestore");
 
   // 2. 입력 데이터 검증
   if (!uid || !password) {
@@ -100,6 +98,7 @@ exports.adminCreateMember = onCall(async (request) => {
   }
 
   try {
+    const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(DATABASE_ID);
 
     // 3. 호출자(관리자) 정보 및 권한 조회
@@ -183,6 +182,7 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
   }
 
   try {
+    const { getFirestore } = require("firebase-admin/firestore");
     const db = getFirestore(DATABASE_ID);
     console.log(`[AdminDeleteCompany] Checking permissions for user ${request.auth.uid} (${request.auth.token.email})`);
 
@@ -289,10 +289,10 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
  */
 exports.checkDeploymentStatus = onCall(async (request) => {
   return {
-    version: "2.1.0",
-    deployedAt: "2026-04-19T11:10:00Z", // 수동 기록 또는 빌드 시 자동화 가능
+    version: "2.2.0",
+    deployedAt: new Date().toISOString(),
     environment: "production",
     databaseId: DATABASE_ID,
-    status: "healthy"
+    status: "healthy (fully lazy loaded)"
   };
 });
