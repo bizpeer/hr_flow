@@ -264,7 +264,12 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
 
   } catch (error) {
     console.error(`[AdminDeleteCompanyError]`, error);
+    // 상세 에러 정보(메시지 및 스택 일부)를 반환하여 정확한 원인 파악 유도
+    const detailedMessage = error instanceof Error 
+      ? `${error.message}\n${error.stack?.split('\n').slice(0, 2).join('\n')}` 
+      : JSON.stringify(error);
+      
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
+    throw new HttpsError("internal", detailedMessage || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
   }
 });
