@@ -172,7 +172,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
           }
           
-          // [퇴사자 접속 차단]
+          // [역할 정규화] gemini.md 기준: SUPER_ADMIN | ADMIN | SUB_ADMIN | MEMBER
+          // DB에 구버전 역할명(EMPLOYEE 등)이 있을 경우 MEMBER로 자동 정규화
+          if (currentData && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
+            console.warn(`[Auth] Unknown role '${currentData.role}' detected, normalizing to 'MEMBER'`);
+            currentData = { ...currentData, role: 'MEMBER' };
+            // DB도 동기화하여 일관성 유지
+            try {
+              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+              console.log(`[Auth] Role normalized and saved to weberp DB.`);
+            } catch (e) {
+              console.warn('[Auth] Failed to save normalized role:', e);
+            }
+          }
+
           if (currentData?.status === 'RESIGNED') {
             await auth.signOut();
             set({ user: null, userData: null, loading: false });

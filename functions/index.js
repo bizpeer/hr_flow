@@ -34,15 +34,15 @@ exports.adminResetPassword = onCall(async (request) => {
     const db = getFirestore(DATABASE_ID);
     const callerRef = db.collection("UserProfile").doc(request.auth.uid);
     const targetRef = db.collection("UserProfile").doc(uid);
-    
+
     const [callerSnap, targetSnap] = await Promise.all([callerRef.get(), targetRef.get()]);
-    
+
     if (!callerSnap.exists) {
       throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
     }
 
     const callerData = callerSnap.data();
-    
+
     // SUPER_ADMIN은 모든 권한 허용
     if (callerData.role === "SUPER_ADMIN") {
       console.log(`[AdminReset] SUPER_ADMIN ${request.auth.uid} is resetting password for ${uid}`);
@@ -51,7 +51,7 @@ exports.adminResetPassword = onCall(async (request) => {
       if (!targetSnap.exists) {
         throw new HttpsError("not-found", "대상을 찾을 수 없습니다.");
       }
-      
+
       const targetData = targetSnap.data();
       if (callerData.companyId !== targetData.companyId) {
         throw new HttpsError(
@@ -68,12 +68,12 @@ exports.adminResetPassword = onCall(async (request) => {
 
     // 4. 비밀번호 강제 업데이트
     await admin.auth().updateUser(uid, { password });
-    
+
     console.log(`[AdminReset] Password for user ${uid} reset by ${request.auth.uid} (Company: ${callerData.companyId})`);
 
-    return { 
-      success: true, 
-      message: "비밀번호가 성공적으로 초기화되었습니다." 
+    return {
+      success: true,
+      message: "비밀번호가 성공적으로 초기화되었습니다."
     };
   } catch (error) {
     console.error(`[AdminResetError]`, error);
@@ -101,7 +101,7 @@ exports.adminCreateMember = onCall(async (request) => {
 
   try {
     const db = getFirestore(DATABASE_ID);
-    
+
     // 3. 호출자(관리자) 정보 및 권한 조회
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
     if (!callerSnap.exists) {
@@ -122,7 +122,7 @@ exports.adminCreateMember = onCall(async (request) => {
 
     // 5. Firestore UserProfile 생성
     const companyId = callerData.role === "SUPER_ADMIN" ? "PLATFORM" : callerData.companyId;
-    
+
     // 팀 소속 정보가 있다면 divisionId 조회
     let divisionId = "";
     if (teamId) {
@@ -184,29 +184,14 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
 
   try {
     const db = getFirestore(DATABASE_ID);
-    
-    // 2. SUPER_ADMIN 권한 확인 (이중 안전망)
-    // 방법 1: Firebase Auth Token의 Custom Claims 확인 (가장 신뢰할 수 있는 방법)
-    const tokenRole = request.auth.token?.role;
-    let isAuthorized = (tokenRole === "SUPER_ADMIN");
-    
-    // 방법 2: Custom Claims에 없으면 Firestore UserProfile에서 확인
-    if (!isAuthorized) {
-      const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-      if (callerSnap.exists) {
-        const callerRole = callerSnap.data().role;
-        console.log(`[AdminDeleteCompany] Firestore role check: uid=${request.auth.uid}, role=${callerRole}`);
-        isAuthorized = (callerRole === "SUPER_ADMIN");
-      } else {
-        console.warn(`[AdminDeleteCompany] No UserProfile found for uid=${request.auth.uid}, tokenRole=${tokenRole}`);
-      }
-    }
-    
-    if (!isAuthorized) {
-      throw new HttpsError("permission-denied", `조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용) tokenRole=${tokenRole}`);
+
+    // 2. 호출자(관리자) 정보 조회
+    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "SUPER_ADMIN") {
+      throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
     }
 
-    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} authorized, deleting company ${companyId}`);
+    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} requested deletion for company ${companyId}`);
 
     // 상위 조직 정보 확인
     const companySnap = await db.collection("companies").doc(companyId).get();
@@ -255,7 +240,7 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
 
         totalDeleted += qSnap.size;
         console.log(`[AdminDeleteCompany] Deleted ${qSnap.size} docs from ${collectionName} (Total: ${totalDeleted})`);
-        
+
         // 데이터가 500개 미만이면 더 이상 루프를 돌 필요 없음
         if (qSnap.size < 500) break;
       }
@@ -269,7 +254,7 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
 
     // 5. 최종적으로 회사 문서 삭제
     await db.collection("companies").doc(companyId).delete();
-    
+
     console.log(`[AdminDeleteCompany] Successfully wiped all data for company: ${companyId}`);
 
     return {
@@ -280,10 +265,10 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
   } catch (error) {
     console.error(`[AdminDeleteCompanyError]`, error);
     // 상세 에러 정보(메시지 및 스택 일부)를 반환하여 정확한 원인 파악 유도
-    const detailedMessage = error instanceof Error 
-      ? `${error.message}\n${error.stack?.split('\n').slice(0, 2).join('\n')}` 
+    const detailedMessage = error instanceof Error
+      ? `${error.message}\n${error.stack?.split('\n').slice(0, 2).join('\n')}`
       : JSON.stringify(error);
-      
+
     if (error instanceof HttpsError) throw error;
     throw new HttpsError("internal", detailedMessage || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
   }
