@@ -64,19 +64,20 @@ jobs:
           node-version: 20
           cache: 'npm'
 
-      # 1. Firebase 인증 및 서비스 계정 권한 로드 (printf 방식으로 무결성 확보)
-      - name: Authenticate with Firebase
-        run: |
-          mkdir -p .firebase
-          printf "%s" "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
-          echo "GOOGLE_CLOUD_PROJECT=${{ secrets.VITE_FIREBASE_PROJECT_ID }}" >> $GITHUB_ENV
+      # 1. Google 공식 인증 액션을 통한 서비스 계정 로드
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}'
 
-      # 2. 인증 상태 사전 검증 (실패 시 즉시 중단하여 원인 파악)
+      # 2. 인증 상태 사전 검증 (공식 인증 경로 확인)
       - name: Verify Firebase Auth Status
         run: |
+          echo "GOOGLE_APPLICATION_CREDENTIALS: $GOOGLE_APPLICATION_CREDENTIALS"
           npx firebase-tools projects:list --non-interactive
           npx firebase-tools --version
+        env:
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
 
       # 3. Firebase Cloud Functions 배포 (디버그 모드 활성화)
       - name: Deploy to Firebase (Functions Only)
