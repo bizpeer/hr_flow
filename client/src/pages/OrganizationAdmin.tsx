@@ -218,7 +218,7 @@ export const OrganizationAdmin: React.FC = () => {
     if (!window.confirm(`'${name}' 직원을 삭제하시겠습니까?`)) return;
     try {
       await deleteDoc(doc(db, 'UserProfile', uid));
-      await logAction('DELETE_EMPLOYEE', uid, name, '직원 삭제(영구)');
+      await logAction('DELETE_MEMBER', uid, name, '직원 삭제(영구)');
     } catch (err) {
       alert("삭제 실패: " + (err as Error).message);
     }
@@ -242,7 +242,7 @@ export const OrganizationAdmin: React.FC = () => {
         teamHistory: newHistory
       });
       
-      await logAction('UPDATE_EMPLOYEE', emp.uid, emp.name, `${teamName} 로 이동 / 역할: ${newRole}`);
+      await logAction('UPDATE_MEMBER', emp.uid, emp.name, `${teamName} 로 이동 / 역할: ${newRole}`);
       alert(`${emp.name}님의 소속/역할이 ${newRole} 등급으로 변경되었습니다.`);
       setShowEditModal(false);
       setEditingEmployee(null);
