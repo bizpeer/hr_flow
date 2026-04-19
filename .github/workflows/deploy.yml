@@ -57,26 +57,29 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # Node.js 설정 (v20 LTS로 고정하여 GCF 런타임 일치)
+      # Node.js 설정 (최신 안정화 버전)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
-      # 1. Firebase 인증 상태 확인
+      # 1. Firebase 인증 상태 확인 (토큰이 있을 때만)
       - name: Verify Firebase Auth Status
+        if: ${{ secrets.FIREBASE_TOKEN != '' }}
         run: |
-          npx firebase-tools projects:list --non-interactive --token ${{ secrets.FIREBASE_TOKEN }}
+          npx firebase-tools projects:list --non-interactive --token "${{ secrets.FIREBASE_TOKEN }}"
           npx firebase-tools --version
 
       # 2. Firebase Cloud Functions 배포
       - name: Deploy to Firebase (Functions Only)
-        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token ${{ secrets.FIREBASE_TOKEN }}
+        if: ${{ secrets.FIREBASE_TOKEN != '' }}
+        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token "${{ secrets.FIREBASE_TOKEN }}"
 
       # 3. Firebase Hosting 및 규칙 배포
       - name: Deploy to Firebase (Hosting & Rules)
-        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token ${{ secrets.FIREBASE_TOKEN }}
+        if: ${{ secrets.FIREBASE_TOKEN != '' }}
+        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token "${{ secrets.FIREBASE_TOKEN }}"
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
