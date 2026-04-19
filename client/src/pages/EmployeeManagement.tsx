@@ -36,7 +36,7 @@ interface AttendanceRecord {
 }
 
 export const EmployeeManagement: React.FC = () => {
-  const { userData } = useAuthStore();
+  const { userData, companyData } = useAuthStore();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
@@ -145,6 +145,16 @@ export const EmployeeManagement: React.FC = () => {
   };
 
   const handleToggleStatus = async (emp: Employee, newStatus: 'ACTIVE' | 'RESIGNED') => {
+    // 1. 자가 정지 및 소유자 정지 보호
+    if (emp.uid === userData?.uid) {
+      alert("운영 실수 방지를 위해 본인의 계정 상태는 변경할 수 없습니다.");
+      return;
+    }
+    if (emp.uid === companyData?.adminUid && newStatus === 'RESIGNED') {
+      alert("사내 최고 관리자(Owner)의 계정은 정지할 수 없습니다.");
+      return;
+    }
+
     const isActactivating = newStatus === 'ACTIVE';
     const confirmMsg = isActactivating 
       ? `[업무정지 해제] ${emp.name}님의 계정을 다시 활성화하시겠습니까?`
@@ -162,6 +172,19 @@ export const EmployeeManagement: React.FC = () => {
 
   const handleDeleteAll = async () => {
     if (!deleteConfirmEmp || !adminPassword) return;
+
+    // 2. 자가 삭제 및 소유자 삭제 보호
+    if (deleteConfirmEmp.uid === userData?.uid) {
+      alert("본인의 계정은 삭제할 수 없습니다.");
+      setDeleteConfirmEmp(null);
+      return;
+    }
+    if (deleteConfirmEmp.uid === companyData?.adminUid) {
+      alert("사내 최고 관리자(Owner)의 데이터는 삭제할 수 없습니다.");
+      setDeleteConfirmEmp(null);
+      return;
+    }
+
     setIsProcessing(true);
     
     try {

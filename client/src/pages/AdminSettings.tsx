@@ -55,10 +55,14 @@ export const AdminSettings: React.FC = () => {
     setMessage({ type: '', text: '' });
     try {
       if (auth.currentUser) {
+        // 보안 정책 준수를 위한 관리자 재인증 (verifyAdmin 내부에서 세션 갱신)
+        await verifyAdmin();
+        
         await updatePassword(auth.currentUser, newPassword);
         setMessage({ type: 'success', text: '관리자 비밀번호가 성공적으로 변경되었습니다.' });
         setNewPassword('');
         setConfirmPassword('');
+        setVerifyPassword(''); // 사용한 검증 비밀번호 초기화
       } else {
         setMessage({ type: 'error', text: '인증 세션이 만료되었습니다. 다시 로그인해주세요.' });
       }

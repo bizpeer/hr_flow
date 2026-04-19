@@ -76,18 +76,18 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (
         isSuperAdmin() || 
         (isAdmin() && (
-          // 1. 본인 문서인 경우: role과 companyId 필드 수정 금지 (자가 보호)
-          (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId'])) ||
-          // 2. 타인 문서인 경우: 대상자가 Owner인 경우 role 덮어쓰기 금지, 그 외엔 무제한 수정 허용
+          // 1. 본인 문서인 경우: role, companyId, status 필드 수정 금지 (자가 보호)
+          (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'status'])) ||
+          // 2. 타인 문서인 경우: 대상자가 Owner인 경우 role 및 status 덮어쓰기 금지
           (request.auth.uid != userId && (
              !isDocCompanyOwner(resource.data.companyId, userId) || 
-             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
           ))
         )) ||
         ( 
           // 3. MEMBER / SUB_ADMIN 의 본인 단순 정보 수정 (민감 및 권한 정보 불가)
           (request.auth.uid == userId) && 
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId'])
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId', 'status'])
         )
       );
 
