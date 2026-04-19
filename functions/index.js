@@ -185,21 +185,28 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
   try {
     const db = getFirestore(DATABASE_ID);
 
-    // 2. 호출자(관리자) 정보 조회
+    // 1. 권한 이중 확인 (Auth Token Claims + Firestore Profile)
+    // Auth Custom Claims를 1순위로 확인하여 성능과 보안 강화
+    const isSuperAdminByToken = request.auth.token.role === "SUPER_ADMIN";
+    
+    // Firestore Profile을 2순위(안전망)로 확인
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-    if (!callerSnap.exists || callerSnap.data().role !== "SUPER_ADMIN") {
+    const isSuperAdminByProfile = callerSnap.exists && callerSnap.data().role === "SUPER_ADMIN";
+
+    if (!isSuperAdminByToken && !isSuperAdminByProfile) {
+      console.error(`[AdminDeleteCompany] Unauthorized attempt by user ${request.auth.uid}`);
       throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
     }
 
-    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} requested deletion for company ${companyId}`);
+    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} verified. Starting deletion for company ${companyId}`);
 
-    // 상위 조직 정보 확인
+    // 조직 정보 확인
     const companySnap = await db.collection("companies").doc(companyId).get();
     if (!companySnap.exists) {
       throw new HttpsError("not-found", "해당 조직을 찾을 수 없습니다.");
     }
 
-    // 3. 삭제할 컬렉션 목록 정의
+    // 3. 삭제할 컬렉션 목록 (gemini.md 지침에 따른 모든 연관 데이터)
     const collectionsToWipe = [
       "attendance",
       "divisions",
@@ -207,7 +214,8 @@ exports.adminDeleteCompanyData = onCall({ timeoutSeconds: 300, memory: "512MiB" 
       "leaves",
       "expenses",
       "AuditLogs",
-      "UserProfile"
+      "UserProfile",
+      "config" // 회사별 설정 포함
     ];
 
     // 4. 일괄 삭제 헬퍼 함수 (Batch Chunking 적용)
