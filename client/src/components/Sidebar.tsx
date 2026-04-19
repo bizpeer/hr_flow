@@ -43,7 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
       {/* Decorative Gradient Background */}
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-indigo-600/5 to-transparent opacity-50 pointer-events-none"></div>
 
-      <div className="flex items-center justify-between mb-6 relative z-10">
+      <div className="flex items-center justify-between mb-6 relative z-10 shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white italic shadow-lg shadow-indigo-900/20">HF</div>
           <div className="text-2xl font-black tracking-tighter text-white">HR <span className="text-indigo-400">FLOW</span></div>
@@ -53,7 +53,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
 
       {/* 회사 정보 표시 */}
       {companyData && !isSuperAdmin && (
-        <div className="mb-6 px-3 py-2 bg-indigo-600/10 rounded-xl border border-indigo-500/20 relative z-10">
+        <div className="mb-6 px-3 py-2 bg-indigo-600/10 rounded-xl border border-indigo-500/20 relative z-10 shrink-0">
           <div className="flex items-center gap-2">
             <Building2 className="w-3.5 h-3.5 text-indigo-400" />
             <span className="text-xs font-bold text-indigo-300 truncate">{companyData.nameKo}</span>
@@ -62,7 +62,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
         </div>
       )}
       
-      <nav className="flex-1 space-y-2 relative z-10">
+      <nav className="flex-1 space-y-2 relative z-10 overflow-y-auto pr-2 custom-scrollbar no-scrollbar hover:no-scrollbar md:hover:block">
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.1);
+            border-radius: 10px;
+          }
+          .custom-scrollbar:hover::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.3);
+          }
+        `}</style>
         {isSuperAdmin ? (
           /* SUPER_ADMIN 전용 메뉴 */
           <>
@@ -92,7 +107,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
         )}
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-slate-800 relative z-10">
+      <div className="mt-auto pt-6 border-t border-slate-800 relative z-10 shrink-0">
         {/* 현재 사용자 정보 */}
         {userData && (
           <div className="mb-4 px-2">
