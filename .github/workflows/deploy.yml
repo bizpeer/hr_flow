@@ -68,7 +68,7 @@ jobs:
       - id: 'auth'
         uses: 'google-github-actions/auth@v2'
         with:
-          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}'
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}
 
       # 2. 인증 상태 사전 검증 (공식 인증 경로 확인)
       - name: Verify Firebase Auth Status
