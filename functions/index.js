@@ -164,3 +164,92 @@ exports.adminCreateMember = onCall(async (request) => {
     throw new HttpsError("internal", error.message || "직원 등록 중 오류가 발생했습니다.");
   }
 });
+
+/**
+ * 특정 조직(Company) 및 해당 조직과 관련된 모든 데이터를 일괄 삭제합니다.
+ * 호출자는 반드시 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
+ */
+exports.adminDeleteCompanyData = onCall(async (request) => {
+  // 1. 인증 및 권한 확인
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
+  }
+
+  const { companyId } = request.data;
+  if (!companyId) {
+    throw new HttpsError("invalid-argument", "삭제할 조직 ID가 누락되었습니다.");
+  }
+
+  try {
+    const db = admin.firestore(DATABASE_ID);
+    
+    // 2. 호출자(관리자) 정보 조회
+    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
+    if (!callerSnap.exists || callerSnap.data().role !== "SUPER_ADMIN") {
+      throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
+    }
+
+    console.log(`[AdminDeleteCompany] SUPER_ADMIN ${request.auth.uid} requested deletion for company ${companyId}`);
+
+    // 상위 조직 정보 확인
+    const companySnap = await db.collection("companies").doc(companyId).get();
+    if (!companySnap.exists) {
+      throw new HttpsError("not-found", "해당 조직을 찾을 수 없습니다.");
+    }
+
+    // 3. 삭제할 컬렉션 목록 정의
+    const collectionsToWipe = [
+      "attendance",
+      "divisions",
+      "teams",
+      "leaves",
+      "expenses",
+      "AuditLogs",
+      "UserProfile"
+    ];
+
+    // 4. 일괄 삭제 수행 (병렬 처리)
+    const deletionPromises = collectionsToWipe.map(async (collectionName) => {
+      const qSnap = await db.collection(collectionName).where("companyId", "==", companyId).get();
+      const batch = db.batch();
+      
+      // 만약 UserProfile인 경우 Auth 계정도 삭제 대상 식별 (옵션)
+      if (collectionName === "UserProfile") {
+        for (const doc of qSnap.docs) {
+          try {
+            await admin.auth().deleteUser(doc.id);
+            console.log(`[AdminDeleteCompany] Deleted Auth user: ${doc.id}`);
+          } catch (e) {
+            console.warn(`[AdminDeleteCompany] Failed to delete Auth user ${doc.id}:`, e.message);
+          }
+        }
+      }
+
+      qSnap.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      if (qSnap.size > 0) {
+        await batch.commit();
+        console.log(`[AdminDeleteCompany] Deleted ${qSnap.size} documents from ${collectionName}`);
+      }
+    });
+
+    await Promise.all(deletionPromises);
+
+    // 5. 최종적으로 회사 문서 삭제
+    await db.collection("companies").doc(companyId).delete();
+    
+    console.log(`[AdminDeleteCompany] Successfully wiped all data for ${companyId}`);
+
+    return {
+      success: true,
+      message: "조직의 모든 데이터가 영구적으로 삭제되었습니다."
+    };
+
+  } catch (error) {
+    console.error(`[AdminDeleteCompanyError]`, error);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", error.message || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
+  }
+});

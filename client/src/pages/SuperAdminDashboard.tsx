@@ -6,8 +6,11 @@ import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
   ToggleLeft, ToggleRight, Crown, Calendar,
-  TrendingUp, Briefcase, AlertTriangle
+  TrendingUp, Briefcase, AlertTriangle, Key, Trash2, Lock
 } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions, auth } from '../firebase';
+import { signInWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 
 export const SuperAdminDashboard: React.FC = () => {
   const { userData } = useAuthStore();
@@ -16,6 +19,32 @@ export const SuperAdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  
+  // 비밀번호 초기화 모달 상태
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetTarget, setResetTarget] = useState<{uid: string, name: string} | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
+  // 조직 삭제 모달 상태
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null); // companyId
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const calculateDDay = (createdAt: string) => {
+    if (!createdAt) return 'D+0';
+    try {
+      const start = new Date(createdAt);
+      start.setHours(0, 0, 0, 0);
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const diffTime = now.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return `D+${diffDays}`;
+    } catch (e) {
+      return 'D+0';
+    }
+  };
 
   useEffect(() => {
     if (userData?.role !== 'SUPER_ADMIN') return;
@@ -57,6 +86,51 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const totalUsers = allUsers.filter(u => u.role !== 'SUPER_ADMIN').length;
   const activeCompanies = companies.filter(c => c.status === 'ACTIVE').length;
+
+  const handleResetPassword = async () => {
+    if (!resetTarget || !newPassword) return;
+    if (newPassword.length < 6) {
+      alert('비밀번호는 최소 6자 이상이어야 합니다.');
+      return;
+    }
+
+    try {
+      const resetFn = httpsCallable(functions, 'adminResetPassword');
+      await resetFn({ uid: resetTarget.uid, password: newPassword });
+      alert(`[성공] ${resetTarget.name}님의 비밀번호가 '${newPassword}'로 초기화되었습니다.`);
+      setShowResetModal(false);
+      setResetTarget(null);
+      setNewPassword('');
+    } catch (err) {
+      alert('비밀번호 초기화 실패: ' + (err as Error).message);
+    }
+  };
+
+  const handleDeleteCompanyData = async () => {
+    if (!deleteTarget || !adminPassword || !auth.currentUser?.email) return;
+    
+    setIsDeleting(true);
+    try {
+      // 1. SUPER_ADMIN 비밀번호 재확인 (보안)
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, adminPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // 2. 백엔드 삭제 함수 호출
+      const deleteFn = httpsCallable(functions, 'adminDeleteCompanyData');
+      await deleteFn({ companyId: deleteTarget });
+      
+      alert('[완료] 해당 조직의 모든 데이터가 영구적으로 삭제되었습니다.');
+      setShowDeleteModal(false);
+      setDeleteTarget(null);
+      setAdminPassword('');
+    } catch (err: any) {
+      let msg = err.message;
+      if (err.code === 'auth/wrong-password') msg = '비밀번호가 일치하지 않습니다.';
+      alert('데이터 삭제 실패: ' + msg);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -195,6 +269,9 @@ export const SuperAdminDashboard: React.FC = () => {
                             <span className="text-xs text-slate-400 flex items-center gap-1">
                               <Calendar className="w-3 h-3" /> {new Date(company.createdAt).toLocaleDateString('ko-KR')}
                             </span>
+                            <span className="text-xs font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 flex items-center gap-1">
+                              {calculateDDay(company.createdAt)}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -213,6 +290,13 @@ export const SuperAdminDashboard: React.FC = () => {
                           ) : (
                             <><ToggleLeft className="w-4 h-4" /> 활성화</>
                           )}
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteTarget(company.id); setShowDeleteModal(true); }}
+                          className="p-2.5 bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all border border-transparent hover:border-rose-100"
+                          title="모든 데이터 삭제"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -240,13 +324,24 @@ export const SuperAdminDashboard: React.FC = () => {
                                     <p className="text-sm font-black text-slate-800 truncate">{user.name}</p>
                                     <p className="text-[10px] text-slate-400 truncate">{user.email}</p>
                                   </div>
-                                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
-                                    user.role === 'ADMIN' ? 'bg-violet-50 text-violet-600' :
-                                    user.role === 'SUB_ADMIN' ? 'bg-indigo-50 text-indigo-600' :
-                                    'bg-slate-100 text-slate-500'
-                                  }`}>
-                                    {user.role}
-                                  </span>
+                                  <div className="flex flex-col items-end gap-1.5">
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                      user.role === 'ADMIN' ? 'bg-violet-50 text-violet-600' :
+                                      user.role === 'SUB_ADMIN' ? 'bg-indigo-50 text-indigo-600' :
+                                      'bg-slate-100 text-slate-500'
+                                    }`}>
+                                      {user.role}
+                                    </span>
+                                    {user.role === 'ADMIN' && (
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setResetTarget({uid: user.uid, name: user.name || ''}); setShowResetModal(true); }}
+                                        className="p-1 px-1.5 bg-violet-600 text-white rounded-md hover:bg-violet-700 transition-all flex items-center gap-1 text-[9px] font-bold"
+                                        title="비밀번호 초기화"
+                                      >
+                                        <Key className="w-2.5 h-2.5" /> PW 초기화
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -261,6 +356,110 @@ export const SuperAdminDashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* 비밀번호 초기화 모달 */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
+                <Key className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">비밀번호 초기화</h3>
+                <p className="text-xs text-slate-400 font-bold">{resetTarget?.name}님</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">새 임시 비밀번호</label>
+                <input 
+                  type="text" 
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="최소 6자 이상"
+                  className="w-full mt-1 p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-50/50 transition-all font-bold"
+                />
+              </div>
+              <div className="pt-2 flex flex-col gap-2">
+                <button 
+                  onClick={handleResetPassword}
+                  className="w-full p-4 bg-violet-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-violet-100 hover:bg-violet-700 transition-all"
+                >
+                  변경사항 저장
+                </button>
+                <button 
+                  onClick={() => setShowResetModal(false)}
+                  className="w-full p-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition-all"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 조직 삭제 보안 모달 */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-4 bg-rose-50 rounded-2xl text-rose-600">
+                <Trash2 className="w-8 h-8" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">조직 데이터 전체 삭제</h3>
+                <p className="text-xs text-rose-500 font-bold">이 작업은 영구적이며 복구할 수 없습니다.</p>
+              </div>
+            </div>
+            
+            <div className="space-y-6">
+              <div className="p-4 bg-rose-50/50 border border-rose-100 rounded-2xl">
+                <p className="text-xs text-rose-700 font-medium leading-relaxed">
+                  해당 조직과 관련된 모든 데이터(직원, 근태, 결재, 휴가 등)가 파기되며, 소속된 모든 사용자의 인증 계정도 영구 삭제됩니다.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 ml-1">
+                  <Lock className="w-3 h-3 text-slate-400" />
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">본인 비밀번호 재확인 (SUPER_ADMIN)</label>
+                </div>
+                <input 
+                  type="password" 
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-50/50 transition-all font-bold"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <button 
+                  disabled={isDeleting || !adminPassword}
+                  onClick={handleDeleteCompanyData}
+                  className={`w-full p-4 bg-rose-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-rose-100 hover:bg-rose-700 transition-all flex items-center justify-center gap-2 ${
+                    isDeleting ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isDeleting ? (
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  ) : '영구 삭제 실행'}
+                </button>
+                <button 
+                  disabled={isDeleting}
+                  onClick={() => { setShowDeleteModal(false); setAdminPassword(''); }}
+                  className="w-full p-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition-all"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
