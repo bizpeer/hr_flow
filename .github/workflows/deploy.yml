@@ -57,12 +57,12 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
-      # 1. Firebase 인증 및 서비스 계정 설정
-      - name: Authenticate with Firebase
-        run: |
-          mkdir -p .firebase
-          echo "${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}" > .firebase/service-account.json
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/.firebase/service-account.json" >> $GITHUB_ENV
+      # 1. Google Cloud 인증 (공식 액션 사용) - 서비스 계정 JSON 로드
+      - id: 'auth'
+        name: 'Authenticate to Google Cloud'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_HR_SPENDING }}'
 
       # 2. 인증 상태 사전 검증 (실패 시 여기서 중단되어 원인 파악 용이)
       - name: Verify Firebase Auth
