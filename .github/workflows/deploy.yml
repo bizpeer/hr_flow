@@ -57,6 +57,13 @@ jobs:
           VITE_FIREBASE_DATABASE_ID: ${{ secrets.VITE_FIREBASE_DATABASE_ID }}
           CI: true
 
+      # Node.js 설정 (v20 LTS로 고정하여 GCF 런타임 일치)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
       # 1. Firebase 인증 및 서비스 계정 권한 로드 (가장 강건한 Heredoc 방식 적용)
       - name: Authenticate with Firebase
         run: |
@@ -73,13 +80,13 @@ jobs:
           npx firebase-tools projects:list --non-interactive || echo "[WARN] 프로젝트 리스트 조회 실패. IAM 권한(Viewer/Editor)을 확인해 주세요."
           npx firebase-tools --version
 
-      # 3. Firebase Cloud Functions 배포 (최종 변경내용 반영)
+      # 3. Firebase Cloud Functions 배포 (디버그 모드 활성화)
       - name: Deploy to Firebase (Functions Only)
-        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug
 
       # 4. Firebase Hosting 및 규칙 배포
       - name: Deploy to Firebase (Hosting & Rules)
-        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive
+        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug
 
       # 클린업
       - name: Cleanup Auth File
