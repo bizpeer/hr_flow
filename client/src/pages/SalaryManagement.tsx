@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Banknote, Search, Building, Filter, Calculator, 
-  Loader2, Save, PieChart, Info, AlertCircle, 
-  Plus, Minus, Printer, X, Users
+  Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart
 } from 'lucide-react';
 import { 
   collection, query, onSnapshot, doc, updateDoc, where 
@@ -128,6 +126,14 @@ export const SalaryManagement: React.FC = () => {
   const [editingData, setEditingData] = useState<Record<string, Partial<UserData>>>({});
   const [isSaving, setIsSaving] = useState<string | null>(null);
   const [selectedDetails, setSelectedDetails] = useState<UserData | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     if (!userData?.companyId) return;
@@ -167,23 +173,29 @@ export const SalaryManagement: React.FC = () => {
     return () => { unsubDivs(); unsubTeams(); unsubEmployees(); unsubTax(); };
   }, [userData?.companyId]);
 
-  const handleUpdateField = (uid: string, field: keyof UserData, value: any) => {
-    setEditingData(prev => {
-      const current = prev[uid] || {};
-      let updatedValue = value;
-
-      // 월급 모드에서 금액 수정 시 연봉으로 역산하여 저장
-      if (field === 'annualSalary' && current.salaryType === 'MONTHLY') {
-        const factor = current.isSeveranceIncluded ? 13 : 12;
-        updatedValue = value * factor;
+  const handleUpdateField = (uid: string, field: string, value: any) => {
+    setEditingData((prev: any) => ({
+      ...prev,
+      [uid]: {
+        ...prev[uid],
+        [field]: value
       }
-
-      return {
-        ...prev,
-        [uid]: { ...current, [field]: updatedValue }
-      };
-    });
+    }));
   };
+
+  const isChangedAny = Object.keys(editingData).some((uid: any) => {
+    const emp = employees.find((e: any) => e.uid === uid);
+    if (!emp) return false;
+    const data = editingData[uid];
+    return JSON.stringify(data) !== JSON.stringify({
+       annualSalary: emp.annualSalary || 0,
+       salaryType: emp.salaryType || 'ANNUAL',
+       isSeveranceIncluded: emp.isSeveranceIncluded || false,
+       dependents: emp.dependents || 1,
+       childrenUnder20: emp.childrenUnder20 || 0,
+       nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
+    });
+  });
 
   const handleSalaryAdd = (uid: string, amount: number) => {
     const currentData = editingData[uid] || {};
@@ -214,7 +226,7 @@ export const SalaryManagement: React.FC = () => {
   };
 
   const filteredEmployees = employees
-    .filter(emp => {
+    .filter((emp: any) => {
       if (emp.status === 'RESIGNED') return false;
       return (selectedDivision === 'ALL' || emp.divisionId === selectedDivision) &&
              (selectedTeam === 'ALL' || emp.teamId === selectedTeam) &&
@@ -232,228 +244,320 @@ export const SalaryManagement: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6 print:hidden">
         
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl">
-                 <Banknote className="w-6 h-6" />
-              </div>
-              <h1 className="text-3xl font-black text-slate-800 tracking-tight">급여 관리 고도화</h1>
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-slate-200/60">
+          <div className="flex items-center gap-5">
+            <div className="p-4 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl text-white shadow-xl shadow-indigo-100 ring-4 ring-white">
+               <Banknote className="w-8 h-8" />
             </div>
-            <p className="text-slate-500 font-medium text-sm">소득세법 기준의 정교한 산출과 인쇄 기능을 지원합니다.</p>
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">급여 체계 관리</h1>
+              <p className="text-slate-400 text-xs font-semibold flex items-center gap-2">
+                <AlertCircle className="w-3.5 h-3.5 text-indigo-400" />
+                2026년 대한민국 소득세법 및 4대 보험 표준 로직 적용됨
+              </p>
+            </div>
           </div>
-          <div className="relative group w-full lg:w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 focus-within:text-indigo-500" />
-            <input 
-              type="text" placeholder="이름으로 검색..."
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-6 py-4 bg-white rounded-2xl shadow-sm border-none outline-none focus:ring-2 focus:ring-indigo-100 font-bold"
-            />
+
+          <div className="flex items-center gap-4">
+            {isChangedAny && (
+               <div className="px-4 py-2 bg-rose-50 text-rose-500 text-[10px] font-black rounded-lg animate-pulse border border-rose-100">저장되지 않은 변경사항이 있습니다</div>
+            )}
+            <div className="relative group w-full lg:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+              <input 
+                type="text" placeholder="검색..."
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-6 py-3.5 bg-white rounded-2xl shadow-sm border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-bold text-slate-800"
+              />
+            </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+           <div className="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm flex items-center gap-3 hover:border-indigo-200 transition-colors">
               <Building className="w-5 h-5 text-indigo-400" />
               <select 
                 value={selectedDivision} onChange={(e) => {setSelectedDivision(e.target.value); setSelectedTeam('ALL');}}
-                className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 text-sm appearance-none"
+                className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none cursor-pointer"
               >
                  <option value="ALL">전체 본부</option>
-                 {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                 {divisions.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
            </div>
-           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+           <div className="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm flex items-center gap-3 hover:border-emerald-200 transition-colors">
               <Filter className="w-5 h-5 text-emerald-400" />
               <select 
                 value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}
                 disabled={selectedDivision === 'ALL'}
-                className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 text-sm appearance-none disabled:opacity-30"
+                className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none disabled:opacity-30 cursor-pointer"
               >
                  <option value="ALL">팀 검색</option>
-                 {teams.filter(t => t.divisionId === selectedDivision).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                 {teams.filter((t: any) => t.divisionId === selectedDivision).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
            </div>
-           <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg flex items-center justify-between">
-              <div className="flex items-center gap-2"><PieChart className="w-4 h-4 opacity-70" /><span className="text-[10px] font-black uppercase tracking-widest opacity-70">Tax Logic v25.1</span></div>
-              <span className="text-sm font-black">소득세법 기준 자동 산출</span>
+           <div className="md:col-span-2 premium-card p-4 bg-slate-900 text-white shadow-indigo-900/10 flex items-center justify-between px-8 border-none overflow-hidden relative">
+              <div className="relative z-10 flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">Standard Update</span>
+                <span className="text-sm font-black">2026.03 개정 세법 및 4.75% 연금율 적용</span>
+              </div>
+              <PieChart className="w-10 h-10 text-white/5 absolute -right-2 -bottom-2" />
            </div>
         </div>
 
-        {/* List */}
-        <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-           <div className="overflow-x-auto">
-              <table className="w-full min-w-[1200px]">
-                 <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직원 정보</th>
-                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">급여 기본 설정</th>
-                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">선택입력 (공제관련)</th>
-                       <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">실수령 산출결과</th>
-                       <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">관리</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-slate-100">
-                    {filteredEmployees.map(emp => {
-                       const data = editingData[emp.uid] || {};
-                       const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
-                       const isChanged = JSON.stringify(data) !== JSON.stringify({
-                          annualSalary: emp.annualSalary || 0,
-                          salaryType: emp.salaryType || 'ANNUAL',
-                          isSeveranceIncluded: emp.isSeveranceIncluded || false,
-                          dependents: emp.dependents || 1,
-                          childrenUnder20: emp.childrenUnder20 || 0,
-                          nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
-                       });
+        {/* List Section */}
+        <div className="space-y-4">
+           
+           {/* Desktop Table View */}
+           <div className="hidden lg:block premium-card overflow-hidden">
+              <div className="overflow-x-auto">
+                 <table className="w-full min-w-[1200px]">
+                    <thead>
+                       <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직원 정보</th>
+                          <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">급여 기본 설정</th>
+                          <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">선택입력 (공제관련)</th>
+                          <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">실수령 산출결과</th>
+                          <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">관리</th>
+                       </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                       {filteredEmployees.map((emp: any) => {
+                          const data = editingData[emp.uid] || {};
+                          const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
+                          const isChanged = JSON.stringify(data) !== JSON.stringify({
+                             annualSalary: emp.annualSalary || 0,
+                             salaryType: emp.salaryType || 'ANNUAL',
+                             isSeveranceIncluded: emp.isSeveranceIncluded || false,
+                             dependents: emp.dependents || 1,
+                             childrenUnder20: emp.childrenUnder20 || 0,
+                             nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
+                          });
 
-                       return (
-                          <tr key={emp.uid} className="hover:bg-slate-50/50 transition-all">
-                             {/* User Info */}
-                             <td className="px-8 py-6">
-                                <div className="flex items-center gap-3">
-                                   <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">{emp.name[0]}</div>
-                                   <div>
-                                      <div className="text-sm font-black text-slate-800">{emp.name}</div>
-                                      <div className="text-[10px] font-bold text-slate-400">{emp.role}</div>
-                                   </div>
-                                </div>
-                             </td>
-                             
-                             {/* Salary Setup */}
-                             <td className="px-8 py-6">
-                                <div className="space-y-4">
-                                   <div className="flex gap-2">
-                                      <div className="flex bg-slate-100 p-1 rounded-lg">
-                                         <button 
-                                           onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')}
-                                           className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${data.salaryType === 'ANNUAL' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                                         >연봉</button>
-                                         <button 
-                                           onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')}
-                                           className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${data.salaryType === 'MONTHLY' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                                         >월급</button>
-                                      </div>
-                                      <div className="flex bg-slate-100 p-1 rounded-lg">
-                                         <button 
-                                           onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', false)}
-                                           className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${!data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                                         >퇴직금 별도</button>
-                                         <button 
-                                           onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', true)}
-                                           className={`px-3 py-1 text-[10px] font-black rounded-md transition-all ${data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
-                                         >퇴직금 포함</button>
+                          return (
+                             <tr key={emp.uid} className="hover:bg-slate-50/50 transition-all group">
+                                <td className="px-8 py-6">
+                                   <div className="flex items-center gap-3">
+                                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black shadow-sm group-hover:rotate-6 transition-transform">{emp.name[0]}</div>
+                                      <div>
+                                         <div className="text-md font-black text-slate-800">{emp.name}</div>
+                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{emp.role}</div>
                                       </div>
                                    </div>
-                                   
-                                   <div className="space-y-2">
-                                      <div className="relative">
-                                         <input 
-                                           type="text" 
-                                           value={(data.salaryType === 'MONTHLY' 
-                                             ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
-                                             : (data.annualSalary || 0)
-                                           ).toLocaleString()} 
-                                           onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
-                                           className="w-full pl-4 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all"
-                                         />
-                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">원</span>
+                                </td>
+                                
+                                <td className="px-8 py-6">
+                                   <div className="space-y-4">
+                                      <div className="flex gap-2">
+                                         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                            <button 
+                                              onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')}
+                                              className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.salaryType === 'ANNUAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >연봉</button>
+                                            <button 
+                                              onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')}
+                                              className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.salaryType === 'MONTHLY' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >월급</button>
+                                         </div>
+                                         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                                            <button 
+                                              onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', false)}
+                                              className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${!data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >별도</button>
+                                            <button 
+                                              onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', true)}
+                                              className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
+                                            >포함</button>
+                                         </div>
                                       </div>
                                       
-                                      {/* 환산 힌트 표시 */}
-                                      <div className="px-1 py-1 mt-1 flex justify-between items-center text-[11px] font-bold border-t border-slate-50">
-                                         <span className="text-slate-500 italic">
-                                            {data.salaryType === 'ANNUAL' ? (
-                                               <span className="flex items-center gap-1">월 환산: <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">{(Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))).toLocaleString()}원</span></span>
-                                            ) : (
-                                               <span className="flex items-center gap-1">연 환산: <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">{(data.annualSalary || 0).toLocaleString()}원</span></span>
-                                            )}
-                                         </span>
-                                         <span className="text-slate-400 text-[9px] bg-slate-100 px-1.5 py-0.5 rounded">
-                                            {data.isSeveranceIncluded ? '1/13 기준' : '1/12 기준'}
-                                         </span>
-                                      </div>
-
-                                      <div className="flex gap-1">
-                                         <button onClick={() => handleSalaryAdd(emp.uid, 10000000)} className="flex-1 py-1 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md hover:bg-slate-100 border border-slate-100 transition-all">+1000만</button>
-                                         <button onClick={() => handleSalaryAdd(emp.uid, 1000000)} className="flex-1 py-1 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md hover:bg-slate-100 border border-slate-100 transition-all">+100만</button>
-                                         <button onClick={() => handleSalaryAdd(emp.uid, 100000)} className="flex-1 py-1 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md hover:bg-slate-100 border border-slate-100 transition-all">+10만</button>
-                                      </div>
-                                   </div>
-                                </div>
-                             </td>
-
-                             {/* Option Inputs */}
-                             <td className="px-8 py-6">
-                                <div className="space-y-4">
-                                   <div className="grid grid-cols-2 gap-4">
-                                      <div className="space-y-1">
-                                         <div className="text-[9px] font-black text-slate-400 flex items-center gap-1 group">부양가족(본인포함) <Info className="w-3 h-3 cursor-help group-hover:text-indigo-400" /></div>
-                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max(1, (data.dependents || 1) - 1))} className="p-1 px-2 bg-slate-100 rounded hover:bg-slate-200"><Minus className="w-3 h-3" /></button>
-                                            <span className="text-sm font-black text-slate-700 min-w-[20px] text-center">{data.dependents || 1}</span>
-                                            <button onClick={() => handleUpdateField(emp.uid, 'dependents', (data.dependents || 1) + 1)} className="p-1 px-2 bg-slate-100 rounded hover:bg-slate-200"><Plus className="w-3 h-3" /></button>
+                                      <div className="space-y-2">
+                                         <div className="relative group/input">
+                                            <input 
+                                              type="text" 
+                                              value={(data.salaryType === 'MONTHLY' 
+                                                ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
+                                                : (data.annualSalary || 0)
+                                              ).toLocaleString()} 
+                                              onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                              className="w-full pl-5 pr-10 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none group-hover/input:border-slate-100 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
+                                            />
+                                            <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-300 group-focus-within/input:text-indigo-400">원</span>
                                          </div>
-                                      </div>
-                                      <div className="space-y-1">
-                                         <div className="text-[9px] font-black text-slate-400">20세 이하 자녀수</div>
-                                         <div className="flex items-center gap-2">
-                                            <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', Math.max(0, (data.childrenUnder20 || 0) - 1))} className="p-1 px-2 bg-slate-100 rounded hover:bg-slate-200"><Minus className="w-3 h-3" /></button>
-                                            <span className="text-sm font-black text-slate-700 min-w-[20px] text-center">{data.childrenUnder20 || 0}</span>
-                                            <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', (data.childrenUnder20 || 0) + 1)} className="p-1 px-2 bg-slate-100 rounded hover:bg-slate-200"><Plus className="w-3 h-3" /></button>
+                                         
+                                         <div className="px-2 py-2 flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                            <span>
+                                               {data.salaryType === 'ANNUAL' ? '월 환산: ' : '연 환산: '}
+                                               <span className="text-indigo-500 font-extrabold ml-1">
+                                                  {(data.salaryType === 'ANNUAL' 
+                                                    ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
+                                                    : (data.annualSalary || 0)
+                                                  ).toLocaleString()}원
+                                               </span>
+                                            </span>
+                                            <div className="flex gap-1">
+                                              <button onClick={() => handleSalaryAdd(emp.uid, 5000000)} className="px-1.5 py-0.5 bg-slate-100 rounded text-[8px] hover:bg-slate-200">+500</button>
+                                              <button onClick={() => handleSalaryAdd(emp.uid, 1000000)} className="px-1.5 py-0.5 bg-slate-100 rounded text-[8px] hover:bg-slate-200">+100</button>
+                                            </div>
                                          </div>
                                       </div>
                                    </div>
-                                   <div className="space-y-1">
-                                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">비과세액 (식대 등)</div>
-                                      <input 
-                                        type="text" value={(data.nonTaxable !== undefined ? data.nonTaxable : MEAL_ALLOWANCE_DEFAULT).toLocaleString()}
-                                        onChange={(e) => handleUpdateField(emp.uid, 'nonTaxable', parseInt(e.target.value.replace(/,/g, '')) || 0)}
-                                        className="w-full px-3 py-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black text-slate-600 outline-none focus:border-indigo-400"
-                                      />
+                                </td>
+   
+                                <td className="px-8 py-6">
+                                   <div className="space-y-4">
+                                      <div className="flex items-center gap-6">
+                                         <div className="flex-1 space-y-2">
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">부양 가족 <Info className="w-3 h-3 text-slate-200" /></div>
+                                            <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
+                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max(1, (data.dependents || 1) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
+                                               <span className="flex-1 text-center text-xs font-black text-slate-700">{data.dependents || 1}</span>
+                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', (data.dependents || 1) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
+                                            </div>
+                                         </div>
+                                         <div className="flex-1 space-y-2">
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">자녀 수</div>
+                                            <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
+                                               <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', Math.max(0, (data.childrenUnder20 || 0) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
+                                               <span className="flex-1 text-center text-xs font-black text-slate-700">{data.childrenUnder20 || 0}</span>
+                                               <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', (data.childrenUnder20 || 0) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
+                                            </div>
+                                         </div>
+                                      </div>
+                                      <div className="space-y-2">
+                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비과세액 (월)</div>
+                                         <input 
+                                           type="text" value={(data.nonTaxable !== undefined ? data.nonTaxable : MEAL_ALLOWANCE_DEFAULT).toLocaleString()}
+                                           onChange={(e) => handleUpdateField(emp.uid, 'nonTaxable', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                           className="w-full px-4 py-2.5 bg-slate-50 border border-transparent rounded-xl text-xs font-black text-slate-600 outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
+                                         />
+                                      </div>
                                    </div>
-                                </div>
-                             </td>
+                                </td>
+   
+                                <td className="px-8 py-6">
+                                   {res ? (
+                                      <div className="space-y-1 py-2">
+                                         <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Monthly Net Pay</div>
+                                         <div className="text-3xl font-black text-slate-900 tracking-tighter">{res.netPay.toLocaleString()} <span className="text-sm font-bold text-slate-400">원</span></div>
+                                         <div className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1.5">
+                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                                            지급액: {res.monthlyGross.toLocaleString()}원
+                                         </div>
+                                      </div>
+                                   ) : (
+                                      <div className="h-20 flex items-center justify-center opacity-20 border-2 border-dashed border-slate-100 rounded-2xl"><Users className="w-6 h-6" /></div>
+                                   )}
+                                </td>
+   
+                                <td className="px-8 py-6 relative">
+                                   <div className="flex items-center justify-end gap-3">
+                                      <button 
+                                        onClick={() => handleSave(emp.uid)}
+                                        disabled={!isChanged || isSaving === emp.uid}
+                                        className={`px-5 py-3 rounded-2xl text-[11px] font-black transition-all ${isChanged ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100 hover:bg-indigo-700' : 'bg-slate-50 text-slate-300 pointer-events-none'}`}
+                                      >
+                                         {isSaving === emp.uid ? <Loader2 className="w-4 h-4 animate-spin" /> : '설정 저장'}
+                                      </button>
+                                      
+                                      <button 
+                                        onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
+                                        className={`p-3 rounded-2xl transition-all ${activeMenuId === emp.uid ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
+                                      >
+                                         <MoreVertical className="w-4 h-4" />
+                                      </button>
 
-                             {/* Result */}
-                             <td className="px-8 py-6">
-                                {res ? (
-                                   <div className="space-y-1 py-1">
-                                      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 inline-block px-2 py-0.5 rounded-full mb-2">Estimated Monthly Net</div>
-                                      <div className="text-2xl font-black text-slate-900 leading-none">{res.netPay.toLocaleString()} <span className="text-xs font-bold text-slate-400">원</span></div>
-                                      <div className="text-[10px] font-bold text-slate-400 mt-2">월 지급액: {res.monthlyGross.toLocaleString()}원</div>
+                                      {/* Dropdown Menu */}
+                                      {activeMenuId === emp.uid && (
+                                        <div className="absolute right-8 top-16 w-52 bg-white rounded-[1.5rem] shadow-2xl border border-slate-100 z-50 p-2 animate-in fade-in zoom-in-95 duration-200">
+                                          <button 
+                                            onClick={() => setSelectedDetails(emp)}
+                                            disabled={!res}
+                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-700 text-[11px] font-black rounded-xl transition-all"
+                                          >
+                                            <Calculator className="w-4 h-4 text-indigo-500" /> 상세 내역 및 인쇄
+                                          </button>
+                                          <button 
+                                            onClick={() => alert('기능 준비 중입니다.')}
+                                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-slate-400 text-[11px] font-black rounded-xl transition-all"
+                                          >
+                                            <Printer className="w-4 h-4" /> 급여명세서 메일 발송
+                                          </button>
+                                        </div>
+                                      )}
                                    </div>
-                                ) : (
-                                   <span className="text-xs font-bold text-slate-300 italic">연봉을 입력하세요</span>
-                                )}
-                             </td>
+                                </td>
+                             </tr>
+                          );
+                       })}
+                    </tbody>
+                 </table>
+              </div>
+           </div>
 
-                             {/* Management */}
-                             <td className="px-8 py-6 text-right">
-                                <div className="flex flex-col items-end gap-2">
-                                   <button 
-                                     onClick={() => handleSave(emp.uid)}
-                                     disabled={!isChanged || isSaving === emp.uid}
-                                     className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[11px] font-black transition-all ${isChanged ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 hover:bg-indigo-700' : 'bg-slate-100 text-slate-400 pointer-events-none'}`}
-                                   >
-                                      {isSaving === emp.uid ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-                                      설정 저장
-                                   </button>
-                                   <button 
-                                     onClick={() => setSelectedDetails(emp)}
-                                     disabled={!res}
-                                     className="w-full flex items-center justify-center gap-2 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black hover:bg-indigo-600 transition-all disabled:opacity-30"
-                                   >
-                                      <Calculator className="w-3.5 h-3.5" />
-                                      상세 보기 / 인쇄
-                                   </button>
-                                </div>
-                             </td>
-                          </tr>
-                       );
-                    })}
-                 </tbody>
-              </table>
+           {/* Mobile Card View */}
+           <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+               {filteredEmployees.map((emp: any) => {
+                  const data = editingData[emp.uid] || {};
+                  const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
+                  const isChanged = JSON.stringify(data) !== JSON.stringify({
+                     annualSalary: emp.annualSalary || 0,
+                     salaryType: emp.salaryType || 'ANNUAL',
+                     isSeveranceIncluded: emp.isSeveranceIncluded || false,
+                     dependents: emp.dependents || 1,
+                     childrenUnder20: emp.childrenUnder20 || 0,
+                     nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
+                  });
+
+                  return (
+                     <div key={emp.uid} className="premium-card p-6 flex flex-col gap-6">
+                        <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">{emp.name[0]}</div>
+                              <div>
+                                 <h3 className="text-sm font-black text-slate-900">{emp.name}</h3>
+                                 <p className="text-[10px] font-bold text-slate-400">{emp.role}</p>
+                              </div>
+                           </div>
+                           <button onClick={() => setSelectedDetails(emp)} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Calculator className="w-5 h-5" /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                           <div className="relative">
+                              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">급여 금액 (원)</label>
+                              <input 
+                                type="text"
+                                value={(data.salaryType === 'MONTHLY' 
+                                  ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
+                                  : (data.annualSalary || 0)
+                                ).toLocaleString()}
+                                onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all font-mono"
+                              />
+                              <div className="flex gap-2 mt-2">
+                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'ANNUAL' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>연봉</button>
+                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'MONTHLY' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>월급</button>
+                              </div>
+                           </div>
+
+                           {res && (
+                              <div className="p-5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
+                                 <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest mb-1">Estimated Net</p>
+                                 <p className="text-2xl font-black">{res.netPay.toLocaleString()}원</p>
+                              </div>
+                           )}
+
+                           <button 
+                             onClick={() => handleSave(emp.uid)}
+                             disabled={!isChanged || isSaving === emp.uid}
+                             className={`w-full py-4 rounded-2xl font-black text-xs transition-all ${isChanged ? 'bg-slate-900 text-white shadow-lg' : 'bg-slate-100 text-slate-300'}`}
+                           >
+                              {isSaving === emp.uid ? '저장 중...' : '급여 설정 업데이트'}
+                           </button>
+                        </div>
+                     </div>
+                  );
+               })}
            </div>
         </div>
       </div>

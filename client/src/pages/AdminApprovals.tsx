@@ -3,7 +3,7 @@ import { collection, query, onSnapshot, doc, updateDoc, where } from 'firebase/f
 import { db } from '../firebase';
 import { 
   CheckCircle, XCircle, Clock, FileText, Calendar, Filter, User, 
-  Check, X, ShieldCheck, Search, Building, Users, RotateCcw, AlertCircle
+  Check, X, ShieldCheck, Search, Building, Users, RotateCcw, AlertCircle, DollarSign
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
@@ -257,37 +257,37 @@ export const AdminApprovals: React.FC = () => {
         </div>
 
         {/* Tab Selection */}
-        <div className="flex p-1.5 bg-slate-200/50 rounded-[2.5rem] w-fit premium-shadow border border-slate-100">
+        <div className="flex p-1.5 bg-slate-200/50 backdrop-blur-md rounded-[2.5rem] w-fit premium-shadow border border-slate-100">
           <button 
             onClick={() => setActiveTab('LEAVE')}
-            className={`flex items-center gap-3 px-10 py-5 rounded-[2rem] font-black text-sm transition-all duration-500 ${activeTab === 'LEAVE' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'LEAVE' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            <Calendar className={`w-5 h-5 ${activeTab === 'LEAVE' ? 'text-indigo-600' : 'text-slate-400'}`} />
-            휴가 신청 건 ({filteredLeaves.length})
+            <Calendar className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'LEAVE' ? 'text-indigo-600' : 'text-slate-400'}`} />
+            휴가 신청 ({filteredLeaves.length})
           </button>
           <button 
             onClick={() => setActiveTab('EXPENSE')}
-            className={`flex items-center gap-3 px-10 py-5 rounded-[2rem] font-black text-sm transition-all duration-500 ${activeTab === 'EXPENSE' ? 'bg-white text-emerald-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'EXPENSE' ? 'bg-white text-emerald-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
           >
-            <FileText className={`w-5 h-5 ${activeTab === 'EXPENSE' ? 'text-emerald-600' : 'text-slate-400'}`} />
-            지출결의 건 ({filteredExpenses.length})
+            <FileText className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'EXPENSE' ? 'text-emerald-600' : 'text-slate-400'}`} />
+            지출 결의 ({filteredExpenses.length})
           </button>
         </div>
 
-        {/* Content Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[500px]">
+        {/* Desktop Table View */}
+        <div className="hidden md:block bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[500px]">
            <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px]">
                  <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-50">
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">요청 일시 / 신청자 / 소속</th>
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{activeTab === 'LEAVE' ? '공가 유형 / 사유' : '분류 / 항목'}</th>
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{activeTab === 'LEAVE' ? '휴가 기간 / 총 일수' : '금액'}</th>
-                       <th className="px-8 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">처리 상태</th>
+                    <tr className="bg-slate-50/50 border-b border-slate-100">
+                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">요청 정보 / 신청자</th>
+                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">항목 / 사유</th>
+                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{activeTab === 'LEAVE' ? '기간 / 소진일' : '지출 금액'}</th>
+                       <th className="px-8 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">진행 상태</th>
                        <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">상세 / 관리</th>
                     </tr>
                  </thead>
-                 <tbody className="divide-y divide-slate-100 font-sans">
+                 <tbody className="divide-y divide-slate-100">
                     {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).map((req: any) => {
                        const userProf = employees.find(e => e.uid === req.userId);
                        const userTeam = teams.find(t => t.id === (req.teamId || userProf?.teamId));
@@ -297,16 +297,16 @@ export const AdminApprovals: React.FC = () => {
                         <tr key={req.id} className="group hover:bg-slate-50/80 transition-all duration-300">
                            <td className="px-8 py-7">
                               <div className="flex items-center gap-4">
-                                 <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-all group-hover:rotate-6 shadow-sm border border-slate-50">
+                                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:rotate-6 transition-all shadow-sm">
                                     <User className="w-5.5 h-5.5" />
                                  </div>
                                  <div className="space-y-1">
-                                    <div className="text-sm font-black text-slate-800">{req.userName}</div>
+                                    <div className="text-sm font-black text-slate-800 tracking-tight">{req.userName}</div>
                                     <div className="flex items-center gap-1.5">
-                                       <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                       <span className="text-[9px] font-black text-indigo-600/70 uppercase tracking-tighter bg-indigo-50/50 px-1.5 py-0.5 rounded">
                                           {userDiv?.name || '소속미지정'}
                                        </span>
-                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">
                                           {userTeam?.name || '팀 미지정'}
                                        </span>
                                     </div>
@@ -318,41 +318,51 @@ export const AdminApprovals: React.FC = () => {
                            </td>
 
                            <td className="px-8 py-7">
-                              <div className="inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] font-black tracking-widest uppercase mb-1.5 bg-slate-100 text-slate-600 border border-slate-200">
-                                 {activeTab === 'LEAVE' ? (req.type === 'annual' ? '연차' : req.type === 'half' ? '반차' : req.type === 'sick' ? '병가' : '기타') : req.category}
-                              </div>
-                              <div className="text-sm font-black text-slate-700 line-clamp-1 max-w-[220px]">
-                                 {activeTab === 'LEAVE' ? req.reason : req.title}
+                              <div className="space-y-1.5">
+                                 <span className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase bg-slate-100 text-slate-500 border border-slate-200">
+                                    {activeTab === 'LEAVE' ? (req.type === 'annual' ? '연차' : req.type === 'half' ? '반차' : req.type === 'sick' ? '병가' : '기타') : req.category}
+                                 </span>
+                                 <div className="text-sm font-black text-slate-700 line-clamp-1 max-w-[200px]">
+                                    {activeTab === 'LEAVE' ? req.reason : req.title}
+                                 </div>
                               </div>
                            </td>
 
                            <td className="px-8 py-7">
                               {activeTab === 'LEAVE' ? (
                                  <div className="space-y-1">
-                                    <div className="text-sm font-black text-slate-800">{req.startDate} ~ {req.endDate}</div>
+                                    <div className="text-sm font-black text-slate-800 tracking-tight">{req.startDate} ~ {req.endDate}</div>
                                     <div className="text-[10px] font-black text-rose-500 flex items-center gap-1">
-                                       <Clock className="w-3 h-3" /> 소진일: {req.requestDays}일
+                                       <Clock className="w-3 h-3" /> 소진 {req.requestDays}일
                                     </div>
                                  </div>
                               ) : (
                                  <div className="space-y-1">
-                                    <div className="text-lg font-black text-slate-900 tracking-tighter italic block">₩ {Number(req.amount).toLocaleString()}</div>
+                                    <div className="text-lg font-black text-slate-900 tracking-tighter block italic">₩ {Number(req.amount).toLocaleString()}</div>
                                     <div className="text-[10px] font-bold text-slate-400">{req.date} 지출</div>
                                  </div>
                               )}
                            </td>
 
                            <td className="px-8 py-7">
-                              <div className="flex justify-center">
-                                 <span className={`flex items-center gap-2 px-4 py-2 rounded-full text-[11px] font-black border transition-all ${getStatusStyle(req.status)}`}>
-                                    {req.status === 'APPROVED' ? <CheckCircle className="w-3.5 h-3.5" /> : 
-                                     req.status === 'SUB_APPROVED' ? <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" /> :
-                                     req.status === 'REJECTED' ? <XCircle className="w-3.5 h-3.5" /> : 
-                                     <Clock className="w-3.5 h-3.5 animate-spin-slow" />}
+                              <div className="flex flex-col items-center gap-2">
+                                 <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${getStatusStyle(req.status)}`}>
+                                    {req.status === 'APPROVED' ? <CheckCircle className="w-3 h-3" /> : 
+                                     req.status === 'SUB_APPROVED' ? <ShieldCheck className="w-3 h-3" /> :
+                                     req.status === 'REJECTED' ? <XCircle className="w-3 h-3" /> : 
+                                     <Clock className="w-3 h-3 animate-spin-slow" />}
                                     {req.status === 'APPROVED' ? '최종승인' : 
-                                     req.status === 'SUB_APPROVED' ? '1차 승인됨' :
+                                     req.status === 'SUB_APPROVED' ? '1차 승인' :
                                      req.status === 'REJECTED' ? '반려됨' : '결재대기'}
                                  </span>
+                                 {/* 미니 타임라인 인디케이터 */}
+                                 <div className="flex items-center gap-0.5">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-3 h-0.5 ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-indigo-500 shadow-sm shadow-indigo-200' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-3 h-0.5 ${req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status === 'APPROVED' ? 'bg-emerald-500 shadow-lg shadow-emerald-200' : 'bg-slate-200'}`}></div>
+                                 </div>
                               </div>
                            </td>
 
@@ -360,17 +370,17 @@ export const AdminApprovals: React.FC = () => {
                               <div className="flex items-center justify-end gap-2.5">
                                  <button 
                                     onClick={() => setSelectedRequest(req)}
-                                    className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-lg shadow-slate-100"
+                                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-md active:scale-95"
                                  >
-                                    View Details
+                                    Review
                                  </button>
                                  {/* 신청 유형별/권한별 처리 버튼 */}
                                  {((userData?.role === 'SUB_ADMIN' && req.status === 'PENDING') || 
                                    (userData?.role === 'ADMIN' && (req.status === 'PENDING' || req.status === 'SUB_APPROVED'))) ? (
-                                    <>
+                                    <div className="flex items-center gap-1.5">
                                        <button 
                                           onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, userData?.role === 'ADMIN' ? 'APPROVED' : 'SUB_APPROVED')}
-                                          className={`p-3 rounded-2xl transition-all shadow-sm border group/btn ${
+                                          className={`p-2 rounded-xl transition-all shadow-sm border ${
                                             userData?.role === 'ADMIN' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
                                           }`}
                                           title={userData?.role === 'ADMIN' ? "최종 승인" : "1차 승인"}
@@ -379,28 +389,23 @@ export const AdminApprovals: React.FC = () => {
                                        </button>
                                        <button 
                                           onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, 'REJECTED')}
-                                          className="p-3 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-600 hover:text-white hover:scale-110 active:scale-95 transition-all shadow-sm border border-rose-100"
+                                          className="p-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
                                           title="반려"
                                        >
-                                          <X className="w-5 h-5 font-black" />
+                                          <X className="w-5 h-5" />
                                        </button>
-                                    </>
+                                    </div>
                                  ) : (
-                                    <div className="flex items-center justify-end gap-2.5">
-                                       {/* 최고 관리자(ADMIN)만 되돌리기 가능 */}
+                                    <div className="flex items-center gap-1.5">
                                        {userData?.role === 'ADMIN' && (req.status === 'APPROVED' || req.status === 'REJECTED' || req.status === 'SUB_APPROVED') && (
                                           <button 
                                              onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, 'PENDING')}
-                                             className="flex items-center gap-2 px-3 py-2.5 bg-amber-50 text-amber-600 rounded-xl hover:bg-amber-600 hover:text-white transition-all shadow-sm border border-amber-100 group/undo"
-                                             title="결재취소 및 복구"
+                                             className="p-2 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl hover:bg-amber-600 hover:text-white transition-all group/undo"
+                                             title="복구"
                                           >
                                              <RotateCcw className="w-4 h-4 group-hover/undo:-rotate-45 transition-transform" />
-                                             <span className="text-[10px] font-black uppercase tracking-tight">Undo</span>
                                           </button>
                                        )}
-                                       <button className="px-4 py-2.5 bg-slate-50 text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all">
-                                          History
-                                       </button>
                                     </div>
                                  )}
                               </div>
@@ -410,22 +415,79 @@ export const AdminApprovals: React.FC = () => {
                     })}
                     {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).length === 0 && (
                        <tr>
-                          <td colSpan={5} className="py-40 text-center">
-                             <div className="flex flex-col items-center gap-5">
-                                 <div className="w-24 h-24 bg-slate-50 rounded-[2.5rem] flex items-center justify-center border border-slate-100 shadow-inner group/empty">
-                                    <Filter className="w-10 h-10 text-slate-200 group-hover/empty:scale-110 transition-transform" />
+                          <td colSpan={5} className="py-32 text-center">
+                              <div className="flex flex-col items-center gap-4">
+                                 <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100">
+                                    <Filter className="w-8 h-8 text-slate-200" />
                                  </div>
-                                 <div className="space-y-1">
-                                    <p className="text-slate-500 font-black tracking-tight text-xl">조회 조건에 맞는 안건이 없습니다.</p>
-                                    <p className="text-slate-400 text-sm font-medium">필터(기간, 소속, 상태)를 조정해 보세요.</p>
-                                 </div>
-                             </div>
+                                 <p className="text-slate-400 font-black tracking-tight">조건에 맞는 결재 안건이 없습니다.</p>
+                              </div>
                           </td>
                        </tr>
                     )}
                  </tbody>
               </table>
            </div>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-4 pb-10">
+           {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).map((req: any) => (
+              <div 
+                key={req.id} 
+                onClick={() => setSelectedRequest(req)}
+                className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100 active:scale-[0.98] transition-transform"
+              >
+                 <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3">
+                       <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                          <User className="w-5 h-5" />
+                       </div>
+                       <div>
+                          <div className="text-xs font-black text-slate-900 tracking-tight">{req.userName}</div>
+                          <div className="text-[10px] font-bold text-slate-400">
+                            {req.createdAt ? format(new Date(req.createdAt), 'MM.dd HH:mm') : '-'}
+                          </div>
+                       </div>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black border tracking-widest ${getStatusStyle(req.status)}`}>
+                       {req.status === 'APPROVED' ? '최종승인' : 
+                        req.status === 'SUB_APPROVED' ? '1차승인' :
+                        req.status === 'REJECTED' ? '반려' : '대기'}
+                    </span>
+                 </div>
+
+                 <div className="bg-slate-50 p-4 rounded-2xl mb-4 border border-slate-100">
+                    <div className="text-[9px] font-black text-indigo-500 uppercase mb-1 tracking-widest">
+                       {activeTab === 'LEAVE' ? (req.type === 'annual' ? '연차' : '기타휴가') : req.category}
+                    </div>
+                    <div className="text-sm font-black text-slate-700 mb-1">{activeTab === 'LEAVE' ? req.reason : req.title}</div>
+                    <div className="text-xs font-bold text-slate-400 flex items-center gap-2">
+                       {activeTab === 'LEAVE' ? (
+                          <><Calendar className="w-3 h-3" /> {req.startDate} ~ {req.endDate}</>
+                       ) : (
+                          <><DollarSign className="w-3 h-3" /> ₩ {Number(req.amount).toLocaleString()}</>
+                       )}
+                    </div>
+                 </div>
+
+                 <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-1">
+                       <div className={`w-1 h-1 rounded-full ${req.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                       <div className={`w-2 h-0.5 ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                       <div className={`w-1 h-1 rounded-full ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
+                       <div className={`w-2 h-0.5 ${req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
+                       <div className={`w-1 h-1 rounded-full ${req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
+                    </div>
+                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Touch to Review Detail</span>
+                 </div>
+              </div>
+           ))}
+           {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).length === 0 && (
+              <div className="bg-white p-10 rounded-3xl text-center border-2 border-dashed border-slate-100">
+                 <p className="text-slate-300 font-black text-xs">안건이 없습니다.</p>
+              </div>
+           )}
         </div>
 
         {/* Stats Summary Panel */}
@@ -553,18 +615,49 @@ export const AdminApprovals: React.FC = () => {
                     </div>
                  )}
 
-                 <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-                    <Clock className="w-5 h-5 text-amber-500 animate-spin-slow" />
-                    <div>
-                        <p className="text-xs font-bold text-amber-600">
-                          현재 이 문서는 <span className="underline font-black">{
+                  <div className="flex items-center gap-4 p-5 bg-indigo-50/50 border border-indigo-100 rounded-[2rem] shadow-sm relative overflow-hidden group/alert">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/5 rounded-full -mr-12 -mt-12 transition-transform group-hover/alert:scale-110"></div>
+                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                       <Clock className="w-6 h-6 text-indigo-600 animate-spin-slow" />
+                    </div>
+                    <div className="space-y-1 relative z-10">
+                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">실시간 결재 상태 엔진</p>
+                        <p className="text-xs font-black text-slate-700 leading-tight">
+                          현재 이 문서는 <span className="text-indigo-600 underline underline-offset-4 font-black">{
                             selectedRequest.status === 'PENDING' ? '1차 검토 대기' : 
-                            selectedRequest.status === 'SUB_APPROVED' ? '2차 최종 승인 대기' : 
+                            selectedRequest.status === 'SUB_APPROVED' ? '최종 승인 대기' : 
                             selectedRequest.status === 'APPROVED' ? '최종 승인 완료' : '반려됨'
                           }</span> 상태입니다.
                         </p>
                     </div>
-                 </div>
+                  </div>
+
+                  {/* 시각적 타임라인 UI */}
+                  <div className="pt-6 space-y-4">
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Approval Timeline</span>
+                     <div className="flex items-center justify-between px-2">
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status !== 'REJECTED' ? 'bg-indigo-600 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
+                              <FileText className="w-5 h-5" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-800">신청완료</span>
+                        </div>
+                        <div className={`h-1 flex-1 -mt-6 ${selectedRequest.status === 'SUB_APPROVED' || selectedRequest.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-100'}`}></div>
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status === 'SUB_APPROVED' || selectedRequest.status === 'APPROVED' ? 'bg-indigo-600 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
+                              <ShieldCheck className="w-5 h-5" />
+                           </div>
+                           <span className="text-[10px] font-black text-slate-800">1차승인</span>
+                        </div>
+                        <div className={`h-1 flex-1 -mt-6 ${selectedRequest.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-100'}`}></div>
+                        <div className="flex flex-col items-center gap-2 flex-1">
+                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status === 'APPROVED' ? 'bg-emerald-500 text-white border-white shadow-lg shadow-emerald-100' : selectedRequest.status === 'REJECTED' ? 'bg-rose-500 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
+                              {selectedRequest.status === 'REJECTED' ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
+                           </div>
+                           <span className="text-[10px] font-black text-slate-800">{selectedRequest.status === 'REJECTED' ? '반려됨' : '최종승인'}</span>
+                        </div>
+                     </div>
+                  </div>
 
                  {/* 첨부파일 섹션 - 항상 제목은 표시하여 존재감을 인지시킴 */}
                  <div className="space-y-4 pt-6 border-t border-slate-100">

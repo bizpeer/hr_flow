@@ -34,7 +34,7 @@ export const AttendanceDashboard: React.FC = () => {
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [monthlyRecords, setMonthlyRecords] = useState<AttendanceRecord[]>([]);
   const [allUsers, setAllUsers] = useState<any[]>([]);
-  const [monthlyLoading, setMonthlyLoading] = useState(false);
+
 
   // 초기 selectedUserId 설정
   useEffect(() => {
@@ -62,7 +62,7 @@ export const AttendanceDashboard: React.FC = () => {
   useEffect(() => {
     if (!selectedUserId) return;
 
-    setMonthlyLoading(true);
+
     // KST 기준 월 시작/종료 계산
     const start = startOfMonth(currentMonth).toISOString();
     const end = endOfMonth(currentMonth).toISOString();
@@ -78,10 +78,8 @@ export const AttendanceDashboard: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord));
       setMonthlyRecords(docs);
-      setMonthlyLoading(false);
     }, (err) => {
       console.error("Monthly Attendance Error:", err);
-      setMonthlyLoading(false);
     });
 
     return () => unsubscribe();
@@ -226,303 +224,303 @@ export const AttendanceDashboard: React.FC = () => {
   const remainingLeave = totalLeave - usedLeave;
 
   return (
-    <div className="flex-1 p-2 md:p-6 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto">
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between mb-4 gap-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-0.5">
-                <div className="p-1.5 bg-indigo-600 rounded-lg text-white">
-                  <CalendarIcon className="w-4 h-4" />
-                </div>
-                <h1 className="text-xl font-black text-slate-900 tracking-tight">전체 근태 정보</h1>
-              </div>
-              <div className="flex flex-col md:flex-row md:items-center gap-1.5 md:gap-3">
-                <p className="text-slate-400 text-[10px] font-medium">{kstDate}</p>
-                <div className="hidden md:block w-px h-2 bg-slate-200"></div>
-                <div className="flex items-center gap-1.5">
-                  {userData ? (
-                    <>
-                      <span className="text-[11px] font-black text-indigo-600">{userData.name}</span>
-                    </>
-                  ) : (
-                    <div className="flex items-center gap-1.5 py-1">
-                      <Loader2 className="w-3 h-3 animate-spin text-indigo-400" />
-                      <span className="text-[10px] font-bold text-slate-400">정보 로딩 중...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+    <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen page-transition">
+      <div className="max-w-7xl mx-auto space-y-8">
+        
+        {/* Header Section: Profile & Global Action */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-white">
+              <span className="text-2xl font-black">{userData?.name?.slice(0, 1) || 'H'}</span>
             </div>
-
-            {/* 비밀번호 변경 버튼 추가 */}
-            <button
-              onClick={openPasswordChange}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white text-slate-600 rounded-xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-all active:scale-95 group"
-            >
-              <KeyRound className="w-3.5 h-3.5 text-indigo-500 group-hover:rotate-12 transition-transform" />
-              <span className="text-[11px] font-bold">비밀번호 변경</span>
-            </button>
-
-            {/* 연차 요약 축소형 */}
-            <div className="flex gap-2 bg-white p-1 rounded-xl shadow-md border border-slate-100">
-               <div className="px-3 py-1 rounded-lg bg-slate-50 flex flex-col items-center min-w-[50px]">
-                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">총 발생</span>
-                  <span className="text-xs font-black text-slate-700">{totalLeave}</span>
-               </div>
-               <div className="px-3 py-1 rounded-lg bg-slate-50 flex flex-col items-center min-w-[50px]">
-                  <span className="text-[7px] font-black text-slate-400 uppercase tracking-widest">사용</span>
-                  <span className="text-xs font-black text-rose-500">{usedLeave}</span>
-               </div>
-               <div className="px-3 py-1 rounded-lg bg-indigo-600 flex flex-col items-center min-w-[60px] shadow-sm shadow-indigo-100">
-                  <span className="text-[7px] font-black text-indigo-200 uppercase tracking-widest">잔여</span>
-                  <span className="text-xs font-black text-white">{remainingLeave}</span>
-               </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-2xl font-black text-slate-900 tracking-tight">{userData?.name || '로딩 중...'}님, 반갑습니다.</h1>
+                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg uppercase tracking-wider">{userData?.role || 'MEMBER'}</span>
+              </div>
+              <p className="text-slate-400 text-xs font-semibold flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-indigo-400" />
+                {kstDate} • <span className="text-indigo-500 font-bold">{kstTime}</span>
+              </p>
             </div>
           </div>
-          
-          <div className="glass-card px-4 py-2 rounded-xl premium-shadow flex items-center gap-3 border-indigo-100">
-            <div className="flex flex-col items-end">
-              <span className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mb-0.5">Current KST</span>
-              <span className="text-xl font-mono font-black text-slate-800 tracking-tighter">{kstTime || '00:00:00'}</span>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={openPasswordChange}
+              className="px-5 py-2.5 bg-white text-slate-600 rounded-2xl shadow-sm border border-slate-100 hover:bg-slate-50 transition-all active:scale-95 flex items-center gap-2 text-xs font-black"
+            >
+              <KeyRound className="w-4 h-4 text-indigo-500" />
+              보안 설정
+            </button>
+            <div className="h-10 w-px bg-slate-200 hidden md:block mx-2"></div>
+            <div className="flex -space-x-3">
+              {allUsers.slice(0, 5).map((u, i) => (
+                <div key={u.id} className="w-10 h-10 rounded-full border-4 border-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shadow-sm" style={{ zIndex: 10 - i }}>
+                  {u.name?.slice(0, 1)}
+                </div>
+              ))}
+              {allUsers.length > 5 && (
+                <div className="w-10 h-10 rounded-full border-4 border-white bg-slate-800 flex items-center justify-center text-[10px] font-black text-white shadow-sm z-0">
+                  +{allUsers.length - 5}
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-          {/* Action Cards */}
-          <div className="lg:col-span-4 flex flex-col gap-4">
-            <div className="bg-white rounded-2xl shadow-xl p-4 border border-slate-100 relative overflow-hidden group flex-1">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-indigo-50 rounded-full -mr-10 -mt-10 transition-transform group-hover:scale-110 duration-700"></div>
-              
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
-                    <Clock className="w-4 h-4" />
+        {/* Bento Grid Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
+          
+          {/* Main Attendance Action Card (L: Spans 5) */}
+          <div className="lg:col-span-5 h-[340px]">
+             <div className="premium-card bento-inner bg-gradient-to-br from-white to-indigo-50/30 group">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
+                    <Clock className="w-6 h-6" />
                   </div>
                   {lastStatus?.type === 'IN' ? (
-                    <span className="px-2.5 py-0.5 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-full animate-pulse">근무 중</span>
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-500 text-white text-[10px] font-black rounded-xl animate-in zoom-in duration-500">
+                      <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></div>
+                      근무 중
+                    </div>
                   ) : (
-                    <span className="px-2.5 py-0.5 bg-slate-50 text-slate-400 text-[9px] font-black rounded-full">미출근</span>
+                    <div className="px-4 py-1.5 bg-slate-100 text-slate-400 text-[10px] font-black rounded-xl uppercase tracking-widest">Off Duty</div>
                   )}
                 </div>
 
-                <h2 className="text-base font-black text-slate-800 mb-0.5 uppercase tracking-tight">체크인/아웃</h2>
-                <p className="text-[10px] text-slate-400 mb-4 leading-relaxed">회사의 보안 규정을 준수해주세요.</p>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => handleAttendance('IN')}
-                    disabled={isSubmitting || hasCheckedInToday}
-                    className="flex justify-center items-center gap-2 py-2.5 bg-indigo-600 text-white text-[11px] font-black rounded-xl shadow-md shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-30 disabled:grayscale group"
-                  >
-                    {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogIn className="w-3.5 h-3.5" />}
-                    {hasCheckedInToday ? '출근완료' : '출근하기'}
-                  </button>
+                <div className="flex-1">
+                  <h2 className="text-xl font-black text-slate-900 mb-1">근태 기록</h2>
+                  <p className="text-xs font-bold text-slate-400 mb-8 leading-relaxed">오늘의 업무 시작과 종료를 기록하세요.<br/>데이터는 실시간으로 클라우드에 연동됩니다.</p>
                   
-                  <button 
-                    onClick={() => handleAttendance('OUT')}
-                    disabled={isSubmitting || !hasCheckedInToday || hasCheckedOutToday}
-                    className="flex justify-center items-center gap-2 py-2.5 bg-white text-rose-600 border border-rose-100 text-[11px] font-black rounded-xl hover:bg-rose-50 transition-all active:scale-95 disabled:opacity-30 group"
-                  >
-                    {isSubmitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
-                    {hasCheckedOutToday ? '퇴근완료' : '퇴근하기'}
-                  </button>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button 
+                      onClick={() => handleAttendance('IN')}
+                      disabled={isSubmitting || hasCheckedInToday}
+                      className="group relative h-24 overflow-hidden rounded-[1.5rem] bg-indigo-600 shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-40 disabled:grayscale"
+                    >
+                      <div className="relative z-10 flex flex-col items-center gap-2 text-white">
+                        <LogIn className="w-6 h-6" />
+                        <span className="text-xs font-black tracking-tighter">{hasCheckedInToday ? '출근 완료' : '출근하기'}</span>
+                      </div>
+                      <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    </button>
+
+                    <button 
+                      onClick={() => handleAttendance('OUT')}
+                      disabled={isSubmitting || !hasCheckedInToday || hasCheckedOutToday}
+                      className="group relative h-24 overflow-hidden rounded-[1.5rem] bg-white border-2 border-rose-100 shadow-lg transition-all hover:bg-rose-50 active:scale-[0.98] disabled:opacity-40"
+                    >
+                      <div className="relative z-10 flex flex-col items-center gap-2 text-rose-600">
+                        <LogOut className="w-6 h-6" />
+                        <span className="text-xs font-black tracking-tighter">{hasCheckedOutToday ? '퇴근 완료' : '퇴근하기'}</span>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
+             </div>
           </div>
 
-          {/* Timeline / logs */}
-          <div className="lg:col-span-8">
-            <div className="bg-white rounded-2xl shadow-xl p-4 border border-slate-100 h-full">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-indigo-500" />
-                  실시간 타임라인
-                </h2>
-                <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Live Updates</div>
+          {/* Timeline Feed (Narrow - Spans 4) */}
+          <div className="lg:col-span-4 h-[340px]">
+            <div className="premium-card bento-inner border-slate-50">
+              <div className="flex items-center justify-between mb-6">
+                 <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <History className="w-4 h-4 text-indigo-500" />
+                    Timeline
+                 </h2>
+                 <span className="text-[10px] font-bold text-slate-400">Live</span>
               </div>
 
-              {loading ? (
-                <div className="flex flex-col items-center justify-center py-6 text-slate-300">
-                  <Loader2 className="w-6 h-6 animate-spin mb-2" />
-                  <p className="font-bold tracking-tight text-[10px]">로딩 중...</p>
-                </div>
-              ) : records.length > 0 ? (
-                <div className="space-y-3">
-                  {records.map((record, idx) => (
-                    <div key={record.id} className="relative pl-6 transition-all hover:translate-x-0.5">
-                      {/* Line */}
-                      {idx !== records.length - 1 && (
-                        <div className="absolute left-[7px] top-6 bottom-[-16px] w-[1px] bg-slate-100"></div>
-                      )}
-                      {/* Dot */}
-                      <div className={`absolute left-0 top-1.5 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white shadow-sm ${record.type === 'IN' ? 'bg-indigo-500' : 'bg-rose-500'}`}>
-                        {record.type === 'IN' ? <LogIn className="w-2 h-2 text-white" /> : <LogOut className="w-2 h-2 text-white" />}
+              <div className="flex-1 overflow-y-auto px-1 space-y-4 custom-scrollbar">
+                {loading ? (
+                  <div className="h-full flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
+                ) : records.length > 0 ? (
+                  records.map((record, idx) => (
+                    <div key={record.id} className="flex gap-4 group">
+                      <div className="flex flex-col items-center">
+                        <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ring-2 ${record.type === 'IN' ? 'bg-indigo-500 ring-indigo-100' : 'bg-rose-500 ring-rose-100'}`}></div>
+                        {idx !== records.length - 1 && <div className="w-0.5 h-full bg-slate-100 mt-1"></div>}
                       </div>
-                      
-                      <div className="bg-slate-50/50 rounded-lg p-2.5 border border-slate-100 group hover:border-indigo-100 hover:bg-white transition-all">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-baseline gap-2">
-                            <span className={`text-[7px] font-black uppercase tracking-widest ${record.type === 'IN' ? 'text-indigo-500' : 'text-rose-500'}`}>
-                              {record.type === 'IN' ? 'IN' : 'OUT'}
-                            </span>
-                            <h3 className="font-black text-slate-800 text-sm">
-                              {format(new Date(record.timestamp), 'HH:mm:ss')}
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-1 text-slate-400">
-                            <MapPin className="w-2.5 h-2.5" />
-                            <span className="text-[9px] font-semibold">{record.location}</span>
-                          </div>
+                      <div className="flex-1 pb-4">
+                        <div className="flex items-baseline justify-between mb-1">
+                           <span className="text-xs font-black text-slate-900">{format(new Date(record.timestamp), 'HH:mm:ss')}</span>
+                           <span className={`text-[8px] font-black uppercase ${record.type === 'IN' ? 'text-indigo-400' : 'text-rose-400'}`}>{record.type === 'IN' ? 'Check In' : 'Check Out'}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                           <MapPin className="w-3 h-3" />
+                           {record.location || 'Unknown'}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
-                    <History className="w-6 h-6 text-slate-200" />
+                  ))
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center opacity-30">
+                    <History className="w-8 h-8 mb-2" />
+                    <span className="text-[9px] font-black uppercase">No Logs</span>
                   </div>
-                  <h3 className="text-xs font-black text-slate-800 mb-0.5">기록이 없습니다</h3>
-                  <p className="text-slate-400 text-[9px]">현황을 시작하세요.</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* 월별 근태 캘린더 (컴팩트 최적화) */}
-        <div className="mt-4 bg-white rounded-2xl shadow-xl p-3 border border-slate-100">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 gap-3">
-            <div>
-              <h2 className="text-xl font-black text-slate-800 flex items-center gap-3">
-                <CalendarIcon className="w-6 h-6 text-indigo-500" />
-                월별 근태 현황
-              </h2>
-              <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
-                Monthly Performance
-              </p>
-              {monthlyLoading && (
-                <div className="flex items-center gap-2 mt-2 text-indigo-500">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span className="text-[10px] font-bold">로딩 중...</span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              {(userData?.role === 'ADMIN' || userData?.role === 'SUB_ADMIN') && (
-                <select
-                  id="attendance-user-selector"
-                  value={selectedUserId}
-                  onChange={(e) => setSelectedUserId(e.target.value)}
-                  className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  {allUsers.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name} ({getDisplayEmail(u.email)})
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-slate-200">
-                <button
-                  id="calendar-prev-month"
-                  onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                >
-                  <History className="w-4 h-4 text-slate-600 rotate-180" />
-                </button>
-                <span className="px-4 text-sm font-black text-slate-800 min-w-[90px] text-center">
-                  {format(currentMonth, 'yyyy. MM')}
-                </span>
-                <button
-                  id="calendar-next-month"
-                  onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-                  className="p-2 hover:bg-white hover:shadow-sm rounded-lg transition-all"
-                >
-                  <History className="w-4 h-4 text-slate-600" />
-                </button>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="mb-3">
-            <div className="grid grid-cols-7 mb-1 border-b border-slate-50 pb-1">
-              {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-                <div key={day} className="text-center text-[10px] font-black text-slate-400 uppercase tracking-tighter">
-                  {day}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: startOfWeek(startOfMonth(currentMonth)).getDay() }).map((_, i) => (
-                <div key={`empty-${i}`} className="h-9"></div>
-              ))}
-              
-              {eachDayOfInterval({
-                start: startOfMonth(currentMonth),
-                end: endOfMonth(currentMonth)
-              }).map((day) => {
-                const dayRecords = monthlyRecords.filter(r => isSameDay(new Date(r.timestamp), day));
-                const hasCheckIn = dayRecords.some(r => r.type === 'IN');
-                const hasCheckOut = dayRecords.some(r => r.type === 'OUT');
-                const isTodayLocal = isToday(day);
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-
-                return (
-                  <div 
-                    key={day.toString()}
-                    className={`h-9 relative flex items-center justify-center rounded-lg transition-all border ${
-                      isTodayLocal ? 'border-indigo-200 bg-indigo-50' : 'border-transparent hover:bg-slate-50'
-                    } ${!isCurrentMonth ? 'opacity-20' : ''}`}
-                  >
-                    <span className={`text-sm font-bold ${
-                      isTodayLocal ? 'text-indigo-600' : 'text-slate-700'
-                    }`}>
-                      {format(day, 'd')}
-                    </span>
-                    
-                    {hasCheckIn && (
-                      <div className="absolute top-0.5 right-0.5">
-                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-sm shadow-indigo-200"></div>
-                      </div>
-                    )}
-                    {hasCheckOut && (
-                      <div className="absolute bottom-0.5 right-0.5">
-                        <div className="w-1.5 h-1.5 bg-rose-400 rounded-full shadow-sm shadow-rose-100"></div>
-                      </div>
-                    )}
+          {/* Leave Entitlement Summary (Spans 3) */}
+          <div className="lg:col-span-3 h-[340px]">
+            <div className="premium-card bento-inner bg-slate-900 text-white border-none shadow-indigo-900/10">
+               <div className="flex items-center justify-between mb-8">
+                  <div className="p-3 bg-white/10 rounded-2xl">
+                    <CalendarIcon className="w-6 h-6 text-indigo-400" />
                   </div>
-                );
-              })}
+                  <div className="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest">Leaves</div>
+               </div>
+
+               <div className="flex-1 space-y-6">
+                 <div>
+                   <h3 className="text-3xl font-black tracking-tight mb-1">{remainingLeave}<span className="text-base text-slate-500 ml-1">Days</span></h3>
+                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Remaining Balance</p>
+                 </div>
+
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                       <div className="text-[18px] font-black mb-1">{totalLeave}</div>
+                       <div className="text-[8px] font-black text-slate-500 uppercase">Total</div>
+                    </div>
+                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                       <div className="text-[18px] font-black mb-1 text-rose-400">{usedLeave}</div>
+                       <div className="text-[8px] font-black text-slate-500 uppercase">Used</div>
+                    </div>
+                 </div>
+
+                 <div className="pt-4">
+                    <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                       <div 
+                         className="h-full bg-gradient-to-r from-indigo-500 to-violet-400 rounded-full transition-all duration-1000" 
+                         style={{ width: `${(remainingLeave / totalLeave) * 100}%` }}
+                       ></div>
+                    </div>
+                 </div>
+               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-2 bg-slate-50 rounded-2xl border border-slate-100">
-            <div className="text-center md:border-r border-slate-200 last:border-0 px-2">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">근무일수</p>
-              <p className="text-lg font-black text-slate-700">
-                {new Set(monthlyRecords.filter(r => r.type === 'IN').map(r => format(new Date(r.timestamp), 'yyyy-MM-dd'))).size}일
-              </p>
-            </div>
-            <div className="text-center md:border-r border-slate-200 last:border-0 px-2">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">정시퇴근</p>
-              <p className="text-lg font-black text-emerald-500">
-                {monthlyRecords.filter(r => r.type === 'OUT').length}회
-              </p>
-            </div>
-            <div className="text-center md:border-r border-slate-200 last:border-0 px-2">
-              <p className="text-[9px] font-black text-slate-700 uppercase tracking-widest mb-1">연차사용</p>
-              <p className="text-lg font-black text-indigo-600">0일</p>
-            </div>
-            <div className="text-center px-2">
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">지각</p>
-              <p className="text-lg font-black text-rose-500">0회</p>
+          {/* Monthly Attendance Calendar (Full Width: Spans 12) */}
+          <div className="lg:col-span-12">
+            <div className="premium-card p-8">
+               <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+                 <div>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight mb-1">월별 근태 분석</h2>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Performance Analytics</p>
+                 </div>
+
+                 <div className="flex flex-wrap items-center gap-4">
+                    {isManagement && (
+                      <select
+                        value={selectedUserId}
+                        onChange={(e) => setSelectedUserId(e.target.value)}
+                        className="px-6 py-3 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-xs font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer"
+                      >
+                        {allUsers.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name} ({getDisplayEmail(u.email)})</option>
+                        ))}
+                      </select>
+                    )}
+
+                    <div className="flex items-center bg-slate-50 rounded-[1.25rem] p-1.5 border border-slate-100 shadow-inner">
+                      <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                        <History className="w-4 h-4 text-slate-500 rotate-180" />
+                      </button>
+                      <span className="px-6 text-sm font-black text-slate-800 min-w-[120px] text-center">
+                        {format(currentMonth, 'yyyy. MM')}
+                      </span>
+                      <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                        <History className="w-4 h-4 text-slate-500" />
+                      </button>
+                    </div>
+                 </div>
+               </div>
+
+               <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+                  {/* Calendar Grid */}
+                  <div className="xl:col-span-8">
+                    <div className="grid grid-cols-7 mb-4 border-b border-slate-100 pb-4">
+                      {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
+                        <div key={day} className="text-center text-[10px] font-black text-slate-300 tracking-widest">{day}</div>
+                      ))}
+                    </div>
+                    
+                    <div className="grid grid-cols-7 gap-3">
+                      {Array.from({ length: startOfWeek(startOfMonth(currentMonth)).getDay() }).map((_, i) => (
+                        <div key={`empty-${i}`} className="aspect-square"></div>
+                      ))}
+                      
+                      {eachDayOfInterval({
+                        start: startOfMonth(currentMonth),
+                        end: endOfMonth(currentMonth)
+                      }).map((day) => {
+                        const dayRecords = monthlyRecords.filter(r => isSameDay(new Date(r.timestamp), day));
+                        const hasCheckIn = dayRecords.some(r => r.type === 'IN');
+                        const hasCheckOut = dayRecords.some(r => r.type === 'OUT');
+                        const isTodayLocal = isToday(day);
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+
+                        return (
+                          <div 
+                            key={day.toString()}
+                            className={`aspect-square relative flex flex-col items-center justify-center rounded-2xl transition-all border-2 ${
+                              isTodayLocal ? 'border-indigo-500 bg-indigo-50/50 shadow-lg shadow-indigo-100' : 'border-transparent hover:bg-slate-50 hover:border-slate-100'
+                            } ${!isCurrentMonth ? 'opacity-20' : ''} group cursor-default`}
+                          >
+                            <span className={`text-sm font-black ${isTodayLocal ? 'text-indigo-600' : 'text-slate-700'}`}>
+                              {format(day, 'd')}
+                            </span>
+                            
+                            <div className="flex gap-1 mt-1.5 mt-2">
+                               <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasCheckIn ? 'bg-indigo-500 scale-100' : 'bg-slate-100 scale-75'}`}></div>
+                               <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasCheckOut ? 'bg-rose-400 scale-100' : 'bg-slate-100 scale-75'}`}></div>
+                            </div>
+
+                            {/* Tooltip hint on hover */}
+                            {dayRecords.length > 0 && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-slate-900 text-white text-[8px] font-black rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none">
+                                {dayRecords.filter(r => r.type === 'IN')[0] && `IN: ${format(new Date(dayRecords.filter(r => r.type === 'IN')[0].timestamp), 'HH:mm')}`}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Summary Stats */}
+                  <div className="xl:col-span-4 flex flex-col justify-center space-y-4">
+                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-200 transition-colors">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">근무 요약</p>
+                       <div className="flex items-end gap-3">
+                          <span className="text-4xl font-black text-slate-900">{new Set(monthlyRecords.filter(r => r.type === 'IN').map(r => format(new Date(r.timestamp), 'yyyy-MM-dd'))).size}</span>
+                          <span className="text-sm font-bold text-slate-500 mb-2">Days Worked</span>
+                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
+                          <div className="text-xl font-black text-indigo-600 mb-1">{monthlyRecords.filter(r => r.type === 'OUT').length}</div>
+                          <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">정시 퇴근</div>
+                       </div>
+                       <div className="p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50">
+                          <div className="text-xl font-black text-rose-600 mb-1">0</div>
+                          <div className="text-[9px] font-black text-rose-400 uppercase tracking-widest">지각/조퇴</div>
+                       </div>
+                    </div>
+
+                    <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                       <div className="flex items-center gap-3">
+                          <div className="p-2 bg-slate-100 rounded-xl"><History className="w-4 h-4 text-slate-500" /></div>
+                          <span className="text-xs font-black text-slate-700">근태 증명서 발급</span>
+                       </div>
+                       <button className="text-[10px] font-black text-indigo-600 hover:underline">Download</button>
+                    </div>
+                  </div>
+               </div>
             </div>
           </div>
         </div>

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Search, Building, Filter, Trash2, UserX, UserCheck, Key, 
-  ChevronRight, Loader2, ShieldAlert,
-  Calendar, X
+  Loader2, ShieldAlert,
+  Calendar, X, MoreVertical
 } from 'lucide-react';
 import { 
   collection, query, where, onSnapshot, doc, updateDoc, 
@@ -59,6 +59,14 @@ export const EmployeeManagement: React.FC = () => {
   const [editingInfo, setEditingInfo] = useState({ rrn: '', address: '', phone: '', personalEmail: '', additionalLeave: 0 });
   const [isSaving, setIsSaving] = useState(false);
   const isAdmin = userData?.role === 'ADMIN';
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleGlobalClick = () => setActiveMenuId(null);
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
 
   useEffect(() => {
     if (!userData?.companyId) return;
@@ -349,94 +357,165 @@ export const EmployeeManagement: React.FC = () => {
           </div>
         </div>
 
-        {/* List Card */}
-        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px]">
-              <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-100">
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직원 정보 / 소속</th>
-                  <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직책 / 입사일</th>
-                  <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">계정 상태</th>
-                  <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">관리 액션</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredEmployees.map(emp => {
-                  const div = divisions.find(d => d.id === emp.divisionId)?.name || '기타';
-                  const team = teams.find(t => t.id === emp.teamId)?.name || '팀 없음';
-                  const isResigned = emp.status === 'RESIGNED';
+        {/* List Section - Responsive Container */}
+        <div className="space-y-4">
+          
+          {/* Desktop Table: Hidden on small screens */}
+          <div className="hidden xl:block premium-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1000px]">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-200/40">
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직원 정보 / 소속</th>
+                    <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직책 / 입사일</th>
+                    <th className="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">계정 상태</th>
+                    <th className="px-8 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">관리</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredEmployees.map(emp => {
+                    const div = divisions.find(d => d.id === emp.divisionId)?.name || '기타';
+                    const team = teams.find(t => t.id === emp.teamId)?.name || '팀 없음';
+                    const isResigned = emp.status === 'RESIGNED';
 
-                  return (
-                    <tr key={emp.uid} className={`group hover:bg-slate-50/80 transition-all ${isResigned ? 'bg-slate-50/30' : ''}`}>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center gap-4 cursor-pointer" onClick={() => handleOpenDetail(emp)}>
-                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:rotate-6 transition-all ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white'}`}>
-                            {emp.name[0]}
-                          </div>
-                          <div>
-                            <div className={`text-md font-black tracking-tight ${isResigned ? 'text-slate-400' : 'text-slate-800'}`}>{emp.name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                               <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 whitespace-nowrap">{div}</span>
-                               <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">{team}</span>
+                    return (
+                      <tr key={emp.uid} className={`group hover:bg-indigo-50/30 transition-all ${isResigned ? 'opacity-60' : ''}`}>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => handleOpenDetail(emp)}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:rotate-6 transition-all ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-indigo-100'}`}>
+                              {emp.name[0]}
+                            </div>
+                            <div>
+                              <div className="text-md font-black tracking-tight text-slate-800">{emp.name}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 whitespace-nowrap">{div}</span>
+                                <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">{team}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                         <div className={`text-sm font-black ${isResigned ? 'text-slate-300' : 'text-slate-700'}`}>{emp.role}</div>
-                         <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center gap-1">
-                           <Calendar className="w-3 h-3" /> {emp.joinDate || '-'} 입사
-                         </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex justify-center">
-                          {isResigned ? (
-                            <span className="px-3 py-1 bg-rose-50 text-rose-500 text-[10px] font-black rounded-full border border-rose-100">퇴사(업무정지)</span>
-                          ) : (
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-500 text-[10px] font-black rounded-full border border-emerald-100">정상</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-2 text-slate-300">
-                          <button 
-                            onClick={() => handleInitializePassword(emp)}
-                            className="p-2.5 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl transition-all" 
-                            title="비밀번호 초기화 (123456)"
-                          >
-                            <Key className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleToggleStatus(emp, isResigned ? 'ACTIVE' : 'RESIGNED')}
-                            className={`p-2.5 rounded-xl transition-all ${
-                              isResigned ? 'hover:bg-emerald-50 hover:text-emerald-600' : 'hover:bg-amber-50 hover:text-amber-600'
-                            }`}
-                            title={isResigned ? '업무정지 해제' : '퇴사(업무정지) 처리'}
-                          >
-                            {isResigned ? <UserCheck className="w-4 h-4" /> : <UserX className="w-4 h-4" />}
-                          </button>
-                          <button 
-                            onClick={() => setDeleteConfirmEmp(emp)}
-                            className="p-2.5 hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all"
-                            title="전체 기록 삭제"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                          <div className="w-px h-4 bg-slate-100 mx-2"></div>
-                          <button 
-                            onClick={() => handleOpenDetail(emp)}
-                            className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-indigo-600 transition-all shadow-sm"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="text-sm font-black text-slate-700">{emp.role}</div>
+                          <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {emp.joinDate || '-'} 입사
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex justify-center">
+                            <span className={`px-3 py-1 text-[10px] font-black rounded-full border ${
+                              isResigned ? 'bg-rose-50 text-rose-500 border-rose-100' : 'bg-emerald-50 text-emerald-500 border-emerald-100'
+                            }`}>
+                              {isResigned ? '퇴사' : '재직 중'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 relative">
+                          <div className="flex items-center justify-end gap-3">
+                            <button 
+                              onClick={() => handleOpenDetail(emp)}
+                              className="px-4 py-2 bg-slate-900 border border-slate-800 text-white rounded-xl text-[11px] font-black hover:bg-indigo-600 transition-all shadow-sm"
+                            >
+                              상세보기
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
+                              className={`p-2 rounded-xl transition-all ${activeMenuId === emp.uid ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 text-slate-400'}`}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                            
+                            {/* Contextual Menu */}
+                            {activeMenuId === emp.uid && (
+                              <div className="absolute right-8 top-16 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2 animate-in fade-in zoom-in-95 duration-200">
+                                <button onClick={() => handleInitializePassword(emp)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-xl transition-colors">
+                                  <Key className="w-3.5 h-3.5 text-indigo-500" /> 비밀번호 초기화
+                                </button>
+                                <button onClick={() => handleToggleStatus(emp, isResigned ? 'ACTIVE' : 'RESIGNED')} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-xl transition-colors">
+                                  {isResigned ? <UserCheck className="w-3.5 h-3.5 text-emerald-500" /> : <UserX className="w-3.5 h-3.5 text-amber-500" />}
+                                  {isResigned ? '정지 해제' : '퇴사(정지) 처리'}
+                                </button>
+                                <div className="h-px bg-slate-50 my-1"></div>
+                                <button onClick={() => setDeleteConfirmEmp(emp)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-rose-50 text-rose-600 text-[11px] font-bold rounded-xl transition-colors">
+                                  <Trash2 className="w-3.5 h-3.5" /> 데이터 영구 삭제
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Mobile Card View: Visible on small screens */}
+          <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredEmployees.map(emp => {
+              const div = divisions.find(d => d.id === emp.divisionId)?.name || '기타';
+              const team = teams.find(t => t.id === emp.teamId)?.name || '팀 없음';
+              const isResigned = emp.status === 'RESIGNED';
+              
+              return (
+                <div key={emp.uid} className="premium-card p-6 flex flex-col gap-6 relative overflow-hidden">
+                  {isResigned && <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-bl-full flex items-start justify-end p-2"><UserX className="w-4 h-4 text-rose-400" /></div>}
+                  
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'}`}>
+                        {emp.name[0]}
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black text-slate-800">{emp.name}</h3>
+                        <p className="text-xs font-bold text-slate-400">{emp.role}</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid)}
+                      className="p-2 bg-slate-50 rounded-xl text-slate-400 hover:bg-slate-100 transition-all"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-[10px] font-black uppercase tracking-wider">
+                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-400 block mb-1">본부 / 팀</span>
+                        <span className="text-indigo-600">{div} <span className="text-slate-300">/</span> {team}</span>
+                     </div>
+                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
+                        <span className="text-slate-400 block mb-1">상태</span>
+                        <span className={isResigned ? 'text-rose-500' : 'text-emerald-500'}>{isResigned ? '퇴사' : '재직'}</span>
+                     </div>
+                  </div>
+
+                  <button 
+                    onClick={() => handleOpenDetail(emp)}
+                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-indigo-600 transition-all active:scale-[0.98]"
+                  >
+                    상세 정보 및 인사 수정
+                  </button>
+
+                  {/* Mobile Context Menu */}
+                  {activeMenuId === emp.uid && (
+                    <div className="absolute inset-x-0 bottom-0 top-0 bg-white/95 backdrop-blur-md z-20 p-6 flex flex-col justify-center gap-2 animate-in slide-in-from-bottom-5 duration-300">
+                       <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">{emp.name} 관리</h4>
+                       <button onClick={() => handleInitializePassword(emp)} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl text-xs font-black text-slate-700 active:bg-indigo-50">
+                          <Key className="w-5 h-5 text-indigo-500" /> 비밀번호 초기화 (123456)
+                       </button>
+                       <button onClick={() => handleToggleStatus(emp, isResigned ? 'ACTIVE' : 'RESIGNED')} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl text-xs font-black text-slate-700 active:bg-amber-50">
+                          {isResigned ? <UserCheck className="w-5 h-5 text-emerald-500" /> : <UserX className="w-5 h-5 text-amber-500" />} {isResigned ? '정지 해제' : '퇴사(정지) 처리'}
+                       </button>
+                       <button onClick={() => setDeleteConfirmEmp(emp)} className="flex items-center gap-4 p-4 bg-rose-50 rounded-2xl text-xs font-black text-rose-600 active:bg-rose-100">
+                          <Trash2 className="w-5 h-5" /> 데이터 영구 삭제
+                       </button>
+                       <button onClick={() => setActiveMenuId(null)} className="mt-4 p-4 text-slate-400 font-bold text-xs uppercase tracking-widest">창 닫기</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

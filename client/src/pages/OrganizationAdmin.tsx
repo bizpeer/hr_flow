@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   PlusCircle, Users, UserPlus, Loader2,
-  Trash2, Building, X, Search, ChevronRight, Briefcase, ShieldCheck, History
+  Trash2, Building, X, Search, ChevronRight, Briefcase, ShieldCheck, History, Filter
 } from 'lucide-react';
 import { 
   collection, onSnapshot, addDoc, doc, setDoc, deleteDoc, updateDoc,
@@ -46,7 +46,7 @@ interface AuditLog {
 }
 
 export const OrganizationAdmin: React.FC = () => {
-  const { userData, companyData, systemDomain, getDisplayEmail } = useAuthStore();
+  const { userData, companyData, systemDomain } = useAuthStore();
   const navigate = useNavigate();
 
   const [divisions, setDivisions] = useState<Division[]>([]);
@@ -511,92 +511,126 @@ export const OrganizationAdmin: React.FC = () => {
         )}
 
         {/* 조직 엔진 (Main Grid) */}
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
-          {/* 본부 리스트 */}
-          <div className="xl:col-span-4 space-y-6">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
-              <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          <div className="lg:col-span-4 space-y-6">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden group">
+              <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <div className="p-2.5 bg-white rounded-2xl shadow-sm text-indigo-600 border border-slate-100">
                     <Building className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-tight">본부 구성</h2>
+                  <div>
+                    <h2 className="text-xl font-black text-slate-800 tracking-tight">본부 구성</h2>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">Division architecture</p>
+                  </div>
                 </div>
                 <button 
                   onClick={() => setShowDivisionModal(true)}
-                  className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                  className="p-2.5 text-indigo-400 hover:text-indigo-600 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
                 >
                   <PlusCircle className="w-6 h-6" />
                 </button>
               </div>
               
-              <div className="p-2 space-y-2">
+              <div className="p-4 space-y-3">
                 {divisions.map((div) => (
                   <div 
                     key={div.id}
                     onClick={() => setSelectedDivision(div.id)}
-                    className={`group p-3 rounded-2xl transition-all duration-500 cursor-pointer border-2 ${
+                    className={`group/item p-4 rounded-[2rem] transition-all duration-500 cursor-pointer border-2 shadow-sm ${
                       selectedDivision === div.id 
-                        ? 'bg-indigo-600 border-indigo-400 shadow-2xl shadow-indigo-100 -translate-y-1' 
-                        : 'bg-white border-transparent hover:border-indigo-100 hover:bg-slate-50'
+                        ? 'bg-slate-900 border-slate-800 shadow-2xl shadow-indigo-100 -translate-y-1' 
+                        : 'bg-white border-slate-50 hover:border-indigo-100 hover:bg-slate-50/50 hover:shadow-indigo-50/50'
                     }`}
                   >
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-3">
                        <div className="flex justify-between items-center">
                          <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-                              selectedDivision === div.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'
+                            <div className={`w-9 h-9 rounded-2xl flex items-center justify-center transition-colors shadow-sm ${
+                              selectedDivision === div.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400 group-hover/item:bg-white'
                             }`}>
-                              <Briefcase className="w-4 h-4" />
+                              <Briefcase className="w-4.5 h-4.5" />
                             </div>
                             <span className={`text-base font-black tracking-tight ${selectedDivision === div.id ? 'text-white' : 'text-slate-700'}`}>
-                              {div.name}
+                               {div.name}
                             </span>
                          </div>
-                         <Trash2 className="w-4 h-4 opacity-0 group-hover:opacity-100 text-slate-200 hover:text-rose-500 transition-all" onClick={(e) => { e.stopPropagation(); handleDeleteDivision(div.id, div.name); }} />
+                         <button 
+                            onClick={(e) => { e.stopPropagation(); handleDeleteDivision(div.id, div.name); }}
+                            className={`p-2 rounded-xl transition-all ${selectedDivision === div.id ? 'text-slate-500 hover:text-rose-400' : 'text-slate-200 hover:text-rose-500'}`}
+                         >
+                            <Trash2 className="w-4 h-4" />
+                         </button>
                        </div>
-                       <div className={`flex items-center gap-2 p-1.5 rounded-xl transition-colors ${selectedDivision === div.id ? 'bg-white/10' : 'bg-slate-50'}`}>
-                          <ShieldCheck className="w-4 h-4 text-slate-400" />
-                          <span className="text-xs font-bold text-slate-400">본부장:</span>
+                       
+                       <div className={`flex items-center gap-2 p-2 rounded-2xl transition-colors border ${
+                        selectedDivision === div.id ? 'bg-white/5 border-white/10' : 'bg-slate-50/50 border-slate-100'
+                       }`}>
+                          <ShieldCheck className={`w-3.5 h-3.5 ${selectedDivision === div.id ? 'text-indigo-400' : 'text-slate-300'}`} />
+                          <span className={`text-[10px] font-black uppercase tracking-widest ${selectedDivision === div.id ? 'text-slate-500' : 'text-slate-400'}`}>본부장:</span>
                           <select 
                             className={`flex-1 text-xs font-black bg-transparent border-none focus:ring-0 p-0 appearance-none ${selectedDivision === div.id ? 'text-white' : 'text-indigo-600'}`}
                             value={div.headId || ''}
                             onClick={(e) => e.stopPropagation()}
                             onChange={(e) => handleAppointHead(div.id, e.target.value)}
                           >
-                            <option value="" className="text-slate-900">미임명</option>
-                            {dedupedEmployees.map(emp => <option key={emp.uid} value={emp.uid} className="text-slate-900">{emp.name} ({getDisplayEmail(emp.email)})</option>)}
+                            <option value="">미임명</option>
+                            {dedupedEmployees.map(emp => <option key={emp.uid} value={emp.uid}>{emp.name}</option>)}
                           </select>
-                          <ChevronRight className="w-4 h-4 text-slate-300" />
+                          <ChevronRight className={`w-3.5 h-3.5 transition-transform group-hover/item:translate-x-0.5 ${selectedDivision === div.id ? 'text-white' : 'text-slate-300'}`} />
                        </div>
                     </div>
                   </div>
                 ))}
+                {divisions.length === 0 && (
+                   <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/20">
+                      <Building className="w-10 h-10 text-slate-100 mx-auto mb-3" />
+                      <p className="text-xs font-black text-slate-300 uppercase tracking-widest">No Divisions Setup</p>
+                   </div>
+                )}
               </div>
             </div>
           </div>
 
+
           {/* 팀 및 구성원 */}
-          <div className="xl:col-span-8 space-y-8">
-            <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[600px]">
-              <div className="p-4 border-b border-slate-50 flex items-center justify-between">
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">소속 팀 관리</h2>
+          <div className="lg:col-span-8 space-y-8">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[600px] relative">
+              <div className="p-8 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-6 bg-slate-50/10">
+                <div>
+                   <h2 className="text-2xl font-black text-slate-800 tracking-tight">팀 관리 및 구성원</h2>
+                   <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em] mt-1">Team hierarchy & permissions</p>
+                </div>
                 <button 
                   onClick={() => { if (selectedDivision) setNewTeamDivId(selectedDivision); setShowTeamModal(true); }}
-                  className="flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-black rounded-xl shadow-xl hover:bg-emerald-700 transition-all"
+                  className="flex items-center justify-center gap-2.5 px-7 py-4 bg-slate-900 text-white font-black rounded-[1.5rem] shadow-xl hover:bg-indigo-600 transition-all active:scale-95 group/btn"
                 >
-                  <PlusCircle className="w-4 h-4" /> <span>팀 생성</span>
+                  <PlusCircle className="w-5 h-5 group-hover/btn:rotate-90 transition-transform" />
+                  <span className="text-sm tracking-tight uppercase">Create New Team</span>
                 </button>
               </div>
 
-              <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-8 grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
                 {unassignedEmployees.length > 0 && !selectedDivision && (
-                  <div className="p-4 rounded-3xl border-2 border-amber-100 bg-amber-50/20">
-                    <h4 className="text-lg font-black text-amber-800 mb-3">미배정 구성원</h4>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="xl:col-span-2 p-6 rounded-[2rem] border-2 border-amber-100 bg-amber-50/20 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                       <Users className="w-20 h-20 text-amber-900" />
+                    </div>
+                    <div className="flex items-center gap-3 mb-5">
+                       <div className="w-10 h-10 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center shadow-sm">
+                          <Users className="w-5 h-5" />
+                       </div>
+                       <h4 className="text-xl font-black text-amber-900 italic">미배정 구성원 (Unassigned)</h4>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
                        {unassignedEmployees.map(emp => (
-                         <div key={emp.uid} className="flex items-center gap-3 bg-white border border-slate-100 px-4 py-2 rounded-2xl shadow-sm cursor-pointer" onClick={() => { setEditingEmployee(emp); setShowEditModal(true); }}>
+                         <div 
+                           key={emp.uid} 
+                           className="group/tag flex items-center gap-3 bg-white border border-amber-100 px-5 py-3 rounded-2xl shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer" 
+                           onClick={() => { setEditingEmployee(emp); setShowEditModal(true); }}
+                         >
                            <span className="text-xs font-black text-slate-700">{emp.name}</span>
+                           <ChevronRight className="w-3.5 h-3.5 text-amber-300 group-hover/tag:translate-x-0.5 transition-transform" />
                          </div>
                        ))}
                     </div>
@@ -604,40 +638,95 @@ export const OrganizationAdmin: React.FC = () => {
                 )}
                 
                 {filteredTeams.map((team) => (
-                  <div key={team.id} className="p-4 rounded-3xl border-2 border-slate-50 bg-slate-50/30 hover:bg-white hover:border-indigo-100 transition-all">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <span className="text-[10px] font-black text-indigo-500 uppercase bg-white px-2 py-0.5 rounded-lg border">{divisions.find(d => d.id === team.divisionId)?.name}</span>
-                        <h4 className="text-xl font-black text-slate-900">{team.name}</h4>
-                      </div>
-                      <button onClick={() => handleDeleteTeam(team.id, team.name)} className="p-2 text-slate-200 hover:text-rose-500"><Trash2 className="w-4 h-4" /></button>
-                    </div>
-                    
-                    <div className="space-y-3">
-                       <div className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-100">
-                          <span className="text-xs font-black text-slate-500">팀 리더</span>
-                          <select className="text-xs font-black text-emerald-600 bg-transparent border-none p-0 text-right" value={team.leaderId || ''} onChange={(e) => handleAppointLeader(team.id, e.target.value)}>
-                            <option value="">미지정</option>
-                            {getEmployeesInTeam(team.id).map(emp => <option key={emp.uid} value={emp.uid}>{emp.name} ({getDisplayEmail(emp.email)})</option>)}
-                          </select>
+                  <div key={team.id} className="p-1 rounded-[2.5rem] bg-slate-50/50 border border-slate-100 hover:shadow-2xl hover:shadow-indigo-50 transition-all group/team-card">
+                    <div className="p-6">
+                       <div className="flex justify-between items-start mb-6">
+                         <div className="space-y-1.5">
+                           <span className="inline-block text-[9px] font-black text-indigo-500 uppercase bg-white px-2 py-0.5 rounded-lg border border-slate-100 shadow-sm">
+                              {divisions.find(d => d.id === team.divisionId)?.name || 'N/A'}
+                           </span>
+                           <h4 className="text-2xl font-black text-slate-900 tracking-tight">{team.name}</h4>
+                         </div>
+                         <button 
+                           onClick={() => handleDeleteTeam(team.id, team.name)} 
+                           className="p-3 text-slate-300 hover:text-rose-500 hover:bg-white rounded-2xl transition-all shadow-sm border border-transparent hover:border-rose-50 border-dashed"
+                         >
+                            <Trash2 className="w-5 h-5" />
+                         </button>
                        </div>
-                       <div className="space-y-2">
-                          <div className="flex items-center justify-between px-1">
-                            <span className="text-[10px] font-black text-slate-400 uppercase">구성원 ({getEmployeesInTeam(team.id).length})</span>
+                       
+                       <div className="space-y-5">
+                          {/* 팀장 관리 */}
+                          <div className="flex items-center justify-between p-4 bg-white rounded-2xl border border-slate-100 shadow-sm group/leader">
+                             <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shadow-inner">
+                                   <ShieldCheck className="w-5 h-5" />
+                                </div>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Team Leader</span>
+                             </div>
+                             <select 
+                               className="text-xs font-black text-emerald-600 bg-transparent border-none focus:ring-0 p-0 text-right cursor-pointer" 
+                               value={team.leaderId || ''} 
+                               onChange={(e) => handleAppointLeader(team.id, e.target.value)}
+                             >
+                               <option value="">미지정</option>
+                               {getEmployeesInTeam(team.id).map(emp => <option key={emp.uid} value={emp.uid}>{emp.name}</option>)}
+                             </select>
                           </div>
-                          <div className="flex flex-wrap gap-2">
-                            {getEmployeesInTeam(team.id).map(emp => (
-                              <div key={emp.uid} className="flex items-center gap-2 bg-white border border-slate-100 px-3 py-2 rounded-2xl shadow-sm hover:scale-105 transition-all cursor-pointer" onClick={() => { setEditingEmployee(emp); setShowEditModal(true); }}>
-                                <span className="text-xs font-black text-slate-700">{emp.name}</span>
-                                <History className="w-3.5 h-3.5 text-slate-200" onClick={(e) => { e.stopPropagation(); setSelectedEmpForLogs(emp); }} />
-                                <X className="w-3.5 h-3.5 text-slate-200 hover:text-rose-500" onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(emp.uid, emp.name); }} />
-                              </div>
-                            ))}
+
+                          {/* 구성원 리스트 */}
+                          <div className="space-y-3">
+                             <div className="flex items-center gap-2 px-1">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Members</span>
+                                <div className="h-px flex-1 bg-slate-100"></div>
+                                <span className="text-[10px] font-black text-indigo-500 bg-white px-2 rounded-full border">{getEmployeesInTeam(team.id).length}</span>
+                             </div>
+                             
+                             <div className="grid grid-cols-2 gap-2">
+                               {getEmployeesInTeam(team.id).map(emp => (
+                                 <div 
+                                   key={emp.uid} 
+                                   className="group/mem flex items-center justify-between bg-white border border-slate-100 px-4 py-3 rounded-2xl hover:border-indigo-200 transition-all cursor-pointer relative overflow-hidden" 
+                                   onClick={() => { setEditingEmployee(emp); setShowEditModal(true); }}
+                                 >
+                                   <div className="flex items-center gap-2 relative z-10">
+                                      <div className={`w-1.5 h-1.5 rounded-full ${emp.role === 'ADMIN' ? 'bg-indigo-500' : emp.role === 'SUB_ADMIN' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
+                                      <span className="text-[11px] font-black text-slate-700">{emp.name}</span>
+                                   </div>
+                                   <div className="flex items-center gap-1 opacity-0 group-hover/mem:opacity-100 transition-opacity relative z-10">
+                                      <History className="w-3.5 h-3.5 text-slate-300 hover:text-indigo-600 transition-colors" onClick={(e) => { e.stopPropagation(); setSelectedEmpForLogs(emp); }} />
+                                      <X className="w-3.5 h-3.5 text-slate-300 hover:text-rose-500 transition-colors" onClick={(e) => { e.stopPropagation(); handleDeleteEmployee(emp.uid, emp.name); }} />
+                                   </div>
+                                   <div className="absolute inset-y-0 left-0 w-0 group-hover/mem:w-1 bg-indigo-500 transition-all"></div>
+                                 </div>
+                               ))}
+                             </div>
+                             
+                             {getEmployeesInTeam(team.id).length === 0 && (
+                                <div className="py-8 text-center border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/30">
+                                   <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">No members found</p>
+                                </div>
+                             )}
                           </div>
                        </div>
                     </div>
                   </div>
                 ))}
+                
+                {filteredTeams.length === 0 && selectedDivision && (
+                   <div className="xl:col-span-2 py-32 text-center">
+                      <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center border border-slate-100 mx-auto mb-6">
+                         <Filter className="w-8 h-8 text-slate-200" />
+                      </div>
+                      <p className="text-slate-400 font-black tracking-tight text-xl">이 본부에는 아직 생성된 팀이 없습니다.</p>
+                      <button 
+                        onClick={() => { setNewTeamDivId(selectedDivision!); setShowTeamModal(true); }}
+                        className="mt-6 text-sm font-black text-indigo-600 hover:underline"
+                      >
+                         + 첫 번째 팀 생성하기
+                      </button>
+                   </div>
+                )}
               </div>
             </div>
           </div>
