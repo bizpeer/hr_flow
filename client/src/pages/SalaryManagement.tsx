@@ -128,7 +128,6 @@ export const SalaryManagement: React.FC = () => {
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [taxTable, setTaxTable] = useState<any>(null);
-  const [taxError, setTaxError] = useState<string | null>(null);
   
   // Filters
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
@@ -188,19 +187,10 @@ export const SalaryManagement: React.FC = () => {
 
   // 전역 시스템 설정(세액표)은 회사 정보와 무관하게 로드
   useEffect(() => {
-    setTaxError(null);
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
       if (doc.exists()) {
-        console.log("Tax table loaded successfully");
         setTaxTable(doc.data());
-        setTaxError(null);
-      } else {
-        console.warn("Tax table document not found in system_config/tax_table");
-        setTaxError("Not Found: 'system_config/tax_table' 문서가 데이터베이스에 없습니다.");
       }
-    }, (error) => {
-      console.error("Error fetching tax table:", error);
-      setTaxError(`Firestore Error: ${error.code} - ${error.message}`);
     });
 
     return () => unsubTax();
@@ -277,17 +267,10 @@ export const SalaryManagement: React.FC = () => {
 
   return (
     <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans print:p-0 print:bg-white overflow-hidden">
-      {(!taxTable || taxError) && (
-        <div className="max-w-7xl mx-auto mb-4 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex flex-col gap-2 group animate-in slide-in-from-top duration-500">
-           <div className="flex items-center gap-3 text-rose-600">
-              <AlertCircle className="w-5 h-5 flex-shrink-0" />
-              <div className="text-xs font-black">세액표 데이터를 불러올 수 없습니다. {taxError ? '진단 정보가 아래에 표시됩니다.' : '시스템 관리자에게 문의하세요.'} (현재 예비 산출 모드 작동 중)</div>
-           </div>
-           {taxError && (
-              <div className="ml-8 p-3 bg-white/50 rounded-xl border border-rose-100/50 text-[10px] font-mono text-rose-400 font-bold break-all">
-                 [Diagnostic Info]: {taxError}
-              </div>
-           )}
+      {!taxTable && (
+        <div className="max-w-7xl mx-auto mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-in slide-in-from-top duration-500">
+           <AlertCircle className="w-5 h-5 flex-shrink-0" />
+           <div className="text-[11px] font-black">세액표 데이터를 불러올 수 없습니다. 시스템 관리자에게 문의하세요. (현재 예비 산출 모드 작동 중)</div>
         </div>
       )}
       <div className="max-w-7xl mx-auto space-y-6 print:hidden">
