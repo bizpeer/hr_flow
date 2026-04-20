@@ -13,7 +13,7 @@ import type { UserData } from '../store/authStore';
 
 const MEAL_ALLOWANCE_DEFAULT = 200000;
 
-const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }) => {
+const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTable: any) => {
   const salary = emp.currentVal || emp.annualSalary || 0;
   if (salary <= 0) return null;
 
@@ -32,46 +32,62 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }) => {
 
   const taxableIncome = Math.max(0, monthlyGross - nonTaxable);
 
-  // 1. 국민연금 (4.75%, 상한액 265,500원, 하한액 17,550원)
+  // 1. 국민연금 (4.75%, 상한액 302,570원, 하한액 19,000원 - 2026 기준)
   let pension = Math.floor(taxableIncome * 0.0475);
-  if (pension > 265500) pension = 265500;
-  if (taxableIncome > 0 && pension < 17550) pension = 17550;
+  pension = Math.floor(pension / 10) * 10; // 원 단위 절사
+  if (pension > 302570) pension = 302570;
+  if (taxableIncome > 0 && pension < 19000) pension = 19000;
 
   // 2. 건강보험 (3.595%)
-  const health = Math.floor(taxableIncome * 0.03595);
+  let health = Math.floor(taxableIncome * 0.03595);
+  health = Math.floor(health / 10) * 10; // 원 단위 절사
 
   // 3. 장기요양보험 (건강보험의 13.14%)
-  const longTerm = Math.floor(health * 0.1314);
+  let longTerm = Math.floor(health * 0.1314);
+  longTerm = Math.floor(longTerm / 10) * 10; // 원 단위 절사
 
   // 4. 고용보험 (0.9%)
-  const employment = Math.floor(taxableIncome * 0.009);
+  let employment = Math.floor(taxableIncome * 0.009);
+  employment = Math.floor(employment / 10) * 10; // 원 단위 절사
 
   const totalInsurance = pension + health + longTerm + employment;
 
-  // 5. 소득세 (간이세액표 근사치 - 부양가족/자녀수 반영 정교화)
-  // taxBase = 과세대상액 - 4대보험
-  let taxBase = taxableIncome - totalInsurance;
-  
-  // 부양가족 공제 (보정치)
-  // 부양가족 1인당 약 15만원 과세표준 제외 효과 (매우 거친 보정)
-  const dependentDeduction = (dependents - 1) * 150000;
-  taxBase = Math.max(0, taxBase - dependentDeduction);
-
+  // 5. 소득세 (간이세액표 기반 조회)
   let incomeTax = 0;
-  if (taxBase <= 1200000) {
-    incomeTax = 0;
-  } else if (taxBase <= 4600000) {
-    incomeTax = Math.floor(taxBase * 0.06);
-  } else if (taxBase <= 8800000) {
-    incomeTax = Math.floor(taxBase * 0.15 - 108000);
-  } else {
-    incomeTax = Math.floor(taxBase * 0.24 - 522000);
-  }
-
-  // 자녀세액공제 반영 (자녀 1인당 월간 약 1.5만원 ~ 2.5만원 세액 감면 효과 예시)
-  if (children > 0) {
-    const childCredit = children * 20000; 
-    incomeTax = Math.max(0, incomeTax - childCredit);
+  
+  if (taxTable && taxTable.brackets && taxableIncome > 0) {
+    const monthlyIncome = Math.floor(taxableIncome / 1000); // 세액표는 천원 단위 기준
+    const bracket = taxTable.brackets.find((b: any) => monthlyIncome >= b.min && monthlyIncome < b.max);
+    
+    if (bracket) {
+      // dependents - 1 (컬럼 인덱스, 0: 1인, 1: 2인, 2: 3인...)
+      const colIdx = Math.min(Math.max(0, dependents - 1), 10);
+      incomeTax = bracket.taxes[colIdx] || 0;
+      
+      // 자녀 세액공제 반영 (2026.03.01 기준 반영)
+      if (children > 0) {
+        let childCredit = 0;
+        if (children === 1) childCredit = 20830;
+        else if (children === 2) childCredit = 45830;
+        else if (children >= 3) childCredit = 45830 + (children - 2) * 33330;
+        
+        incomeTax = Math.max(0, incomeTax - childCredit);
+      }
+    } else {
+      // 테이블에 해당 구간이 없는 경우 Fallback
+      const taxBase = taxableIncome - totalInsurance;
+      if (taxBase <= 1200000) incomeTax = 0;
+      else if (taxBase <= 4600000) incomeTax = Math.floor(taxBase * 0.06);
+      else if (taxBase <= 8800000) incomeTax = Math.floor(taxBase * 0.15 - 108000);
+      else incomeTax = Math.floor(taxBase * 0.24 - 522000);
+    }
+  } else if (taxableIncome > 0) {
+    // 세액표 데이터 자체가 없는 경우 Fallback
+    const taxBase = taxableIncome - totalInsurance;
+    if (taxBase <= 1200000) incomeTax = 0;
+    else if (taxBase <= 4600000) incomeTax = Math.floor(taxBase * 0.06);
+    else if (taxBase <= 8800000) incomeTax = Math.floor(taxBase * 0.15 - 108000);
+    else incomeTax = Math.floor(taxBase * 0.24 - 522000);
   }
 
   // 6. 지방소득세 (소득세의 10%)
@@ -106,6 +122,7 @@ export const SalaryManagement: React.FC = () => {
   const [divisions, setDivisions] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [taxTable, setTaxTable] = useState<any>(null);
   
   // Filters
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
@@ -148,19 +165,39 @@ export const SalaryManagement: React.FC = () => {
       setLoading(false);
     });
 
-    return () => { unsubDivs(); unsubTeams(); unsubEmployees(); };
+    const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
+      if (doc.exists()) setTaxTable(doc.data());
+    });
+
+    return () => { unsubDivs(); unsubTeams(); unsubEmployees(); unsubTax(); };
   }, [userData?.companyId]);
 
   const handleUpdateField = (uid: string, field: keyof UserData, value: any) => {
-    setEditingData(prev => ({
-      ...prev,
-      [uid]: { ...prev[uid], [field]: value }
-    }));
+    setEditingData(prev => {
+      const current = prev[uid] || {};
+      let updatedValue = value;
+
+      // 월급 모드에서 금액 수정 시 연봉으로 역산하여 저장
+      if (field === 'annualSalary' && current.salaryType === 'MONTHLY') {
+        const factor = current.isSeveranceIncluded ? 13 : 12;
+        updatedValue = value * factor;
+      }
+
+      return {
+        ...prev,
+        [uid]: { ...current, [field]: updatedValue }
+      };
+    });
   };
 
   const handleSalaryAdd = (uid: string, amount: number) => {
-    const current = editingData[uid]?.annualSalary || 0;
-    handleUpdateField(uid, 'annualSalary', current + amount);
+    const currentData = editingData[uid] || {};
+    const factor = (currentData.salaryType === 'MONTHLY') ? (currentData.isSeveranceIncluded ? 13 : 12) : 1;
+    const currentBase = currentData.salaryType === 'MONTHLY' 
+      ? Math.floor((currentData.annualSalary || 0) / factor)
+      : (currentData.annualSalary || 0);
+      
+    handleUpdateField(uid, 'annualSalary', currentBase + amount);
   };
 
   const handleSave = async (uid: string) => {
@@ -265,7 +302,7 @@ export const SalaryManagement: React.FC = () => {
                  <tbody className="divide-y divide-slate-100">
                     {filteredEmployees.map(emp => {
                        const data = editingData[emp.uid] || {};
-                       const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data });
+                       const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
                        const isChanged = JSON.stringify(data) !== JSON.stringify({
                           annualSalary: emp.annualSalary || 0,
                           salaryType: emp.salaryType || 'ANNUAL',
@@ -317,12 +354,31 @@ export const SalaryManagement: React.FC = () => {
                                    <div className="space-y-2">
                                       <div className="relative">
                                          <input 
-                                           type="text" value={(data.annualSalary || 0).toLocaleString()} 
+                                           type="text" 
+                                           value={(data.salaryType === 'MONTHLY' 
+                                             ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
+                                             : (data.annualSalary || 0)
+                                           ).toLocaleString()} 
                                            onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
                                            className="w-full pl-4 pr-10 py-3 bg-slate-50 border-2 border-slate-100 rounded-xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all"
                                          />
                                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">원</span>
                                       </div>
+                                      
+                                      {/* 환산 힌트 표시 */}
+                                      <div className="px-1 py-1 mt-1 flex justify-between items-center text-[11px] font-bold border-t border-slate-50">
+                                         <span className="text-slate-500 italic">
+                                            {data.salaryType === 'ANNUAL' ? (
+                                               <span className="flex items-center gap-1">월 환산: <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">{(Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))).toLocaleString()}원</span></span>
+                                            ) : (
+                                               <span className="flex items-center gap-1">연 환산: <span className="text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[10px]">{(data.annualSalary || 0).toLocaleString()}원</span></span>
+                                            )}
+                                         </span>
+                                         <span className="text-slate-400 text-[9px] bg-slate-100 px-1.5 py-0.5 rounded">
+                                            {data.isSeveranceIncluded ? '1/13 기준' : '1/12 기준'}
+                                         </span>
+                                      </div>
+
                                       <div className="flex gap-1">
                                          <button onClick={() => handleSalaryAdd(emp.uid, 10000000)} className="flex-1 py-1 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md hover:bg-slate-100 border border-slate-100 transition-all">+1000만</button>
                                          <button onClick={() => handleSalaryAdd(emp.uid, 1000000)} className="flex-1 py-1 bg-slate-50 text-[9px] font-black text-slate-400 rounded-md hover:bg-slate-100 border border-slate-100 transition-all">+100만</button>
@@ -418,7 +474,7 @@ export const SalaryManagement: React.FC = () => {
                  <Calculator className="w-6 h-6 text-indigo-400 print:hidden" />
                  <div>
                     <h2 className="text-xl font-black tracking-tight">{selectedDetails.name}님 급여 산출 명세서</h2>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">2025년 대한민국 소득세법 기준 산출 내역 (본인 포함 {editingData[selectedDetails.uid]?.dependents || 1}인 부양, 자식 {editingData[selectedDetails.uid]?.childrenUnder20 || 0}인)</p>
+                    <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {editingData[selectedDetails.uid]?.dependents || 1}인 부양, 자식 {editingData[selectedDetails.uid]?.childrenUnder20 || 0}인)</p>
                  </div>
               </div>
               <div className="flex items-center gap-2 print:hidden">
@@ -430,7 +486,7 @@ export const SalaryManagement: React.FC = () => {
             <div className="p-8 space-y-8 print:p-4 print:space-y-6">
               {(() => {
                 const draft = editingData[selectedDetails.uid] || {};
-                const res = calculateNetPay({ ...selectedDetails, currentVal: draft.annualSalary, ...draft });
+                const res = calculateNetPay({ ...selectedDetails, currentVal: draft.annualSalary, ...draft }, taxTable);
                 if (!res) return null;
                 return (
                   <>
@@ -520,7 +576,7 @@ export const SalaryManagement: React.FC = () => {
 
                     <div className="bg-slate-900 border-l-4 border-indigo-500 p-5 rounded-2xl print:bg-white print:border-black print:mt-10">
                        <p className="text-[9px] text-slate-400 leading-relaxed font-medium print:text-[8pt] print:text-black">
-                          본 명세서는 2025년도 대한민국 소득세법 및 각 보험 요율 기준에 따른 예상 산출 내역입니다.<br/>
+                          본 명세서는 2026년도 대한민국 소득세법 및 각 보험 요율 기준에 따른 예상 산출 내역입니다.<br/>
                           실제 지급액은 회사별 수당 체계, 비과세 적용 범위, 부양가족 상세 요건 등에 따라 상이할 수 있습니다.
                        </p>
                        <div className="mt-4 flex justify-between items-end">

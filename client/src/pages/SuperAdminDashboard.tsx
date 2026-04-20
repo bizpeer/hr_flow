@@ -6,11 +6,13 @@ import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
   ToggleLeft, ToggleRight, Crown, Calendar,
-  TrendingUp, Briefcase, AlertTriangle, Key, Trash2, Lock
+  TrendingUp, Briefcase, AlertTriangle, Key, Trash2, Lock, Loader2
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
-import { functions, auth } from '../firebase';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import * as XLSX from 'xlsx';
+import { setDoc } from 'firebase/firestore';
+import { functions, auth } from '../firebase';
 
 export const SuperAdminDashboard: React.FC = () => {
   const { userData } = useAuthStore();
@@ -31,6 +33,8 @@ export const SuperAdminDashboard: React.FC = () => {
   const [adminPassword, setAdminPassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [backendStatus, setBackendStatus] = useState<{ version: string; deployedAt: string } | null>(null);
+  const [isUploadingTaxTable, setIsUploadingTaxTable] = useState(false);
+  const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number } | null>(null);
 
   useEffect(() => {
     checkBackend();
@@ -74,7 +78,14 @@ export const SuperAdminDashboard: React.FC = () => {
       setAllUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserData)));
     });
 
-    return () => { unsubCompanies(); unsubUsers(); };
+    const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
+      if (doc.exists()) {
+        const data = doc.data();
+        setTaxTableInfo({ updateDate: data.updateDate, count: data.brackets?.length || 0 });
+      }
+    });
+
+    return () => { unsubCompanies(); unsubUsers(); unsubTax(); };
   }, [userData]);
 
   const handleToggleStatus = async (companyId: string, currentStatus: string) => {
@@ -148,6 +159,49 @@ export const SuperAdminDashboard: React.FC = () => {
       alert('데이터 삭제 실패:\n' + msg);
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleTaxTableUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingTaxTable(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // 시트 확인 (소득령 별표2 또는 근로소득간이세액표)
+        const sheetName = workbook.SheetNames.find(n => n.includes('세액표')) || workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+
+        // 데이터 시작점 찾기 (보통 5행 이후 수치 데이터)
+        const brackets = rows.slice(4)
+          .filter(row => row[0] !== undefined && typeof row[0] === 'number')
+          .map(row => ({
+            min: Number(row[0]),
+            max: Number(row[1]),
+            taxes: row.slice(2).map(v => (v === '-' || v === undefined) ? 0 : Number(v))
+          }));
+
+        if (brackets.length === 0) throw new Error('유효한 세액표 데이터를 찾을 수 없습니다. 시트 구성과 급여 구간을 확인하세요.');
+
+        await setDoc(doc(db, 'system_config', 'tax_table'), {
+          updateDate: new Date().toISOString().split('T')[0],
+          brackets
+        });
+
+        alert(`[성공] ${brackets.length}개의 급여 구간 데이터가 업로드되었습니다.`);
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (err: any) {
+      alert('세액표 업로드 실패: ' + err.message);
+    } finally {
+      setIsUploadingTaxTable(false);
+      e.target.value = '';
     }
   };
 
@@ -234,6 +288,39 @@ export const SuperAdminDashboard: React.FC = () => {
               <span className="text-xs font-black text-slate-400 uppercase tracking-wider">정지 조직</span>
             </div>
             <p className="text-4xl font-black text-amber-600">{companies.length - activeCompanies}</p>
+          </div>
+        </div>
+
+        {/* 세액표 관리 섹션 (SUPER_ADMIN 전용) */}
+        <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white border border-slate-800">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-indigo-600 rounded-3xl shadow-lg">
+                <Calendar className="w-8 h-8" />
+              </div>
+              <div>
+                <h2 className="text-xl font-black tracking-tight">국세청 근로소득 간이세액표 관리</h2>
+                <div className="flex items-center gap-3 mt-1.5">
+                  <span className="text-xs font-bold text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
+                    현재 버전: {taxTableInfo?.updateDate || '미등록'}
+                  </span>
+                  <span className="text-xs font-bold text-slate-400">
+                    데이터 수: {taxTableInfo?.count || 0}개 구간
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+               <div className="text-right hidden lg:block">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Excel Support (xlsx)</p>
+                  <p className="text-xs text-slate-400 font-medium">국세청 제공 엑셀 서식을 그대로 업로드하세요</p>
+               </div>
+               <label className={`flex items-center gap-3 px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-sm cursor-pointer hover:bg-slate-100 transition-all shadow-xl ${isUploadingTaxTable ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {isUploadingTaxTable ? <Loader2 className="w-5 h-5 animate-spin" /> : <Globe className="w-5 h-5 text-indigo-600" />}
+                  최신 세액표 엑셀 업로드
+                  <input type="file" accept=".xlsx" onChange={handleTaxTableUpload} className="hidden" />
+               </label>
+            </div>
           </div>
         </div>
 
