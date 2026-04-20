@@ -32,7 +32,27 @@ export const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
+      const userCredential = await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
+      
+      // [고스트 계정(Ghost Session) 방어 로직] 
+      // DB에서 수동으로 문서를 삭제했을 때 Firebase Auth만 남는 현상 방지
+      if (userCredential.user.email !== 'bizpeer@gmail.com') {
+        const { getDoc } = await import('firebase/firestore');
+        const profileSnap = await getDoc(doc(db, 'UserProfile', userCredential.user.uid));
+        
+        if (!profileSnap.exists()) {
+          try {
+            await userCredential.user.delete(); // 즉각적인 Auth DB 찌꺼기 삭제
+            setError('이전 테넌트(조직) 정보가 제거된 계정입니다. 안전하게 초기화되었으므로, [회원가입] 탭에서 새로운 조직을 생성해주세요.');
+          } catch (e) {
+            await auth.signOut();
+            setError('접근할 수 없는 계정입니다 (데이터 유실). 원활한 처리를 위해 관리자에게 문의해주세요.');
+          }
+          setLoading(false);
+          return;
+        }
+      }
+
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
@@ -43,7 +63,7 @@ export const Login: React.FC = () => {
         setError('로그인 중 오류가 발생했습니다: ' + err.message);
       }
     } finally {
-      setLoading(false);
+      if (!error) setLoading(false); // 오류가 세팅된 경우 UI 로딩 상태는 바로 위 코드블록에서 해제함
     }
   };
 
