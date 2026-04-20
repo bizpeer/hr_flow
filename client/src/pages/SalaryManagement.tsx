@@ -166,7 +166,6 @@ export const SalaryManagement: React.FC = () => {
       setEditingData(prev => {
         const next = { ...prev };
         data.forEach(emp => {
-          // 이미 수정 중인 데이터가 있으면 덮어쓰지 않음
           if (!next[emp.uid]) {
             next[emp.uid] = {
                annualSalary: emp.annualSalary || 0,
@@ -183,12 +182,24 @@ export const SalaryManagement: React.FC = () => {
       setLoading(false);
     });
 
+    return () => { unsubDivs(); unsubTeams(); unsubEmployees(); };
+  }, [userData?.companyId]);
+
+  // 전역 시스템 설정(세액표)은 회사 정보와 무관하게 로드
+  useEffect(() => {
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
-      if (doc.exists()) setTaxTable(doc.data());
+      if (doc.exists()) {
+        console.log("Tax table loaded successfully");
+        setTaxTable(doc.data());
+      } else {
+        console.warn("Tax table document not found in system_config/tax_table");
+      }
+    }, (error) => {
+      console.error("Error fetching tax table:", error);
     });
 
-    return () => { unsubDivs(); unsubTeams(); unsubEmployees(); unsubTax(); };
-  }, [userData?.companyId]);
+    return () => unsubTax();
+  }, []);
 
   const handleUpdateField = (uid: string, field: string, value: any) => {
     setEditingData((prev: any) => ({

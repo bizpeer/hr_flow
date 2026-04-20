@@ -213,21 +213,24 @@ export const SuperAdminDashboard: React.FC = () => {
             }
           }
 
-          // 중복 제거 및 정렬
-          const sortedBrackets = allBrackets.sort((a, b) => a.min - b.min);
+          // 중복 제거 및 정렬 (소득 구간별)
+          const sortedBrackets = allBrackets
+            .filter((v, i, a) => a.findIndex(t => t.min === v.min) === i)
+            .sort((a, b) => a.min - b.min);
 
-          if (sortedBrackets.length === 0) {
-            throw new Error('유효한 세액표 데이터를 찾을 수 없습니다. 엑셀 서식을 확인하세요.');
+          if (sortedBrackets.length < 500) { // 국세청 표준은 보통 600개 이상의 구간이 있음
+            throw new Error(`추출된 데이터가 너무 적습니다 (${sortedBrackets.length}개). 엑셀 파일의 형식이 국세청 표준과 맞는지 확인하세요.`);
           }
 
           // Firestore 업데이트
           await setDoc(doc(db, 'system_config', 'tax_table'), {
             updateDate: new Date().toISOString().split('T')[0],
-            fileName: file.name, // 파일명 저장
-            brackets: sortedBrackets
+            fileName: file.name,
+            brackets: sortedBrackets,
+            lastUpdatedBy: userData?.email || 'unknown'
           });
 
-          alert(`[성공] ${file.name} 파일 업로드 완료!\n총 ${sortedBrackets.length}개의 급여 구간이 반영되었습니다.`);
+          alert(`[업로드 성공]\n파일명: ${file.name}\n반영된 구간: ${sortedBrackets.length}개\n\n이제 모든 사용자의 급여 산출에 최신 세액표가 실시간 적용됩니다.`);
         } catch (innerErr: any) {
           alert('데이터 처리 오류: ' + innerErr.message);
         } finally {
