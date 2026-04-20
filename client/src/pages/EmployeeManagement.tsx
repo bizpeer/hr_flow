@@ -126,9 +126,17 @@ export const EmployeeManagement: React.FC = () => {
     
     let leaves: any[] = [];
     if (emp.uid) {
-      const q = query(collection(db, 'leaves'), where('userId', '==', emp.uid));
-      const snap = await getDocs(q);
-      leaves = snap.docs.map(doc => doc.data());
+      try {
+        const q = query(
+          collection(db, 'leaves'), 
+          where('userId', '==', emp.uid),
+          where('companyId', '==', userData?.companyId || '')
+        );
+        const snap = await getDocs(q);
+        leaves = snap.docs.map(doc => doc.data());
+      } catch (err) {
+        console.error("Failed to fetch leaves for dashboard:", err);
+      }
     }
 
     setSelectedEmpRecords({ emp, records: [], leaves });
