@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, collection, where, limit, getDocs, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, query, collection, where, limit, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'SUB_ADMIN' | 'MEMBER';
@@ -111,81 +111,66 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   initAuth: () => {
+    let unsubscribeProfile: (() => void) | null = null;
+
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out");
       
-      if (user) {
-        const isSuperAdmin = user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
-        set({ user, loading: true });
-        
-        try {
-          const profileDoc = await getDoc(doc(db, 'UserProfile', user.uid));
-          let currentData: UserData | null = profileDoc.exists() ? (profileDoc.data() as UserData) : null;
+      // 기존 프로필 구독 해제
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
 
-          // 임시 문서(temp) 마이그레이션 로직 유지
+      if (user) {
+        set({ user, loading: true });
+        const isSuperAdmin = user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+        
+        // 프로필 실시간 감시 시작
+        unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
+          let currentData: UserData | null = profileSnap.exists() ? (profileSnap.data() as UserData) : null;
+
+          // 1. 임시 문서(temp) 마이그레이션 로직 (최초 로그인 시 1회성)
           if (!currentData && user.email) {
-            console.log("[Auth] UID document not found. Searching by email for temporary profile...");
+            console.log("[Auth] UID document not found. Checking by email for temporary profile...");
             const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
             const fallbackSnap = await getDocs(q);
             
             if (!fallbackSnap.empty) {
               const tempDoc = fallbackSnap.docs[0];
               const tempData = tempDoc.data() as UserData;
-              console.log("[Auth] Temporary profile found:", tempData.name);
-              
-              currentData = {
-                ...tempData,
-                uid: user.uid,
-                mustChangePassword: true
-              };
-
+              currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
               await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-              console.log("[Auth] Migrated temporary doc to permanent UID doc.");
-              
               if (tempDoc.id.startsWith('temp_')) {
-                try {
-                  await deleteDoc(tempDoc.ref);
-                  console.log("[Auth] Old temporary document deleted.");
-                } catch (delErr) {
-                  console.warn("[Auth] Failed to delete temp doc (likely rules):", delErr);
-                }
+                try { await deleteDoc(tempDoc.ref); } catch (e) {}
               }
             }
           }
-          
-          // [SUPER_ADMIN 권한 자동 보장] bizpeer@gmail.com은 항상 SUPER_ADMIN
-          if (isSuperAdmin) {
-            if (!currentData || currentData.role !== 'SUPER_ADMIN') {
-              currentData = {
-                uid: user.uid,
-                email: SUPER_ADMIN_EMAIL,
-                name: currentData?.name || '플랫폼 관리자',
-                role: 'SUPER_ADMIN',
-                companyId: 'PLATFORM',
-                mustChangePassword: false,
-                teamHistory: currentData?.teamHistory || [],
-                teamId: '',
-                divisionId: ''
-              };
-              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-              console.log("[Auth] SUPER_ADMIN profile ensured.");
-            }
-          }
-          
-          // [역할 정규화] gemini.md 기준: SUPER_ADMIN | ADMIN | SUB_ADMIN | MEMBER
-          // DB에 구버전 역할명(EMPLOYEE 등)이 있을 경우 MEMBER로 자동 정규화
-          if (currentData && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
-            console.warn(`[Auth] Unknown role '${currentData.role}' detected, normalizing to 'MEMBER'`);
-            currentData = { ...currentData, role: 'MEMBER' };
-            // DB도 동기화하여 일관성 유지
-            try {
-              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-              console.log(`[Auth] Role normalized and saved to weberp DB.`);
-            } catch (e) {
-              console.warn('[Auth] Failed to save normalized role:', e);
-            }
+
+          // 2. [SUPER_ADMIN 권한 자동 보장] bizpeer@gmail.com은 항상 SUPER_ADMIN
+          if (isSuperAdmin && (!currentData || currentData.role !== 'SUPER_ADMIN')) {
+            currentData = {
+              uid: user.uid,
+              email: SUPER_ADMIN_EMAIL,
+              name: currentData?.name || '플랫폼 관리자',
+              role: 'SUPER_ADMIN',
+              companyId: 'PLATFORM',
+              mustChangePassword: false,
+              teamHistory: currentData?.teamHistory || [],
+              teamId: '',
+              divisionId: ''
+            };
+            await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+            console.log("[Auth] SUPER_ADMIN profile ensured.");
           }
 
+          // 3. [역할 정규화]
+          if (currentData && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
+            currentData = { ...currentData, role: 'MEMBER' };
+            try { await setDoc(doc(db, 'UserProfile', user.uid), currentData); } catch (e) {}
+          }
+
+          // 4. 퇴직/업무정지 상태 확인
           if (currentData?.status === 'RESIGNED') {
             await auth.signOut();
             set({ user: null, userData: null, loading: false });
@@ -193,38 +178,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
 
-          // 회사 정보 로드
+          // 5. 회사 도메인 정보 로드
           if (currentData?.companyId && currentData.companyId !== 'PLATFORM') {
             await get().fetchCompanyDomain(currentData.companyId);
           }
-          
-          // [최종 데이터 검증] 유저는 있으나 프로필 데이터가 없는 경우 (예: 회사 데이터 삭제 시)
-          // 무한 리디렉션 방지를 위해 자동 로그아웃 처리
-          if (!currentData && !isSuperAdmin) {
-            console.warn("[Auth] No Profile found for persistent session. Forcing logout to prevent redirect loops.");
-            await auth.signOut();
-            set({ user: null, userData: null, loading: false });
-            return;
-          }
 
+          // 최종 상태 반영
           set({ 
             userData: currentData, 
             loading: false,
             isLoginModalOpen: (currentData?.mustChangePassword && !isSuperAdmin) || false 
           });
-          if (currentData?.mustChangePassword && !isSuperAdmin) {
-            console.log("[Auth] Password change REQUIRED for normal user. Opening modal.");
-          }
-          console.log("[Auth] Final UserData:", currentData);
-        } catch (error) {
-          console.error("[Auth] Error fetching doc:", error);
-          set({ userData: null, loading: false });
-        }
+          console.log("[Auth] UserData Updated (Reactive):", currentData?.role);
+        }, (err) => {
+          console.error("[Auth] Profile Subscription Error:", err);
+          set({ loading: false });
+        });
+
       } else {
         set({ user: null, userData: null, companyData: null, loading: false });
       }
     });
 
-    return unsubscribeAuth;
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
   }
 }));
