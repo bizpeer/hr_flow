@@ -34,7 +34,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [backendStatus, setBackendStatus] = useState<{ version: string; deployedAt: string } | null>(null);
   const [isUploadingTaxTable, setIsUploadingTaxTable] = useState(false);
-  const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number } | null>(null);
+  const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number; fileName?: string } | null>(null);
 
   useEffect(() => {
     checkBackend();
@@ -81,7 +81,11 @@ export const SuperAdminDashboard: React.FC = () => {
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        setTaxTableInfo({ updateDate: data.updateDate, count: data.brackets?.length || 0 });
+        setTaxTableInfo({ 
+          updateDate: data.updateDate, 
+          count: data.brackets?.length || 0,
+          fileName: data.fileName
+        });
       }
     });
 
@@ -166,42 +170,79 @@ export const SuperAdminDashboard: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!window.confirm(`'${file.name}' 파일로 세액표를 업데이트하시겠습니까?\n이 작업은 즉시 모든 직원의 급여산출에 반영됩니다.`)) {
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingTaxTable(true);
+    
+    // 헬퍼 함수: 값 파싱
+    const parseValue = (val: any) => {
+      if (val === '-' || val === null || val === undefined) return 0;
+      if (typeof val === 'string') return parseInt(val.replace(/,/g, ''), 10) || 0;
+      return val;
+    };
+
     try {
       const reader = new FileReader();
       reader.onload = async (event) => {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // 시트 확인 (소득령 별표2 또는 근로소득간이세액표)
-        const sheetName = workbook.SheetNames.find(n => n.includes('세액표')) || workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        try {
+          const data = new Uint8Array(event.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const allBrackets: any[] = [];
 
-        // 데이터 시작점 찾기 (보통 5행 이후 수치 데이터)
-        const brackets = rows.slice(4)
-          .filter(row => row[0] !== undefined && typeof row[0] === 'number')
-          .map(row => ({
-            min: Number(row[0]),
-            max: Number(row[1]),
-            taxes: row.slice(2).map(v => (v === '-' || v === undefined) ? 0 : Number(v))
-          }));
+          // 처음 2개 시트 처리 (요청 사항: 엑셀 파일 내 sheet 2개 분석)
+          for (let i = 0; i < Math.min(2, workbook.SheetNames.length); i++) {
+            const sheetName = workbook.SheetNames[i];
+            const sheet = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+            
+            for (const row of rows) {
+              const min = parseValue(row[0]);
+              const max = parseValue(row[1]);
+              
+              // 숫자인 유효한 구간 데이터만 추출 (770원 이상)
+              if (typeof min === 'number' && min >= 770 && (max > min || max === 0)) {
+                const taxes = [];
+                for (let j = 2; j <= 12; j++) {
+                  taxes.push(parseValue(row[j]));
+                }
+                allBrackets.push({ min, max: max || null, taxes });
+              }
+            }
+          }
 
-        if (brackets.length === 0) throw new Error('유효한 세액표 데이터를 찾을 수 없습니다. 시트 구성과 급여 구간을 확인하세요.');
+          // 중복 제거 및 정렬
+          const sortedBrackets = allBrackets.sort((a, b) => a.min - b.min);
 
-        await setDoc(doc(db, 'system_config', 'tax_table'), {
-          updateDate: new Date().toISOString().split('T')[0],
-          brackets
-        });
+          if (sortedBrackets.length === 0) {
+            throw new Error('유효한 세액표 데이터를 찾을 수 없습니다. 엑셀 서식을 확인하세요.');
+          }
 
-        alert(`[성공] ${brackets.length}개의 급여 구간 데이터가 업로드되었습니다.`);
+          // Firestore 업데이트
+          await setDoc(doc(db, 'system_config', 'tax_table'), {
+            updateDate: new Date().toISOString().split('T')[0],
+            fileName: file.name, // 파일명 저장
+            brackets: sortedBrackets
+          });
+
+          alert(`[성공] ${file.name} 파일 업로드 완료!\n총 ${sortedBrackets.length}개의 급여 구간이 반영되었습니다.`);
+        } catch (innerErr: any) {
+          alert('데이터 처리 오류: ' + innerErr.message);
+        } finally {
+          setIsUploadingTaxTable(false);
+          e.target.value = '';
+        }
+      };
+      reader.onerror = () => {
+        alert('파일 읽기 오류가 발생했습니다.');
+        setIsUploadingTaxTable(false);
       };
       reader.readAsArrayBuffer(file);
     } catch (err: any) {
       alert('세액표 업로드 실패: ' + err.message);
-    } finally {
       setIsUploadingTaxTable(false);
-      e.target.value = '';
     }
   };
 
@@ -304,6 +345,12 @@ export const SuperAdminDashboard: React.FC = () => {
                   <span className="text-xs font-bold text-indigo-300 bg-indigo-500/20 px-3 py-1 rounded-full border border-indigo-500/30">
                     현재 버전: {taxTableInfo?.updateDate || '미등록'}
                   </span>
+                  {taxTableInfo?.fileName && (
+                    <span className="text-[10px] font-black text-indigo-400/80 bg-white/5 px-2 py-1 rounded-lg border border-white/10 flex items-center gap-1.5">
+                      <Briefcase className="w-2.5 h-2.5" />
+                      적용 파일: {taxTableInfo.fileName}
+                    </span>
+                  )}
                   <span className="text-xs font-bold text-slate-400">
                     데이터 수: {taxTableInfo?.count || 0}개 구간
                   </span>
