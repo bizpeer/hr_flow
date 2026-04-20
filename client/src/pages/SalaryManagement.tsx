@@ -23,12 +23,7 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTa
   const children = emp.childrenUnder20 || 0;
   const nonTaxable = emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT;
 
-  let monthlyGross = 0;
-  if (type === 'ANNUAL') {
-    monthlyGross = isSeveranceIncluded ? Math.floor(salary / 13) : Math.floor(salary / 12);
-  } else {
-    monthlyGross = salary;
-  }
+  const monthlyGross = isSeveranceIncluded ? Math.floor(salary / 13) : Math.floor(salary / 12);
 
   const taxableIncome = Math.max(0, monthlyGross - nonTaxable);
 
@@ -424,7 +419,7 @@ export const SalaryManagement: React.FC = () => {
                              <td className="px-8 py-6">
                                 {res ? (
                                    <div className="space-y-1 py-1">
-                                      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 inline-block px-2 py-0.5 rounded-full mb-2">Estimated Net</div>
+                                      <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-50 inline-block px-2 py-0.5 rounded-full mb-2">Estimated Monthly Net</div>
                                       <div className="text-2xl font-black text-slate-900 leading-none">{res.netPay.toLocaleString()} <span className="text-xs font-bold text-slate-400">원</span></div>
                                       <div className="text-[10px] font-bold text-slate-400 mt-2">월 지급액: {res.monthlyGross.toLocaleString()}원</div>
                                    </div>
@@ -500,7 +495,7 @@ export const SalaryManagement: React.FC = () => {
                         </div>
                       </div>
                       <div className="p-6 bg-indigo-600 text-white rounded-2xl shadow-xl ring-4 ring-indigo-50 print:bg-slate-100 print:text-black print:ring-0 print:border-2 print:border-black">
-                        <div className="text-[10px] font-black text-indigo-200 uppercase mb-2 print:text-[10pt] print:text-black">최종 실수령 예상액 (Net)</div>
+                        <div className="text-[10px] font-black text-indigo-200 uppercase mb-2 print:text-[10pt] print:text-black">월 예상 실수령액 (Monthly Net)</div>
                         <div className="text-3xl font-black">{res.netPay.toLocaleString()}원</div>
                       </div>
                     </div>
