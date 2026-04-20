@@ -137,28 +137,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             let currentData: UserData | null = profileSnap.exists() ? (data as UserData) : null;
 
             // 1. 데이터가 아직 불완전한 경우 (예: 가입 중 가입 정보 누락)
-            // role 필드가 없으면 아직 세팅 중인 것으로 간주하고 로딩 유지
             if (currentData && !currentData.role && !isSuperAdmin) {
               console.log("[Auth] Profile exists but incomplete (no role). Waiting...");
               return; 
             }
 
-            // 2. 임시 문서(temp) 마이그레이션 로직
-            if (!currentData && user.email) {
-              const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
-              const fallbackSnap = await getDocs(q);
-              if (!fallbackSnap.empty) {
-                const tempDoc = fallbackSnap.docs[0];
-                const tempData = tempDoc.data() as UserData;
-                currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
-                await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-                if (tempDoc.id.startsWith('temp_')) {
-                  try { await deleteDoc(tempDoc.ref); } catch (e) {}
+            // 2. 임시 문서(temp) 마이그레이션 및 미생성 프로필 대기 로직
+            if (!currentData && !isSuperAdmin) {
+              if (user.email) {
+                try {
+                  const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
+                  const fallbackSnap = await getDocs(q);
+                  if (!fallbackSnap.empty) {
+                    const tempDoc = fallbackSnap.docs[0];
+                    const tempData = tempDoc.data() as UserData;
+                    currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
+                    await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+                    if (tempDoc.id.startsWith('temp_')) {
+                      try { await deleteDoc(tempDoc.ref); } catch (e) {}
+                    }
+                    console.log("[Auth] Temp profile migrated.");
+                    return; // setDoc will trigger onSnapshot again
+                  }
+                } catch (err) {
+                  console.error("[Auth] Fallback query error:", err);
                 }
               }
+              // [중요 가드] fallback도 없고 currentData도 없는 경우 -> 가입 직후 프로필 생성 전!
+              console.log("[Auth] Profile document not found yet. Waiting for register completion...");
+              return; // 프로필이 생성될 때까지 로딩 유지
             }
 
-            // 3. SUPER_ADMIN 보장 (변경 있을 때만 setDoc)
+            // 3. SUPER_ADMIN 보장
             if (isSuperAdmin) {
               const needsUpdate = !currentData || currentData.role !== 'SUPER_ADMIN' || currentData.companyId !== 'PLATFORM';
               if (needsUpdate) {
