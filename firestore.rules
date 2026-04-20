@@ -158,9 +158,9 @@ service cloud.firestore {
       allow write: if isAdmin() || isSuperAdmin();
     }
 
-    // 전역 시스템 설정 (system_config) - 세액표 등
+    // 전역 시스템 설정 (system_config) - 세액표 등 (공개 데이터로 취급하여 권한 오류 방지)
     match /system_config/{configId} {
-      allow read: if isAuthenticated();
+      allow read: if true;
       allow write: if isSuperAdmin();
     }
 
