@@ -198,6 +198,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             await get().fetchCompanyDomain(currentData.companyId);
           }
           
+          // [최종 데이터 검증] 유저는 있으나 프로필 데이터가 없는 경우 (예: 회사 데이터 삭제 시)
+          // 무한 리디렉션 방지를 위해 자동 로그아웃 처리
+          if (!currentData && !isSuperAdmin) {
+            console.warn("[Auth] No Profile found for persistent session. Forcing logout to prevent redirect loops.");
+            await auth.signOut();
+            set({ user: null, userData: null, loading: false });
+            return;
+          }
+
           set({ 
             userData: currentData, 
             loading: false,

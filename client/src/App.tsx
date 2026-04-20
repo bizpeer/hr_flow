@@ -40,7 +40,8 @@ function App() {
       <LoginModal />
       <Routes>
         <Route path="/" element={
-          !user ? <LandingPage /> : <Navigate to={userData?.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace />
+          !user ? <LandingPage /> : 
+          (userData ? <Navigate to={userData.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace /> : <LoadingSplash />)
         } />
         <Route path="/login" element={
           user ? <Navigate to={userData?.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace /> : <Login />
@@ -82,26 +83,26 @@ function App() {
                 <div className="max-w-7xl mx-auto min-h-full">
                   <Routes>
                     {/* SUPER_ADMIN 전용 */}
-                    <Route path="/super-admin" element={<ProtectedRoute requireSuperAdmin><SuperAdminDashboard /></ProtectedRoute>} />
+                    <Route path="super-admin" element={<ProtectedRoute requireSuperAdmin><SuperAdminDashboard /></ProtectedRoute>} />
 
                     {/* 일반 사용자 */}
-                    <Route path="/" element={
+                    <Route path="" element={
                       userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
                     } />
-                    <Route path="/dashboard" element={
+                    <Route path="dashboard" element={
                       userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
                     } />
                     
-                    <Route path="/leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
-                    <Route path="/expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                    <Route path="/board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+                    <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
+                    <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                    <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
-                    <Route path="/admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                    <Route path="/admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
-                    <Route path="/admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                    <Route path="/admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
-                    <Route path="/admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                    <Route path="/admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
+                    <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
+                    <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
+                    <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
+                    <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
+                    <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
+                    <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
 
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>
