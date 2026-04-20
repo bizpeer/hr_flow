@@ -165,7 +165,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               }
               // [중요 가드] fallback도 없고 currentData도 없는 경우 -> 가입 직후 프로필 생성 전!
               console.log("[Auth] Profile document not found yet. Waiting for register completion...");
-              return; // 프로필이 생성될 때까지 로딩 유지
+              
+              // [해결] 찌꺼기 계정 방어 로직 (DB Profile 누락된 고스트 세션)
+              // 3초 대기 후에도 userData가 채워지지 않으면 무한 로딩을 막기 위해 강제 로그아웃
+              setTimeout(() => {
+                if (get().loading && !get().userData) {
+                  console.log("[Auth] ERROR: No profile found after timeout. Forcing sign out.");
+                  auth.signOut();
+                }
+              }, 3000);
+
+              return; // 프로필이 정상적으로 생성될 때까지 즉각적인 렌더링을 지연시킴
             }
 
             // 3. SUPER_ADMIN 보장
