@@ -48,7 +48,6 @@ interface AuditLog {
 export const OrganizationAdmin: React.FC = () => {
   const { userData, companyData, systemDomain, getDisplayEmail } = useAuthStore();
   const navigate = useNavigate();
-  const isMasterAdmin = userData?.role === 'ADMIN';
 
   const [divisions, setDivisions] = useState<Division[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -416,9 +415,9 @@ export const OrganizationAdmin: React.FC = () => {
               <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
                 <Users className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">전사 조직 관리 시스템</h1>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">조직관리 시스템</h1>
             </div>
-            <p className="text-slate-500 font-medium">본부 및 팀의 구조를 설계하고 인사 정보를 통합 관리합니다.</p>
+            <p className="text-slate-500 font-medium">본부 및 팀의 구조를 설계, 구성원 권한 / 보안설정을 변경합니다.</p>
           </div>
 
           <div className="flex items-center gap-3">
@@ -450,31 +449,6 @@ export const OrganizationAdmin: React.FC = () => {
           </div>
         </div>
 
-        {isMasterAdmin && (
-          <div className="w-full bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/10 rounded-full -mr-32 -mt-32 blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-              <div className="flex items-center gap-6">
-                <div className="p-4 bg-indigo-500/10 rounded-3xl border border-indigo-500/20">
-                  <ShieldCheck className="w-8 h-8 text-indigo-400" />
-                </div>
-                <div>
-                  <h3 className="text-white font-black text-xl flex items-center gap-2 tracking-tight">시스템 마스터 제어판</h3>
-                  <p className="text-slate-400 text-sm font-medium mt-1">부관리자 임명 및 시스템 전역 보안 설정을 관리할 수 있습니다.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setShowLogDeleteConfirm(true)}
-                  className="bg-rose-500/10 text-rose-400 px-6 py-3.5 rounded-2xl border border-rose-500/20 font-black hover:bg-rose-500 hover:text-white transition-all text-xs flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  전체 이력 삭제
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 이력 검색 결과 섹션 */}
         {logSearchResults && (

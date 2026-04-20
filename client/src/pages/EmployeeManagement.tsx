@@ -12,6 +12,7 @@ import { auth, db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
+import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 
 interface Employee {
   uid: string;
@@ -26,6 +27,7 @@ interface Employee {
   phone?: string;
   address?: string;
   personalEmail?: string;
+  additionalLeave?: number;
 }
 
 interface AttendanceRecord {
@@ -48,13 +50,13 @@ export const EmployeeManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modals
-  const [selectedEmpRecords, setSelectedEmpRecords] = useState<{emp: Employee, records: AttendanceRecord[]} | null>(null);
+  const [selectedEmpRecords, setSelectedEmpRecords] = useState<{emp: Employee, records: AttendanceRecord[], leaves: any[]} | null>(null);
   const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<Employee | null>(null);
   const [adminPassword, setAdminPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Personnel Info
-  const [editingInfo, setEditingInfo] = useState({ rrn: '', address: '', phone: '', personalEmail: '' });
+  const [editingInfo, setEditingInfo] = useState({ rrn: '', address: '', phone: '', personalEmail: '', additionalLeave: 0 });
   const [isSaving, setIsSaving] = useState(false);
   const isAdmin = userData?.role === 'ADMIN';
 
@@ -118,9 +120,18 @@ export const EmployeeManagement: React.FC = () => {
       rrn: emp.rrn || '',
       address: emp.address || '',
       phone: emp.phone || '',
-      personalEmail: emp.personalEmail || ''
+      personalEmail: emp.personalEmail || '',
+      additionalLeave: emp.additionalLeave || 0
     });
-    setSelectedEmpRecords({ emp, records: [] });
+    
+    let leaves: any[] = [];
+    if (emp.uid) {
+      const q = query(collection(db, 'leaves'), where('userId', '==', emp.uid));
+      const snap = await getDocs(q);
+      leaves = snap.docs.map(doc => doc.data());
+    }
+
+    setSelectedEmpRecords({ emp, records: [], leaves });
   };
 
   const handleSavePersonalInfo = async () => {
@@ -433,6 +444,36 @@ export const EmployeeManagement: React.FC = () => {
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{selectedEmpRecords.emp.name}님의 상세 정보</h2>
               </div>
+              
+              {/* Leave Dashboard Widget */}
+              <div className="flex bg-slate-50 border border-slate-100 rounded-2xl p-2 gap-2 shadow-sm">
+                 {(() => {
+                   const baseLeave = selectedEmpRecords.emp.joinDate ? calculateLeaveEntitlement(new Date(selectedEmpRecords.emp.joinDate)) : 0;
+                   const totalLeave = baseLeave + (selectedEmpRecords.emp.additionalLeave || 0);
+                   const usedLeave = selectedEmpRecords.leaves
+                     .filter(req => req.status === 'APPROVED' && (req.type === 'annual' || req.type === 'half'))
+                     .reduce((sum, req) => sum + (req.requestDays || 0), 0);
+                   const remainingLeave = totalLeave - usedLeave;
+
+                   return (
+                     <>
+                       <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-50 min-w-[70px]">
+                         <span className="text-[9px] font-black text-slate-400">총 발생</span>
+                         <span className="text-lg font-black text-slate-700">{totalLeave}</span>
+                       </div>
+                       <div className="flex flex-col items-center justify-center px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-50 min-w-[70px]">
+                         <span className="text-[9px] font-black text-slate-400">사용</span>
+                         <span className="text-lg font-black text-rose-500">{usedLeave}</span>
+                       </div>
+                       <div className="flex flex-col items-center justify-center px-4 py-2 bg-indigo-600 rounded-xl shadow-md min-w-[70px]">
+                         <span className="text-[9px] font-black text-indigo-200">잔여</span>
+                         <span className="text-lg font-black text-white">{remainingLeave}</span>
+                       </div>
+                     </>
+                   );
+                 })()}
+              </div>
+
               <button onClick={() => setSelectedEmpRecords(null)} className="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"><X className="w-6 h-6" /></button>
             </div>
 
@@ -473,9 +514,9 @@ export const EmployeeManagement: React.FC = () => {
                         />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">거주지 주소</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">상세 주소</label>
                         <textarea 
-                          rows={3}
+                          rows={2}
                           value={editingInfo.address}
                           onChange={(e) => setEditingInfo({...editingInfo, address: e.target.value})}
                           disabled={!isAdmin}
@@ -483,6 +524,24 @@ export const EmployeeManagement: React.FC = () => {
                           className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-60 resize-none"
                         />
                     </div>
+                    {isAdmin && (
+                      <div className="space-y-2 md:col-span-2">
+                        <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">추가 연차 부여 (일수)</label>
+                        <div className="flex items-center gap-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                          <input 
+                            type="number"
+                            value={editingInfo.additionalLeave}
+                            onChange={(e) => setEditingInfo({...editingInfo, additionalLeave: Number(e.target.value)})}
+                            className="w-24 px-4 py-2 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 font-black text-center text-indigo-700"
+                            min="0"
+                            step="0.5"
+                          />
+                          <p className="text-xs font-bold text-slate-500 flex-1">
+                            근속연수에 따른 기본 연차 외에, <br/>포상 휴가 등 추가 연차를 부여할 수 있습니다.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {isAdmin && (
