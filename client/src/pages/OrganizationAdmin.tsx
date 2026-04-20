@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  PlusCircle, Users, UserPlus, 
+  PlusCircle, Users, UserPlus, Loader2,
   Trash2, Building, X, Search, ChevronRight, Briefcase, ShieldCheck, History
 } from 'lucide-react';
 import { 
@@ -69,6 +69,7 @@ export const OrganizationAdmin: React.FC = () => {
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', password: '', joinDate: new Date().toISOString().split('T')[0] });
+  const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
 
   // 정보 수정용 (임명/이동)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -182,6 +183,7 @@ export const OrganizationAdmin: React.FC = () => {
     }
 
     try {
+      setIsSubmittingEmployee(true);
       const loginInput = newEmp.email.trim().toLowerCase();
       const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${systemDomain}`;
 
@@ -216,6 +218,8 @@ export const OrganizationAdmin: React.FC = () => {
     } catch (err: any) {
       console.error("Employee Registration Error:", err);
       alert("직원 등록 실패: " + (err.message || String(err)));
+    } finally {
+      setIsSubmittingEmployee(false);
     }
   };
 
@@ -701,7 +705,18 @@ export const OrganizationAdmin: React.FC = () => {
                   {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                 </select>
               </div>
-              <button type="submit" className="w-full p-5 text-white bg-indigo-600 rounded-[1.5rem] font-black">등록 완료</button>
+              <button 
+                type="submit" 
+                disabled={isSubmittingEmployee}
+                className="w-full h-[60px] flex items-center justify-center gap-2 text-white bg-indigo-600 rounded-[1.5rem] font-black hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-70 shadow-lg shadow-indigo-600/30"
+              >
+                {isSubmittingEmployee ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    등록 처리 중...
+                  </>
+                ) : '등록 완료'}
+              </button>
               <button type="button" onClick={() => setShowEmployeeModal(false)} className="w-full p-4 text-slate-400 font-bold">취소</button>
             </form>
           </div>
