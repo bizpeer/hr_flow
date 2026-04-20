@@ -87,9 +87,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
           /* 일반 사용자 메뉴 */
           <>
             <NavItem to="/dashboard" icon={Home} label="대시보드" />
-            <NavItem to="/leave" icon={CalendarClock} label="내 휴가 및 근태" />
+            <NavItem to="/leave" icon={CalendarClock} label="휴가신청" />
             <NavItem to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
-            <NavItem to="/board" icon={BookOpen} label="공지사항 게시판" colorClass="rose" />
+            <NavItem to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
 
             {isManagement && (
               <div className="pt-8 pb-3 px-4">
@@ -99,8 +99,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
 
             {isManagement && <NavItem to="/admin/approvals" icon={CheckSquare} label="결재/승인 관리함" />}
             {isDirector && <NavItem to="/admin/organization" icon={Network} label="조직관리" />}
-            {isDirector && <NavItem to="/admin/salary" icon={Banknote} label="급여 및 연봉 관리" colorClass="indigo" />}
-            {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 통합 조회" colorClass="emerald" />}
+            {isDirector && <NavItem to="/admin/salary" icon={Banknote} label="급여관리" colorClass="indigo" />}
+            {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
             {isDirector && <NavItem to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
             {isDirector && <NavItem to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
           </>

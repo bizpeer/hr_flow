@@ -144,11 +144,32 @@ export const OrganizationAdmin: React.FC = () => {
     }
   };
 
+  // 중복 제거된 직원 목록 (이메일 기준, 가장 높은 권한 우선)
+  const dedupedEmployees = React.useMemo(() => {
+    const grouped = employees.reduce((acc, emp) => {
+      const email = emp.email?.toLowerCase().trim();
+      if (!email) return acc;
+      
+      if (!acc[email]) {
+        acc[email] = emp;
+      } else {
+        const roleOrder: Record<string, number> = { 'ADMIN': 3, 'SUB_ADMIN': 2, 'MEMBER': 1 };
+        const currentPrio = roleOrder[acc[email].role] || 0;
+        const newPrio = roleOrder[emp.role] || 0;
+        if (newPrio > currentPrio) {
+          acc[email] = emp;
+        }
+      }
+      return acc;
+    }, {} as Record<string, Employee>);
+    return Object.values(grouped).sort((a, b) => a.name.localeCompare(b.name));
+  }, [employees]);
+
+  const unassignedEmployees = dedupedEmployees.filter(emp => !emp.teamId || emp.teamId === '');
+
   const filteredTeams = selectedDivision
     ? teams.filter((team) => team.divisionId === selectedDivision)
     : teams;
-
-  const unassignedEmployees = employees.filter(emp => !emp.teamId || emp.teamId === '');
 
   const handleCreateDivision = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,7 +391,7 @@ export const OrganizationAdmin: React.FC = () => {
   };
 
   const getEmployeesInTeam = (teamId: string) => {
-    return employees.filter(emp => emp.teamId === teamId);
+    return dedupedEmployees.filter(emp => emp.teamId === teamId);
   }
 
   if (loading) {
@@ -570,7 +591,7 @@ export const OrganizationAdmin: React.FC = () => {
                             onChange={(e) => handleAppointHead(div.id, e.target.value)}
                           >
                             <option value="" className="text-slate-900">미임명</option>
-                            {employees.map(emp => <option key={emp.uid} value={emp.uid} className="text-slate-900">{emp.name} ({getDisplayEmail(emp.email)})</option>)}
+                            {dedupedEmployees.map(emp => <option key={emp.uid} value={emp.uid} className="text-slate-900">{emp.name} ({getDisplayEmail(emp.email)})</option>)}
                           </select>
                           <ChevronRight className="w-4 h-4 text-slate-300" />
                        </div>
