@@ -387,10 +387,10 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
               </div>
 
               <div className="space-y-2">
-                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">PDF 문서 첨부</label>
+                 <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">문서 및 이미지 첨부</label>
                  <div className="relative group/upload">
                    <input 
-                    type="file" accept=".pdf" 
+                    type="file" accept=".pdf,image/*" 
                     onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                     className="hidden" id="notice-file-upload"
                    />
@@ -412,8 +412,8 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
                         <>
                           <UploadCloud className="w-10 h-10 text-slate-300 group-hover/upload:text-indigo-400 transition-colors" />
                           <div className="text-center">
-                            <p className="text-sm font-black text-slate-500">클릭하여 PDF 파일을 업로드하세요</p>
-                            <p className="text-[10px] text-slate-400 font-bold">최대 10MB / PDF 파일만 허용</p>
+                            <p className="text-sm font-black text-slate-500">클릭하여 파일을 업로드하세요</p>
+                            <p className="text-[10px] text-slate-400 font-bold">최대 10MB / PDF 및 이미지 파일 허용</p>
                           </div>
                         </>
                       )}
