@@ -110,99 +110,122 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  initAuth: () => {
+  initAuth: (() => {
+    let initialized = false;
+    let unsubscribeAuth: (() => void) | null = null;
     let unsubscribeProfile: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out");
-      
-      // 기존 프로필 구독 해제
-      if (unsubscribeProfile) {
-        unsubscribeProfile();
-        unsubscribeProfile = null;
-      }
+    return () => {
+      // 이미 초기화된 경우 중복 실행 방지
+      if (initialized) return () => {};
+      initialized = true;
 
-      if (user) {
-        set({ user, loading: true });
-        const isSuperAdmin = user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+      unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+        console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out");
         
-        // 프로필 실시간 감시 시작
-        unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
-          let currentData: UserData | null = profileSnap.exists() ? (profileSnap.data() as UserData) : null;
+        if (unsubscribeProfile) {
+          unsubscribeProfile();
+          unsubscribeProfile = null;
+        }
 
-          // 1. 임시 문서(temp) 마이그레이션 로직 (최초 로그인 시 1회성)
-          if (!currentData && user.email) {
-            console.log("[Auth] UID document not found. Checking by email for temporary profile...");
-            const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
-            const fallbackSnap = await getDocs(q);
-            
-            if (!fallbackSnap.empty) {
-              const tempDoc = fallbackSnap.docs[0];
-              const tempData = tempDoc.data() as UserData;
-              currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
-              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-              if (tempDoc.id.startsWith('temp_')) {
-                try { await deleteDoc(tempDoc.ref); } catch (e) {}
+        if (user) {
+          set({ user, loading: true });
+          const isSuperAdmin = user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+          
+          unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
+            const data = profileSnap.data();
+            let currentData: UserData | null = profileSnap.exists() ? (data as UserData) : null;
+
+            // 1. 데이터가 아직 불완전한 경우 (예: 가입 중 가입 정보 누락)
+            // role 필드가 없으면 아직 세팅 중인 것으로 간주하고 로딩 유지
+            if (currentData && !currentData.role && !isSuperAdmin) {
+              console.log("[Auth] Profile exists but incomplete (no role). Waiting...");
+              return; 
+            }
+
+            // 2. 임시 문서(temp) 마이그레이션 로직
+            if (!currentData && user.email) {
+              const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
+              const fallbackSnap = await getDocs(q);
+              if (!fallbackSnap.empty) {
+                const tempDoc = fallbackSnap.docs[0];
+                const tempData = tempDoc.data() as UserData;
+                currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
+                await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+                if (tempDoc.id.startsWith('temp_')) {
+                  try { await deleteDoc(tempDoc.ref); } catch (e) {}
+                }
               }
             }
-          }
 
-          // 2. [SUPER_ADMIN 권한 자동 보장] bizpeer@gmail.com은 항상 SUPER_ADMIN
-          if (isSuperAdmin && (!currentData || currentData.role !== 'SUPER_ADMIN')) {
-            currentData = {
-              uid: user.uid,
-              email: SUPER_ADMIN_EMAIL,
-              name: currentData?.name || '플랫폼 관리자',
-              role: 'SUPER_ADMIN',
-              companyId: 'PLATFORM',
-              mustChangePassword: false,
-              teamHistory: currentData?.teamHistory || [],
-              teamId: '',
-              divisionId: ''
-            };
-            await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-            console.log("[Auth] SUPER_ADMIN profile ensured.");
-          }
+            // 3. SUPER_ADMIN 보장 (변경 있을 때만 setDoc)
+            if (isSuperAdmin) {
+              const needsUpdate = !currentData || currentData.role !== 'SUPER_ADMIN' || currentData.companyId !== 'PLATFORM';
+              if (needsUpdate) {
+                currentData = {
+                  uid: user.uid,
+                  email: SUPER_ADMIN_EMAIL,
+                  name: currentData?.name || '플랫폼 관리자',
+                  role: 'SUPER_ADMIN',
+                  companyId: 'PLATFORM',
+                  mustChangePassword: false,
+                  teamHistory: currentData?.teamHistory || [],
+                  teamId: '',
+                  divisionId: ''
+                };
+                await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+                console.log("[Auth] SUPER_ADMIN profile updated.");
+              }
+            }
 
-          // 3. [역할 정규화]
-          if (currentData && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
-            currentData = { ...currentData, role: 'MEMBER' };
-            try { await setDoc(doc(db, 'UserProfile', user.uid), currentData); } catch (e) {}
-          }
+            // 4. 역할 정규화 (변경 있을 때만 setDoc)
+            if (currentData && currentData.role && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
+              currentData = { ...currentData, role: 'MEMBER' };
+              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+            }
 
-          // 4. 퇴직/업무정지 상태 확인
-          if (currentData?.status === 'RESIGNED') {
-            await auth.signOut();
-            set({ user: null, userData: null, loading: false });
-            alert("퇴사(업무정지) 처리된 계정입니다. 시스템에 접속할 수 없습니다.");
-            return;
-          }
+            // 5. 상태 확인
+            if (currentData?.status === 'RESIGNED') {
+              await auth.signOut();
+              set({ user: null, userData: null, loading: false });
+              alert("퇴사 처리된 계정입니다.");
+              return;
+            }
 
-          // 5. 회사 도메인 정보 로드
-          if (currentData?.companyId && currentData.companyId !== 'PLATFORM') {
-            await get().fetchCompanyDomain(currentData.companyId);
-          }
+            // 6. 회사 도메인 로드 (이미 로드된 상태면 건너뜀)
+            if (currentData?.companyId && currentData.companyId !== 'PLATFORM') {
+              const currentCompanyId = get().companyData?.id;
+              if (currentCompanyId !== currentData.companyId) {
+                await get().fetchCompanyDomain(currentData.companyId);
+              }
+            }
 
-          // 최종 상태 반영
-          set({ 
-            userData: currentData, 
-            loading: false,
-            isLoginModalOpen: (currentData?.mustChangePassword && !isSuperAdmin) || false 
+            // [최종 상태 업데이트] 데이터가 실제로 다를 때만 set() 호출하여 무한 렌더링 방지
+            const prevUserData = get().userData;
+            const isDifferent = JSON.stringify(prevUserData) !== JSON.stringify(currentData);
+            
+            if (isDifferent || get().loading) {
+              set({ 
+                userData: currentData, 
+                loading: false,
+                isLoginModalOpen: (currentData?.mustChangePassword && !isSuperAdmin) || false 
+              });
+              console.log("[Auth] UserData Updated (Loop-Safe):", currentData?.role);
+            }
+          }, (err) => {
+            console.error("[Auth] Snapshot Error:", err);
+            set({ loading: false });
           });
-          console.log("[Auth] UserData Updated (Reactive):", currentData?.role);
-        }, (err) => {
-          console.error("[Auth] Profile Subscription Error:", err);
-          set({ loading: false });
-        });
+        } else {
+          set({ user: null, userData: null, companyData: null, loading: false });
+        }
+      });
 
-      } else {
-        set({ user: null, userData: null, companyData: null, loading: false });
-      }
-    });
-
-    return () => {
-      unsubscribeAuth();
-      if (unsubscribeProfile) unsubscribeProfile();
+      return () => {
+        if (unsubscribeAuth) unsubscribeAuth();
+        if (unsubscribeProfile) unsubscribeProfile();
+        initialized = false; // 클린업 시 플래그 초기화
+      };
     };
-  }
+  })() as () => (() => void),
 }));
