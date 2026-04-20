@@ -623,34 +623,35 @@ export const SalaryManagement: React.FC = () => {
       {/* Details & Print Modal */}
       {selectedDetails && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 print:relative print:p-0 print:bg-white">
-          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none">
-            
-            {/* Modal Header */}
-            <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white print:bg-transparent print:text-black print:p-4 print:border-b-2 print:border-black">
-              <div className="flex items-center gap-3">
-                 <Calculator className="w-6 h-6 text-indigo-400 print:hidden" />
-                 <div>
-                    <h2 className="text-xl font-black tracking-tight">{selectedDetails.name}님 급여 산출 명세서</h2>
-                     <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">
-                        2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {editingData[selectedDetails.uid]?.dependents || 1}인 부양, 자식 {editingData[selectedDetails.uid]?.childrenUnder20 || 0}인)
-                        {res.metadata.fallbackUsed && (
-                          <span className="text-rose-500 ml-2 font-black">! 세액표 로드 실패로 정규 수식이 적용되었습니다.</span>
-                        )}
-                     </p>
-                 </div>
-              </div>
+          {(() => {
+            const draft = editingData[selectedDetails.uid] || {};
+            const res = calculateNetPay({ ...selectedDetails, currentVal: draft.annualSalary, ...draft }, taxTable);
+            if (!res) return null;
+
+            return (
+              <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none">
+                
+                {/* Modal Header */}
+                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white print:bg-transparent print:text-black print:p-4 print:border-b-2 print:border-black">
+                  <div className="flex items-center gap-3">
+                    <Calculator className="w-6 h-6 text-indigo-400 print:hidden" />
+                    <div>
+                        <h2 className="text-xl font-black tracking-tight">{selectedDetails.name}님 급여 산출 명세서</h2>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">
+                            2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {draft.dependents || 1}인 부양, 자식 {draft.childrenUnder20 || 0}인)
+                            {res.metadata.fallbackUsed && (
+                              <span className="text-rose-500 ml-2 font-black">! 세액표 로드 실패로 정규 수식이 적용되었습니다.</span>
+                            )}
+                        </p>
+                    </div>
+                  </div>
               <div className="flex items-center gap-2 print:hidden">
                  <button onClick={handlePrint} className="p-3 bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all"><Printer className="w-5 h-5" /></button>
                  <button onClick={() => setSelectedDetails(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><X className="w-5 h-5" /></button>
               </div>
             </div>
             
-            <div className="p-8 space-y-8 print:p-4 print:space-y-6">
-              {(() => {
-                const draft = editingData[selectedDetails.uid] || {};
-                const res = calculateNetPay({ ...selectedDetails, currentVal: draft.annualSalary, ...draft }, taxTable);
-                if (!res) return null;
-                return (
+                <div className="p-8 space-y-8 print:p-4 print:space-y-6">
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:border-2 print:border-slate-200">
@@ -747,15 +748,10 @@ export const SalaryManagement: React.FC = () => {
                        </div>
                     </div>
                   </>
-                );
-              })()}
-            </div>
-            
-            <div className="p-8 bg-slate-50 border-t border-slate-100 text-center print:hidden">
-               <button onClick={() => setSelectedDetails(null)} className="px-8 py-3 bg-slate-200 text-slate-600 font-black rounded-xl hover:bg-slate-300 transition-all">창 닫기</button>
-            </div>
-
-          </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
