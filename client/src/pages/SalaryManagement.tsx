@@ -15,6 +15,12 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTa
   const salary = emp.currentVal || emp.annualSalary || 0;
   if (salary <= 0) return null;
 
+  // 산출 정보 메타데이터 (디버깅 및 사용자 안내용)
+  const resMetadata = {
+    tableApplied: false,
+    fallbackUsed: false
+  };
+
   const type = emp.salaryType || 'ANNUAL';
   const isSeveranceIncluded = emp.isSeveranceIncluded || false;
   const dependents = emp.dependents || 1;
@@ -50,12 +56,16 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTa
   
   if (taxTable && taxTable.brackets && taxableIncome > 0) {
     const monthlyIncome = Math.floor(taxableIncome / 1000); // 세액표는 천원 단위 기준
-    const bracket = taxTable.brackets.find((b: any) => monthlyIncome >= b.min && monthlyIncome < b.max);
+    const bracket = taxTable.brackets.find((b: any) => 
+      monthlyIncome >= Number(b.min) && (b.max === null || monthlyIncome < Number(b.max))
+    );
     
     if (bracket) {
-      // dependents - 1 (컬럼 인덱스, 0: 1인, 1: 2인, 2: 3인...)
       const colIdx = Math.min(Math.max(0, dependents - 1), 10);
       incomeTax = bracket.taxes[colIdx] || 0;
+      
+      // 디버깅을 위한 내부 표기용 플래그 (세액표 적용 성공)
+      resMetadata.tableApplied = true;
       
       // 자녀 세액공제 반영 (2026.03.01 기준 반영)
       if (children > 0) {
@@ -81,6 +91,7 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTa
     else if (taxBase <= 4600000) incomeTax = Math.floor(taxBase * 0.06);
     else if (taxBase <= 8800000) incomeTax = Math.floor(taxBase * 0.15 - 108000);
     else incomeTax = Math.floor(taxBase * 0.24 - 522000);
+    resMetadata.fallbackUsed = true;
   }
 
   // 6. 지방소득세 (소득세의 10%)
@@ -104,7 +115,8 @@ const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTa
     dependents,
     children,
     isSeveranceIncluded,
-    salaryBasis: type
+    salaryBasis: type,
+    metadata: resMetadata
   };
 };
 
@@ -249,6 +261,12 @@ export const SalaryManagement: React.FC = () => {
 
   return (
     <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans print:p-0 print:bg-white overflow-hidden">
+      {!taxTable && (
+        <div className="max-w-7xl mx-auto mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-in slide-in-from-top duration-500">
+           <AlertCircle className="w-5 h-5 flex-shrink-0" />
+           <div className="text-[11px] font-black">세액표 데이터를 불러올 수 없습니다. 시스템 관리자에게 문의하세요. (현재 예비 산출 모드 작동 중)</div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto space-y-6 print:hidden">
         
         {/* Header */}
@@ -346,9 +364,14 @@ export const SalaryManagement: React.FC = () => {
                              <tr key={emp.uid} className="hover:bg-slate-50/50 transition-all group">
                                 <td className="px-8 py-6">
                                    <div className="flex items-center gap-3">
-                                      <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black shadow-sm group-hover:rotate-6 transition-transform">{emp.name[0]}</div>
+                                      <div 
+                                        onClick={() => setSelectedDetails(emp)}
+                                        className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black shadow-sm hover:rotate-6 hover:scale-110 hover:shadow-indigo-100 active:scale-95 transition-all cursor-pointer"
+                                      >
+                                        {emp.name[0]}
+                                      </div>
                                       <div>
-                                         <div className="text-md font-black text-slate-800">{emp.name}</div>
+                                         <div onClick={() => setSelectedDetails(emp)} className="text-md font-black text-slate-800 cursor-pointer hover:text-indigo-600 transition-colors uppercase">{emp.name}</div>
                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{emp.role}</div>
                                       </div>
                                    </div>
@@ -454,9 +477,20 @@ export const SalaryManagement: React.FC = () => {
                                    {res ? (
                                       <div className="space-y-1 py-2">
                                          <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Monthly Net Pay</div>
-                                         <div className="text-3xl font-black text-slate-900 tracking-tighter">{res.netPay.toLocaleString()} <span className="text-sm font-bold text-slate-400">원</span></div>
+                                         <div className="text-3xl font-black text-slate-900 tracking-tighter flex items-center gap-2">
+                                            {res.netPay.toLocaleString()}
+                                            {res.metadata.fallbackUsed && (
+                                              <div className="group/warn relative">
+                                                <AlertCircle className="w-4 h-4 text-rose-500 animate-pulse cursor-help" />
+                                                <div className="absolute left-0 top-6 w-48 p-2 bg-rose-500 text-white text-[9px] font-bold rounded-lg shadow-xl opacity-0 group-hover/warn:opacity-100 transition-opacity z-50 pointer-events-none">
+                                                   실시간 세액표를 찾을 수 없어 예비 수식으로 산출되었습니다. 부양가족이 반영되지 않았을 수 있습니다.
+                                                </div>
+                                              </div>
+                                            )}
+                                            <span className="text-sm font-bold text-slate-400">원</span>
+                                         </div>
                                          <div className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1.5">
-                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                                            <div className={`w-1.5 h-1.5 ${res.metadata.fallbackUsed ? 'bg-rose-400' : 'bg-emerald-400'} rounded-full`}></div>
                                             지급액: {res.monthlyGross.toLocaleString()}원
                                          </div>
                                       </div>
@@ -528,11 +562,16 @@ export const SalaryManagement: React.FC = () => {
                      <div key={emp.uid} className="premium-card p-6 flex flex-col gap-6">
                         <div className="flex items-center justify-between">
                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black">{emp.name[0]}</div>
-                              <div>
-                                 <h3 className="text-sm font-black text-slate-900">{emp.name}</h3>
-                                 <p className="text-[10px] font-bold text-slate-400">{emp.role}</p>
-                              </div>
+                               <div 
+                                 onClick={() => setSelectedDetails(emp)}
+                                 className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black cursor-pointer hover:scale-110 transition-transform active:scale-95"
+                               >
+                                 {emp.name[0]}
+                               </div>
+                               <div>
+                                  <h3 onClick={() => setSelectedDetails(emp)} className="text-sm font-black text-slate-900 cursor-pointer hover:text-indigo-600 uppercase">{emp.name}</h3>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">{emp.role}</p>
+                               </div>
                            </div>
                            <button onClick={() => setSelectedDetails(emp)} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Calculator className="w-5 h-5" /></button>
                         </div>
@@ -592,7 +631,12 @@ export const SalaryManagement: React.FC = () => {
                  <Calculator className="w-6 h-6 text-indigo-400 print:hidden" />
                  <div>
                     <h2 className="text-xl font-black tracking-tight">{selectedDetails.name}님 급여 산출 명세서</h2>
-                    <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {editingData[selectedDetails.uid]?.dependents || 1}인 부양, 자식 {editingData[selectedDetails.uid]?.childrenUnder20 || 0}인)</p>
+                     <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">
+                        2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {editingData[selectedDetails.uid]?.dependents || 1}인 부양, 자식 {editingData[selectedDetails.uid]?.childrenUnder20 || 0}인)
+                        {res.metadata.fallbackUsed && (
+                          <span className="text-rose-500 ml-2 font-black">! 세액표 로드 실패로 정규 수식이 적용되었습니다.</span>
+                        )}
+                     </p>
                  </div>
               </div>
               <div className="flex items-center gap-2 print:hidden">
