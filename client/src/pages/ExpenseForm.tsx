@@ -64,9 +64,9 @@ export const ExpenseForm: React.FC = () => {
     }, (error) => {
       console.error("Firestore Subscribe Error:", error);
       setLoading(false);
-      // 권한이나 색인 문제가 있을 경우 alert로 안내
-      if (error.code === 'permission-denied') {
-        alert("데이터 조회 권한이 없습니다. 관리자에게 문의해 주세요.");
+      // 권한이나 색인 문제가 있을 경우 콘솔에 기록 (alert 제거)
+      if (error.code !== 'permission-denied') {
+        console.error("Firestore Permission/Index Error:", error);
       }
     });
 

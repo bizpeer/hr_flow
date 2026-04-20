@@ -75,9 +75,7 @@ export const LeaveApplication: React.FC = () => {
     }, (error) => {
       console.error("Firestore Subscribe Error:", error);
       setLoading(false);
-      if (error.code === 'permission-denied') {
-        alert("데이터 조회 권한이 없습니다. 관리자에게 문의해 주세요.");
-      } else {
+      if (error.code !== 'permission-denied') {
         alert("휴가 정보를 불러오는 데 오류가 발생했습니다. (인덱스/네트워크)");
       }
     });
