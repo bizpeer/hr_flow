@@ -151,18 +151,23 @@ export const SalaryManagement: React.FC = () => {
       const data = snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserData));
       setEmployees(data.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
       
-      const initialEdits: Record<string, Partial<UserData>> = {};
-      data.forEach(emp => {
-        initialEdits[emp.uid] = {
-           annualSalary: emp.annualSalary || 0,
-           salaryType: emp.salaryType || 'ANNUAL',
-           isSeveranceIncluded: emp.isSeveranceIncluded || false,
-           dependents: emp.dependents || 1,
-           childrenUnder20: emp.childrenUnder20 || 0,
-           nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
-        };
+      setEditingData(prev => {
+        const next = { ...prev };
+        data.forEach(emp => {
+          // 이미 수정 중인 데이터가 있으면 덮어쓰지 않음
+          if (!next[emp.uid]) {
+            next[emp.uid] = {
+               annualSalary: emp.annualSalary || 0,
+               salaryType: emp.salaryType || 'ANNUAL',
+               isSeveranceIncluded: emp.isSeveranceIncluded || false,
+               dependents: emp.dependents || 1,
+               childrenUnder20: emp.childrenUnder20 || 0,
+               nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
+            };
+          }
+        });
+        return next;
       });
-      setEditingData(initialEdits);
       setLoading(false);
     });
 
@@ -200,11 +205,14 @@ export const SalaryManagement: React.FC = () => {
   const handleSalaryAdd = (uid: string, amount: number) => {
     const currentData = editingData[uid] || {};
     const factor = (currentData.salaryType === 'MONTHLY') ? (currentData.isSeveranceIncluded ? 13 : 12) : 1;
-    const currentBase = currentData.salaryType === 'MONTHLY' 
+    
+    // 현재 표시된 금액(월급 또는 연봉)에 amount를 더함
+    const currentDisplayedValue = currentData.salaryType === 'MONTHLY' 
       ? Math.floor((currentData.annualSalary || 0) / factor)
       : (currentData.annualSalary || 0);
       
-    handleUpdateField(uid, 'annualSalary', currentBase + amount);
+    // 다시 연봉으로 환산하여 저장
+    handleUpdateField(uid, 'annualSalary', (currentDisplayedValue + amount) * factor);
   };
 
   const handleSave = async (uid: string) => {
@@ -379,7 +387,11 @@ export const SalaryManagement: React.FC = () => {
                                                 ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
                                                 : (data.annualSalary || 0)
                                               ).toLocaleString()} 
-                                              onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                              onChange={(e) => {
+                                                const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                                const factor = (data.salaryType === 'MONTHLY' ? (data.isSeveranceIncluded ? 13 : 12) : 1);
+                                                handleUpdateField(emp.uid, 'annualSalary', val * factor);
+                                              }}
                                               className="w-full pl-5 pr-10 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none group-hover/input:border-slate-100 focus:border-indigo-500 focus:bg-white transition-all shadow-inner"
                                             />
                                             <span className="absolute right-5 top-1/2 -translate-y-1/2 text-xs font-black text-slate-300 group-focus-within/input:text-indigo-400">원</span>
@@ -428,7 +440,10 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비과세액 (월)</div>
                                          <input 
                                            type="text" value={(data.nonTaxable !== undefined ? data.nonTaxable : MEAL_ALLOWANCE_DEFAULT).toLocaleString()}
-                                           onChange={(e) => handleUpdateField(emp.uid, 'nonTaxable', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                           onChange={(e) => {
+                                             const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                             handleUpdateField(emp.uid, 'nonTaxable', val);
+                                           }}
                                            className="w-full px-4 py-2.5 bg-slate-50 border border-transparent rounded-xl text-xs font-black text-slate-600 outline-none focus:border-indigo-400 focus:bg-white transition-all shadow-inner"
                                          />
                                       </div>
@@ -531,7 +546,11 @@ export const SalaryManagement: React.FC = () => {
                                   ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
                                   : (data.annualSalary || 0)
                                 ).toLocaleString()}
-                                onChange={(e) => handleUpdateField(emp.uid, 'annualSalary', parseInt(e.target.value.replace(/,/g, '')) || 0)}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
+                                  const factor = (data.salaryType === 'MONTHLY' ? (data.isSeveranceIncluded ? 13 : 12) : 1);
+                                  handleUpdateField(emp.uid, 'annualSalary', val * factor);
+                                }}
                                 className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all font-mono"
                               />
                               <div className="flex gap-2 mt-2">
