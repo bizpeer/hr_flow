@@ -67,7 +67,10 @@ function App() {
               {/* Sidebar (Responsive Drawer) */}
               <div className={`print:hidden fixed inset-y-0 left-0 z-40 w-64 transform transition-all duration-500 ease-in-out premium-shadow 
                 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0`}>
-                <Sidebar userRole={userData?.role || 'MEMBER'} />
+                <Sidebar 
+                  userRole={userData?.role || 'MEMBER'} 
+                  onItemClick={() => setIsMobileMenuOpen(false)}
+                />
               </div>
 
               {/* Mobile Overlay */}

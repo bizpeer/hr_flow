@@ -405,19 +405,19 @@ export const AttendanceDashboard: React.FC = () => {
 
           {/* Monthly Attendance Calendar (Full Width: Spans 12) */}
           <div className="lg:col-span-12">
-            <div className="premium-card p-8">
-               <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
-                 <div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight mb-1">월별 근태 분석</h2>
-                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Performance Analytics</p>
-                 </div>
+            <div className="premium-card p-4 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-10 gap-6">
+                  <div>
+                    <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight mb-1">월별 근태 분석</h2>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Performance Analytics</p>
+                  </div>
 
-                 <div className="flex flex-wrap items-center gap-4">
+                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
                     {isManagement && (
                       <select
                         value={selectedUserId}
                         onChange={(e) => setSelectedUserId(e.target.value)}
-                        className="px-6 py-3 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-xs font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer"
+                        className="w-full sm:w-auto px-6 py-3 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-xs font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer"
                       >
                         {allUsers.map((u) => (
                           <option key={u.id} value={u.id}>{u.name} ({getDisplayEmail(u.email)})</option>
@@ -425,15 +425,15 @@ export const AttendanceDashboard: React.FC = () => {
                       </select>
                     )}
 
-                    <div className="flex items-center bg-slate-50 rounded-[1.25rem] p-1.5 border border-slate-100 shadow-inner">
-                      <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                        <History className="w-4 h-4 text-slate-500 rotate-180" />
+                    <div className="flex items-center justify-between bg-slate-50 rounded-[1.25rem] p-1.5 border border-slate-100 shadow-inner">
+                      <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                        <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-500 rotate-180" />
                       </button>
-                      <span className="px-6 text-sm font-black text-slate-800 min-w-[120px] text-center">
+                      <span className="px-3 md:px-6 text-xs md:text-sm font-black text-slate-800 min-w-[100px] md:min-w-[120px] text-center">
                         {format(currentMonth, 'yyyy. MM')}
                       </span>
-                      <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
-                        <History className="w-4 h-4 text-slate-500" />
+                      <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                        <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-500" />
                       </button>
                     </div>
                  </div>
@@ -448,7 +448,7 @@ export const AttendanceDashboard: React.FC = () => {
                       ))}
                     </div>
                     
-                    <div className="grid grid-cols-7 gap-3">
+                    <div className="grid grid-cols-7 gap-1 md:gap-3">
                       {Array.from({ length: startOfWeek(startOfMonth(currentMonth)).getDay() }).map((_, i) => (
                         <div key={`empty-${i}`} className="aspect-square"></div>
                       ))}
@@ -466,11 +466,11 @@ export const AttendanceDashboard: React.FC = () => {
                         return (
                           <div 
                             key={day.toString()}
-                            className={`aspect-square relative flex flex-col items-center justify-center rounded-2xl transition-all border-2 ${
+                            className={`aspect-square relative flex flex-col items-center justify-center rounded-xl md:rounded-2xl transition-all border ${
                               isTodayLocal ? 'border-indigo-500 bg-indigo-50/50 shadow-lg shadow-indigo-100' : 'border-transparent hover:bg-slate-50 hover:border-slate-100'
                             } ${!isCurrentMonth ? 'opacity-20' : ''} group cursor-default`}
                           >
-                            <span className={`text-sm font-black ${isTodayLocal ? 'text-indigo-600' : 'text-slate-700'}`}>
+                            <span className={`text-xs md:text-sm font-black ${isTodayLocal ? 'text-indigo-600' : 'text-slate-700'}`}>
                               {format(day, 'd')}
                             </span>
                             

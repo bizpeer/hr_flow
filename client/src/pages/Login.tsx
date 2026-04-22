@@ -37,7 +37,7 @@ export const Login: React.FC = () => {
       
       // [고스트 계정(Ghost Session) 방어 로직] 
       // DB에서 수동으로 문서를 삭제했을 때 Firebase Auth만 남는 현상 방지
-      if (userCredential.user.email !== 'bizpeer@gmail.com') {
+      if (userCredential.user.uid) {
         const { getDoc } = await import('firebase/firestore');
         const profileSnap = await getDoc(doc(db, 'UserProfile', userCredential.user.uid));
         

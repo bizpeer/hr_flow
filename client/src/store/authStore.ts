@@ -63,8 +63,6 @@ interface AuthState {
   getDisplayEmail: (email?: string | null) => string;
 }
 
-// SUPER_ADMIN 이메일 (플랫폼 최고 관리자)
-const SUPER_ADMIN_EMAIL = 'bizpeer@gmail.com';
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -131,20 +129,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (user) {
           set({ user, loading: true });
-          const isSuperAdmin = user.email?.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
           
           unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
             const data = profileSnap.data();
             let currentData: UserData | null = profileSnap.exists() ? (data as UserData) : null;
 
             // 1. 데이터가 아직 불완전한 경우 (예: 가입 중 가입 정보 누락)
-            if (currentData && !currentData.role && !isSuperAdmin) {
+            if (currentData && !currentData.role) {
               console.log("[Auth] Profile exists but incomplete (no role). Waiting...");
               return; 
             }
 
             // 2. 임시 문서(temp) 마이그레이션 및 미생성 프로필 대기 로직
-            if (!currentData && !isSuperAdmin) {
+            if (!currentData) {
               if (user.email) {
                 try {
                   const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
@@ -179,25 +176,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               return; // 프로필이 정상적으로 생성될 때까지 즉각적인 렌더링을 지연시킴
             }
 
-            // 3. SUPER_ADMIN 보장
-            if (isSuperAdmin) {
-              const needsUpdate = !currentData || currentData.role !== 'SUPER_ADMIN' || currentData.companyId !== 'PLATFORM';
-              if (needsUpdate) {
-                currentData = {
-                  uid: user.uid,
-                  email: SUPER_ADMIN_EMAIL,
-                  name: currentData?.name || '플랫폼 관리자',
-                  role: 'SUPER_ADMIN',
-                  companyId: 'PLATFORM',
-                  mustChangePassword: false,
-                  teamHistory: currentData?.teamHistory || [],
-                  teamId: '',
-                  divisionId: ''
-                };
-                await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-                console.log("[Auth] SUPER_ADMIN profile updated.");
-              }
-            }
 
             // 4. 역할 정규화 (변경 있을 때만 setDoc)
             if (currentData && currentData.role && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
@@ -229,7 +207,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               set({ 
                 userData: currentData, 
                 loading: false,
-                isLoginModalOpen: (currentData?.mustChangePassword && !isSuperAdmin) || false 
+                isLoginModalOpen: (currentData?.mustChangePassword && currentData.role !== 'SUPER_ADMIN') || false 
               });
               console.log("[Auth] UserData Updated (Loop-Safe):", currentData?.role);
             }

@@ -8,7 +8,7 @@ service firebase.storage {
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && request.auth.token.email == 'bizpeer@gmail.com';
+      return isAuthenticated() && firestore.get(/databases/weberp/documents/UserProfile/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
     }
 
     // 사용자의 소속 회사 ID를 Firestore(weberp)에서 조회

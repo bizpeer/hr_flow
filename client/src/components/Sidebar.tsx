@@ -7,9 +7,10 @@ import { useAuthStore } from '../store/authStore';
 interface SidebarProps {
   userRole: string;
   userId?: string;
+  onItemClick?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
   const { user, userData, companyData, logout, setLoginModalOpen } = useAuthStore();
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
   const isDirector = userRole === 'ADMIN';
@@ -18,6 +19,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole }) => {
   const NavItem = ({ to, icon: Icon, label, colorClass = 'indigo' }: { to: string, icon: any, label: string, colorClass?: string }) => (
     <NavLink 
       to={to} 
+      onClick={onItemClick}
       className={({ isActive }) => `
         group flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden
         ${isActive 

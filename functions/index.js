@@ -229,13 +229,12 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
 
     // 1. 권한 확인 (Auth Token Claims + Email Fallback + Firestore Profile)
     const isSuperAdminByToken = request.auth.token.role === "SUPER_ADMIN";
-    const isSuperAdminByEmail = request.auth.token.email === "bizpeer@gmail.com";
     
     // Firestore Profile 보호 레이어
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
     const isSuperAdminByProfile = callerSnap.exists && callerSnap.data().role === "SUPER_ADMIN";
 
-    if (!isSuperAdminByToken && !isSuperAdminByEmail && !isSuperAdminByProfile) {
+    if (!isSuperAdminByToken && !isSuperAdminByProfile) {
       console.warn(`[AdminDeleteCompany] Unauthorized access attempt: ${request.auth.token.email}`);
       throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
     }

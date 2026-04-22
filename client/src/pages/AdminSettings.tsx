@@ -197,7 +197,7 @@ export const AdminSettings: React.FC = () => {
 
   return (
     <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-10">
+      <div className="max-w-6xl mx-auto space-y-8 md:space-y-10">
         
         {/* Page Header */}
         <div className="space-y-2">
@@ -205,14 +205,14 @@ export const AdminSettings: React.FC = () => {
             <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
               <Settings className="w-6 h-6" />
             </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">시스템 환경 설정</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">시스템 환경 설정</h1>
           </div>
-          <p className="text-slate-500 font-medium">인사 시스템 기본 정보 및 관리자 보안 옵션을 구성합니다.</p>
+          <p className="text-slate-500 text-xs md:text-sm font-medium leading-relaxed">인사 시스템 기본 정보 및 관리자 보안 옵션을 구성합니다.</p>
         </div>
 
         {/* Status Message */}
         {message.text && (
-          <div className={`w-full p-6 bg-white rounded-[2rem] flex items-center gap-4 shadow-xl border-l-8 animate-modal-pop transition-all ${
+          <div className={`w-full p-5 md:p-6 bg-white rounded-3xl md:rounded-[2rem] flex items-center gap-4 shadow-xl border-l-[6px] md:border-l-8 animate-modal-pop transition-all ${
             message.type === 'success' ? 'border-emerald-500 shadow-emerald-50' : 'border-rose-500 shadow-rose-50'
           }`}>
             <div className={`p-2 rounded-full ${message.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
