@@ -6,7 +6,32 @@ import {
   Globe, LayoutDashboard, Database
 } from 'lucide-react';
 
+export const LandingPage: React.FC = () => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = React.useState<'preview' | 'video'>('preview');
+
+  const features = [
+    {
+      icon: <Clock className="w-6 h-6" />,
+      title: "실시간 근태 관리",
+      description: "위치 기반 체크인/아웃으로 정확하고 투명한 근태 기록을 보장합니다."
+    },
+    {
+      icon: <CheckCircle2 className="w-6 h-6" />,
+      title: "스마트 유가/휴가 신청",
+      description: "잔여 연차 자동 계산부터 복잡한 승인 절차까지 한 번에 해결하세요."
+    },
+    {
+      icon: <FileText className="w-6 h-6" />,
+      title: "투명한 지출결의",
+      description: "영수증 첨부와 전자결재로 비용 처리를 빠르고 체계적으로 관리합니다."
+    },
+    {
+      icon: <Users className="w-6 h-6" />,
+      title: "조직 및 인사 인사이트",
+      description: "직원 정보 및 조직도를 한눈에 파악하고 효율적인 인력 배치를 지원합니다."
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -14,9 +39,12 @@ import {
       <nav className="fixed top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white italic shadow-lg shadow-indigo-600/20">HF</div>
-              <span className="text-2xl font-black tracking-tighter text-slate-900">HR <span className="text-indigo-600">FLOW</span></span>
+            <div 
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 cursor-pointer group"
+            >
+              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white italic shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform">HF</div>
+              <span className="text-2xl font-black tracking-tighter text-slate-900 group-hover:text-indigo-600 transition-colors">HR <span className="text-indigo-600">FLOW</span></span>
             </div>
             <div className="flex items-center gap-4">
               <button 
@@ -250,8 +278,6 @@ import {
           </div>
         </div>
       </section>
-        </div>
-      </section>
 
       {/* Feature Grid */}
       <section className="py-24 bg-white">
@@ -336,7 +362,7 @@ import {
             </div>
             <p className="text-slate-400 text-sm font-medium">© 2026 HR FLOW. All rights reserved.</p>
             <div className="flex gap-6">
-              <span className="text-xs font-bold text-slate-500 hover:text-indigo-600 cursor-pointer">개용약관</span>
+              <span className="text-xs font-bold text-slate-500 hover:text-indigo-600 cursor-pointer">이용약관</span>
               <span className="text-xs font-bold text-slate-500 hover:text-indigo-600 cursor-pointer">개인정보처리방침</span>
             </div>
           </div>

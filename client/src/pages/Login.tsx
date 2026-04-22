@@ -188,11 +188,13 @@ export const Login: React.FC = () => {
       </div>
 
       <div className="w-full max-w-md mx-4 relative z-10">
-        {/* 로고 */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-3 mb-4">
-            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-xl italic shadow-xl shadow-indigo-200 dark:shadow-indigo-900/50">HF</div>
-            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">HR <span className="text-indigo-600 dark:text-indigo-400">FLOW</span></div>
+          <div 
+            onClick={() => navigate('/')}
+            className="inline-flex items-center gap-3 mb-4 cursor-pointer group"
+          >
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-black text-white text-xl italic shadow-xl shadow-indigo-200 dark:shadow-indigo-900/50 group-hover:scale-110 transition-transform">HF</div>
+            <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter group-hover:text-indigo-600 transition-colors">HR <span className="text-indigo-600 dark:text-indigo-400">FLOW</span></div>
           </div>
           <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">조직의 성장을 가속화하는 지능형 HR 솔루션</p>
         </div>
