@@ -2,13 +2,13 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowRight, CheckCircle2, Clock, FileText, Users, 
-  ShieldCheck, Smartphone, Zap, ChevronRight,
-  Globe, LayoutDashboard, Database
+  ShieldCheck, Smartphone, Zap,
+  Globe, LayoutDashboard, Database, Network
 } from 'lucide-react';
 
 export const LandingPage: React.FC = () => {
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = React.useState<'preview' | 'video'>('preview');
+  const [viewMode, setViewMode] = React.useState<'preview' | 'manual'>('preview');
 
   const features = [
     {
@@ -114,15 +114,15 @@ export const LandingPage: React.FC = () => {
                 기능 한눈에 보기
               </button>
               <button 
-                onClick={() => setViewMode('video')}
+                onClick={() => setViewMode('manual')}
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
-                  viewMode === 'video' 
+                  viewMode === 'manual' 
                     ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
                     : 'text-slate-500 hover:text-slate-700'
                 }`}
               >
-                <Smartphone className="w-4 h-4" />
-                동영상 시연
+                <FileText className="w-4 h-4" />
+                기능요약 설명서
               </button>
             </div>
           </div>
@@ -234,38 +234,133 @@ export const LandingPage: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                /* Video Player Area */
-                <div className="w-full h-full bg-slate-900 rounded-[24px] relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-10 text-center">
-                    <div className="w-24 h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center group/play cursor-pointer hover:scale-110 transition-all duration-500 hover:bg-indigo-600/20 active:scale-95">
-                      <ChevronRight className="w-10 h-10 text-white fill-current translate-x-1" />
+                /* Digital Feature Summary Manual UI */
+                <div className="w-full h-full bg-slate-50 rounded-[24px] relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700 flex flex-col">
+                  {/* Manual Header */}
+                  <div className="px-8 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-2">
+                       <div className="w-6 h-6 bg-indigo-600 rounded flex items-center justify-center text-[10px] text-white font-black italic">HF</div>
+                       <span className="text-sm font-black tracking-tight text-slate-900">HR Flow 한눈에 이해하기</span>
                     </div>
-                    <div className="space-y-3">
-                      <h3 className="text-2xl font-black text-white tracking-tight">HR FLOW 시연 동영상</h3>
-                      <p className="text-indigo-200/60 font-medium text-sm">스마트한 인사 관리를 직접 확인해보세요.</p>
-                    </div>
-                    
-                    {/* Fake Video Controls UI */}
-                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-lg px-8">
-                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
-                         <div className="h-full bg-indigo-500 w-1/3" />
-                      </div>
-                      <div className="flex justify-between items-center text-white/50 text-[10px] font-black uppercase tracking-widest">
-                         <div className="flex gap-4">
-                            <span>02:15 / 06:40</span>
-                            <span className="text-white">HD High Quality</span>
-                         </div>
-                         <div className="flex gap-4">
-                            <span>Settings</span>
-                            <span>Full Screen</span>
-                         </div>
-                      </div>
+                    <div className="flex items-center gap-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                       <span>Digital Manual v1.0</span>
+                       <div className="h-3 w-px bg-slate-200" />
+                       <span className="text-indigo-600">Confidential</span>
                     </div>
                   </div>
-                  
-                  {/* Decorative blurred spots */}
-                  <div className="absolute top-1/4 -right-20 w-64 h-64 bg-indigo-600/30 rounded-full blur-[100px]" />
-                  <div className="absolute bottom-1/4 -left-20 w-64 h-64 bg-violet-600/30 rounded-full blur-[100px]" />
+
+                  {/* Manual Content - Scrollable */}
+                  <div className="flex-1 overflow-y-auto p-8 space-y-8 custom-scrollbar">
+                    {/* 1. 기본 구조 */}
+                    <section className="space-y-3">
+                       <div className="flex items-center gap-2 text-indigo-600">
+                          <Database className="w-5 h-5" />
+                          <h3 className="text-lg font-black tracking-tight">1. 기본 구조 (회사별 독립 시스템)</h3>
+                       </div>
+                       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                          <p className="text-sm font-bold text-slate-700">HR Flow는 여러 회사가 함께 쓰지만 데이터는 완전히 분리되는 SaaS입니다.</p>
+                          <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                             {['개인 이메일 등록 가능', '회사 전용 ID 자동 생성 (user@company.com)', '자체 도메인 향후 변경 가능', '타사 데이터 접근 불가 (완전 격리)'].map((text, i) => (
+                               <li key={i} className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                  <div className="w-1 h-1 rounded-full bg-indigo-400" />
+                                  {text}
+                               </li>
+                             ))}
+                          </ul>
+                       </div>
+                    </section>
+
+                    {/* 2. 조직 및 권한 관리 */}
+                    <section className="space-y-3">
+                       <div className="flex items-center gap-2 text-indigo-600">
+                          <Network className="w-5 h-5" />
+                          <h3 className="text-lg font-black tracking-tight">2. 조직 및 권한 관리</h3>
+                       </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">사용자 권한 3단계</h4>
+                             <div className="space-y-2">
+                                <div className="flex justify-between items-center text-xs">
+                                   <span className="font-bold text-slate-700">ADMIN</span>
+                                   <span className="text-slate-500">모든 기능 (대표/관리자)</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                   <span className="font-bold text-slate-700">SUB_ADMIN</span>
+                                   <span className="text-slate-500">팀 관리 + 1차 결재</span>
+                                </div>
+                                <div className="flex justify-between items-center text-xs">
+                                   <span className="font-bold text-slate-700">MEMBER</span>
+                                   <span className="text-slate-500">개인 업무 (근태/신청)</span>
+                                </div>
+                             </div>
+                          </div>
+                          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+                             <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-3">조직 구조</h4>
+                             <p className="text-xs font-bold text-slate-700 mb-2">회사 → 본부 → 팀 체계</p>
+                             <p className="text-[11px] text-slate-500 leading-relaxed">본부장/팀장 지정 시 자동으로 최적화된 결재 라인이 구성됩니다.</p>
+                          </div>
+                       </div>
+                    </section>
+
+                    {/* 3. 인사 관리 */}
+                    <section className="space-y-3">
+                       <div className="flex items-center gap-2 text-indigo-600">
+                          <Users className="w-5 h-5" />
+                          <h3 className="text-lg font-black tracking-tight">3. 인사 관리 (직원 정보 + 근태)</h3>
+                       </div>
+                       <div className="bg-indigo-600/5 p-6 rounded-2xl border border-indigo-100 flex flex-col md:flex-row gap-6">
+                          <div className="flex-1 space-y-3">
+                             <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest">직원 및 상태 관리</h4>
+                             <div className="text-xs font-medium text-indigo-900 leading-relaxed">
+                                ID 자동 생성 및 임시 비밀번호 발급으로 즉시 업무 투입이 가능하며, 민감 정보는 강력하게 암호화되어 보호됩니다.
+                             </div>
+                          </div>
+                          <div className="w-px bg-indigo-100 hidden md:block" />
+                          <div className="flex-1 space-y-3">
+                             <h4 className="text-xs font-black text-indigo-600 uppercase tracking-widest">연차 자동 관리</h4>
+                             <div className="text-xs font-medium text-indigo-900 leading-relaxed">
+                                근로기준법 기반 자동 산정 및 잔여 연차 실시간 반영. 관리자에 의한 유연한 추가 부여가 가능합니다.
+                             </div>
+                          </div>
+                       </div>
+                    </section>
+
+                    {/* 4. 결재 및 지출 / 5. 공지사항 / 6. 급여 (Combined Small Cards) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                       <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2 text-rose-500">
+                             <CheckCircle2 className="w-4 h-4" />
+                             <span className="text-sm font-black">4. 결재 및 지출</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium">Fast-Track 승인 및 반려 사유 관리. 월별 지출 통계를 실시간으로 분석합니다.</p>
+                       </div>
+                       <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2 text-slate-600">
+                             <Globe className="w-4 h-4" />
+                             <span className="text-sm font-black">5. 공지사항</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium">파일 첨부를 지원하는 사내 커뮤니케이션. 권한별 로직으로 안전하게 운영됩니다.</p>
+                       </div>
+                       <div className="p-5 bg-white rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                          <div className="flex items-center gap-2 text-indigo-600">
+                             <LayoutDashboard className="w-4 h-4" />
+                             <span className="text-sm font-black">6. 급여 관리</span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 font-medium">2026년 최신 세법 기준 자동 적용. 소득세부터 실수령액까지 1초 완성.</p>
+                       </div>
+                    </div>
+
+                    {/* Summary Highlight */}
+                    <div className="bg-slate-900 p-8 rounded-3xl text-center space-y-4">
+                       <div className="text-indigo-400 text-[10px] font-black tracking-widest uppercase mb-2">Core Value</div>
+                       <h3 className="text-xl font-black text-white tracking-tight">HR Flow는 기업 운영 통합 자동화 시스템입니다</h3>
+                       <div className="flex flex-wrap justify-center gap-3">
+                          {['직원 관리 자동화', '명확한 결재 프로세스', '정확한 급여 산출', '데이터 완전 분리'].map((tag, i) => (
+                            <span key={i} className="px-3 py-1 bg-white/10 rounded-full text-[10px] font-black text-white/80"># {tag}</span>
+                          ))}
+                       </div>
+                    </div>
+                  </div>
                 </div>
               )}
               
