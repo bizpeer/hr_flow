@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { auth, db, functions } from '../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, LogIn, UserPlus, AlertCircle, Mail, Lock, User, Building2, Globe, ArrowRight } from 'lucide-react';
 
@@ -92,13 +93,24 @@ export const Login: React.FC = () => {
     setLoading(true);
     try {
       const normalizedEmail = regEmail.trim().toLowerCase();
+      const domain = normalizedEmail.split('@')[1];
+
+      // [도메인 중복 체크 로직 추가]
+      const checkDomain = httpsCallable(functions, 'checkDomainAvailability');
+      const result = await checkDomain({ domain });
+      const { available, message: domainMsg } = result.data as { available: boolean; message?: string };
+
+      if (!available) {
+        setError(domainMsg || '이미 등록된 회사 도메인입니다. 관리자 계정 생성 시 중복된 도메인은 사용할 수 없습니다.');
+        setLoading(false);
+        return;
+      }
       
       // 1. Firebase Auth 계정 생성
       const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, regPassword);
       const uid = userCredential.user.uid;
 
       // 2. 이메일에서 도메인 추출 → company_id로 사용
-      const domain = normalizedEmail.split('@')[1];
       const companyId = domain.replace(/\./g, '_'); // aeterno.co.kr → aeterno_co_kr
 
       // 3. 회사 문서 생성

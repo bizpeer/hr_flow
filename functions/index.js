@@ -8,6 +8,46 @@ admin.initializeApp();
 const DATABASE_ID = 'weberp';
 
 /**
+ * 특정 도메인이 이미 다른 회사에 등록되어 있는지 확인합니다.
+ */
+exports.checkDomainAvailability = onCall(async (request) => {
+  const { domain, currentCompanyId } = request.data;
+
+  if (!domain) {
+    throw new HttpsError("invalid-argument", "확인할 도메인이 누락되었습니다.");
+  }
+
+  try {
+    const { getFirestore } = require("firebase-admin/firestore");
+    const db = getFirestore(DATABASE_ID);
+
+    // domain 필드로 검색
+    const qSnap = await db.collection("companies")
+      .where("domain", "==", domain.toLowerCase().trim())
+      .limit(1)
+      .get();
+
+    if (qSnap.empty) {
+      return { available: true };
+    }
+
+    const doc = qSnap.docs[0];
+    // 현재 우리 회사라면 허용
+    if (currentCompanyId && doc.id === currentCompanyId) {
+      return { available: true };
+    }
+
+    return { 
+      available: false, 
+      message: "이미 다른 조직에서 사용 중인 도메인입니다." 
+    };
+  } catch (error) {
+    console.error(`[checkDomainAvailabilityError]`, error);
+    throw new HttpsError("internal", "도메인 중복 확인 중 오류가 발생했습니다.");
+  }
+});
+
+/**
  * 관리자 권한으로 사용자의 비밀번호를 초기화합니다.
  * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
  */

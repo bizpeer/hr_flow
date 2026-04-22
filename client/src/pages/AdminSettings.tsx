@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users } from 'lucide-react';
-import { auth, db } from '../firebase';
+import { auth, db, functions } from '../firebase';
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 import { query, where } from 'firebase/firestore';
 
@@ -114,6 +115,19 @@ export const AdminSettings: React.FC = () => {
     try {
       // 1. 비밀번호 재검증 (공통 로직 사용)
       await verifyAdmin();
+
+      // 1.5 도메인 중복 체크 (Cloud Function 호출)
+      const checkDomain = httpsCallable(functions, 'checkDomainAvailability');
+      const result = await checkDomain({ 
+        domain: tempDomain, 
+        currentCompanyId: userData?.companyId 
+      });
+      
+      const { available, message: domainMsg } = result.data as { available: boolean; message?: string };
+      if (!available) {
+        setMessage({ type: 'error', text: domainMsg || '이미 사용 중인 도메인입니다.' });
+        return;
+      }
 
       // 2. 도메인 설정 저장 (회사 문서 업데이트)
       if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");

@@ -107,7 +107,7 @@ export const ExpenseForm: React.FC = () => {
           throw new Error("Firebase Storage Bucket 설정(VITE_FIREBASE_STORAGE_BUCKET)이 누락되었습니다. 관리자에게 문의해 주세요.");
         }
 
-        const folderPath = `expenses/${user?.uid || 'anonymous'}`;
+        const folderPath = `companies/${userData?.companyId || 'public'}/expenses/${user?.uid || 'anonymous'}`;
         const fileNameToSave = `${Date.now()}_${selectedFile.name}`;
         const fileRef = ref(storage, `${folderPath}/${fileNameToSave}`);
         

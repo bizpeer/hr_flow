@@ -91,7 +91,7 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
       let attachmentName = editingNotice?.attachmentName || '';
 
       if (selectedFile) {
-        const fileRef = ref(storage, `notices/${currentUserId}/${Date.now()}_${selectedFile.name}`);
+        const fileRef = ref(storage, `companies/${userData?.companyId || 'public'}/notices/${Date.now()}_${selectedFile.name}`);
         const uploadResult = await uploadBytes(fileRef, selectedFile);
         attachmentUrl = await getDownloadURL(uploadResult.ref);
         attachmentName = selectedFile.name;

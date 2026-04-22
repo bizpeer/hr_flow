@@ -108,7 +108,7 @@ export const LeaveApplication: React.FC = () => {
       
       let attachmentUrl = '';
       if (formData.file) {
-        const fileRef = ref(storage, `leaves/${user?.uid || 'anonymous'}/${Date.now()}_${formData.file.name}`);
+        const fileRef = ref(storage, `companies/${userData?.companyId || 'public'}/leaves/${user?.uid || 'anonymous'}/${Date.now()}_${formData.file.name}`);
         const uploadResult = await uploadBytes(fileRef, formData.file);
         attachmentUrl = await getDownloadURL(uploadResult.ref);
       }
