@@ -6,31 +6,7 @@ import {
   Globe, LayoutDashboard, Database
 } from 'lucide-react';
 
-export const LandingPage: React.FC = () => {
-  const navigate = useNavigate();
-
-  const features = [
-    {
-      icon: <Clock className="w-6 h-6" />,
-      title: "실시간 근태 관리",
-      description: "위치 기반 체크인/아웃으로 정확하고 투명한 근태 기록을 보장합니다."
-    },
-    {
-      icon: <CheckCircle2 className="w-6 h-6" />,
-      title: "스마트 유가/휴가 신청",
-      description: "잔여 연차 자동 계산부터 복잡한 승인 절차까지 한 번에 해결하세요."
-    },
-    {
-      icon: <FileText className="w-6 h-6" />,
-      title: "투명한 지출결의",
-      description: "영수증 첨부와 전자결재로 비용 처리를 빠르고 체계적으로 관리합니다."
-    },
-    {
-      icon: <Users className="w-6 h-6" />,
-      title: "조직 및 인사 인사이트",
-      description: "직원 정보 및 조직도를 한눈에 파악하고 효율적인 인력 배치를 지원합니다."
-    }
-  ];
+  const [viewMode, setViewMode] = React.useState<'preview' | 'video'>('preview');
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-900">
@@ -95,35 +71,185 @@ export const LandingPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Abstract Dashboard Preview */}
-          <div className="mt-20 relative max-w-5xl mx-auto">
+          {/* Toggle Switch */}
+          <div className="mt-16 mb-8 flex justify-center">
+            <div className="bg-white/60 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 inline-flex shadow-sm">
+              <button 
+                onClick={() => setViewMode('preview')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
+                  viewMode === 'preview' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                기능 한눈에 보기
+              </button>
+              <button 
+                onClick={() => setViewMode('video')}
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all ${
+                  viewMode === 'video' 
+                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' 
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                동영상 시연
+              </button>
+            </div>
+          </div>
+
+          {/* Feature Highlight Container */}
+          <div className="relative max-w-5xl mx-auto">
             <div className="absolute inset-0 bg-indigo-600/5 rounded-[40px] blur-3xl -z-10" />
-            <div className="bg-white rounded-[32px] shadow-2xl border border-slate-200 p-4 relative overflow-hidden group">
-              <div className="bg-slate-50 rounded-[20px] aspect-[16/9] flex items-center justify-center overflow-hidden">
-                <div className="grid grid-cols-12 gap-4 w-full h-full p-8">
-                  <div className="col-span-3 space-y-4">
-                    <div className="h-10 bg-white rounded-xl shadow-sm border border-slate-200" />
-                    <div className="h-64 bg-white rounded-xl shadow-sm border border-slate-200" />
-                  </div>
-                  <div className="col-span-9 space-y-4">
-                    <div className="h-10 bg-white rounded-xl shadow-sm border border-slate-200" />
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="h-32 bg-indigo-50 rounded-xl border border-indigo-100" />
-                      <div className="h-32 bg-emerald-50 rounded-xl border border-emerald-100" />
-                      <div className="h-32 bg-rose-50 rounded-xl border border-rose-100" />
+            <div className="bg-white rounded-[32px] shadow-2xl border border-slate-200 p-4 relative overflow-hidden h-[450px] md:h-[550px] transition-all duration-500">
+              
+              {viewMode === 'preview' ? (
+                /* Enhanced Abstract Dashboard Preview with Labels from Spec */
+                <div className="bg-slate-50 rounded-[20px] w-full h-full p-6 md:p-10 animate-in fade-in zoom-in-95 duration-500">
+                  <div className="flex flex-col h-full gap-4 md:gap-6">
+                    {/* Header bar */}
+                    <div className="h-12 bg-white rounded-xl shadow-sm border border-slate-200 flex items-center px-6 gap-4">
+                      <div className="w-3 h-3 rounded-full bg-rose-400" />
+                      <div className="w-3 h-3 rounded-full bg-amber-400" />
+                      <div className="w-3 h-3 rounded-full bg-emerald-400" />
+                      <div className="h-4 w-32 bg-slate-100 rounded-full ml-4" />
                     </div>
-                    <div className="h-[250px] bg-white rounded-xl shadow-sm border border-slate-200" />
+                    
+                    <div className="flex-1 grid grid-cols-12 gap-4 md:gap-6">
+                      {/* Sidebar abstract */}
+                      <div className="hidden md:block col-span-3 space-y-4">
+                        <div className="h-6 w-full bg-slate-200/50 rounded-lg" />
+                        <div className="space-y-2">
+                          {[1, 2, 3, 4, 5].map(i => (
+                            <div key={i} className="h-10 w-full bg-white rounded-xl border border-slate-100" />
+                          ))}
+                        </div>
+                        <div className="pt-10 flex flex-col items-center">
+                          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center text-indigo-200">
+                            <Users className="w-8 h-8" />
+                          </div>
+                          <p className="text-[10px] font-black text-slate-300 mt-2 uppercase tracking-widest">Employee Org</p>
+                        </div>
+                      </div>
+                      
+                      {/* Main content Area */}
+                      <div className="col-span-12 md:col-span-9 flex flex-col gap-4 md:gap-6">
+                         {/* Highlight Cards */}
+                         <div className="grid grid-cols-3 gap-3 md:gap-6">
+                            <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+                               <div className="absolute top-0 right-0 p-2 opacity-10"><Clock /></div>
+                               <h4 className="text-[10px] md:text-xs font-black text-indigo-500 uppercase tracking-tighter mb-1">Attendance</h4>
+                               <p className="text-[12px] md:text-sm font-black text-slate-900 leading-tight">실시간 근태 및 연차 관리</p>
+                               <div className="mt-4 h-1 w-full bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500 w-2/3" />
+                               </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+                               <div className="absolute top-0 right-0 p-2 opacity-10"><Database /></div>
+                               <h4 className="text-[10px] md:text-xs font-black text-emerald-500 uppercase tracking-tighter mb-1">Payroll</h4>
+                               <p className="text-[12px] md:text-sm font-black text-slate-900 leading-tight">2026 간이세액 자동 산출</p>
+                               <div className="mt-4 h-6 w-full bg-emerald-50 border border-emerald-100 rounded-lg flex items-center px-2">
+                                  <div className="w-full h-1.5 bg-emerald-200/50 rounded-full" />
+                               </div>
+                            </div>
+                            <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden group">
+                               <div className="absolute top-0 right-0 p-2 opacity-10"><CheckCircle2 /></div>
+                               <h4 className="text-[10px] md:text-xs font-black text-rose-500 uppercase tracking-tighter mb-1">Approvals</h4>
+                               <p className="text-[12px] md:text-sm font-black text-slate-900 leading-tight">Fast-Track 승인 프로세스</p>
+                               <div className="mt-4 flex gap-1">
+                                  <div className="w-3 h-3 rounded-full bg-rose-200" />
+                                  <div className="w-3 h-3 rounded-full bg-rose-200" />
+                                  <div className="w-3 h-3 rounded-full bg-rose-500" />
+                               </div>
+                            </div>
+                         </div>
+
+                         {/* Large Graph/Table Placeholder */}
+                         <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm p-6 relative">
+                            <div className="flex items-center justify-between mb-8">
+                               <div className="space-y-1">
+                                  <div className="h-4 w-40 bg-slate-100 rounded-full" />
+                                  <div className="h-3 w-24 bg-slate-50 rounded-full" />
+                               </div>
+                               <div className="flex gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100" />
+                                  <div className="w-24 h-8 rounded-lg bg-indigo-50 border border-indigo-100" />
+                               </div>
+                            </div>
+                            
+                            <div className="space-y-6">
+                               {[1, 2, 3].map(i => (
+                                 <div key={i} className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center">
+                                       <Users className="w-5 h-5 text-slate-300" />
+                                    </div>
+                                    <div className="flex-1 space-y-2">
+                                       <div className="h-3 w-full bg-slate-50 rounded-full max-w-[200px]" />
+                                       <div className="h-2 w-full bg-slate-200/30 rounded-full" />
+                                    </div>
+                                    <div className="w-20 h-4 bg-indigo-50 rounded-full" />
+                                 </div>
+                               ))}
+                            </div>
+                            
+                            {/* Watermark/Title */}
+                            <div className="absolute right-10 bottom-10">
+                               <div className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-2xl flex items-center gap-2">
+                                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                                  Enterprise Secured
+                               </div>
+                            </div>
+                         </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              {/* Play Overlay */}
-              <div className="absolute inset-0 bg-slate-900/5 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl scale-90 group-hover:scale-100 transition-transform">
-                  <ChevronRight className="w-8 h-8 text-indigo-600 fill-current" />
+              ) : (
+                /* Video Player Area */
+                <div className="w-full h-full bg-slate-900 rounded-[24px] relative overflow-hidden animate-in fade-in slide-in-from-bottom-8 duration-700">
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 p-10 text-center">
+                    <div className="w-24 h-24 bg-white/10 backdrop-blur-xl border border-white/20 rounded-full flex items-center justify-center group/play cursor-pointer hover:scale-110 transition-all duration-500 hover:bg-indigo-600/20 active:scale-95">
+                      <ChevronRight className="w-10 h-10 text-white fill-current translate-x-1" />
+                    </div>
+                    <div className="space-y-3">
+                      <h3 className="text-2xl font-black text-white tracking-tight">HR FLOW 시연 동영상</h3>
+                      <p className="text-indigo-200/60 font-medium text-sm">스마트한 인사 관리를 직접 확인해보세요.</p>
+                    </div>
+                    
+                    {/* Fake Video Controls UI */}
+                    <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-lg px-8">
+                      <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden mb-4">
+                         <div className="h-full bg-indigo-500 w-1/3" />
+                      </div>
+                      <div className="flex justify-between items-center text-white/50 text-[10px] font-black uppercase tracking-widest">
+                         <div className="flex gap-4">
+                            <span>02:15 / 06:40</span>
+                            <span className="text-white">HD High Quality</span>
+                         </div>
+                         <div className="flex gap-4">
+                            <span>Settings</span>
+                            <span>Full Screen</span>
+                         </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Decorative blurred spots */}
+                  <div className="absolute top-1/4 -right-20 w-64 h-64 bg-indigo-600/30 rounded-full blur-[100px]" />
+                  <div className="absolute bottom-1/4 -left-20 w-64 h-64 bg-violet-600/30 rounded-full blur-[100px]" />
                 </div>
+              )}
+              
+              {/* Common Status Link in Spec */}
+              <div className="absolute top-6 right-10 flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
+                 <span className="text-[10px] font-black text-indigo-600 uppercase tracking-tighter">Live Demo Available</span>
               </div>
             </div>
           </div>
+        </div>
+      </section>
         </div>
       </section>
 
