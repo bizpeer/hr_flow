@@ -23,7 +23,7 @@ import { SubscriptionManagement } from './pages/SubscriptionManagement';
 import { SubscriptionRequired } from './pages/SubscriptionRequired';
 
 function App() {
-  const { initAuth, userData, user, loading } = useAuthStore();
+  const { initAuth, userData, companyData, user, loading } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -37,17 +37,21 @@ function App() {
     return <LoadingSplash />;
   }
 
+  const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
+  const isExpired = !isSuperAdmin && companyData?.subscriptionStatus === 'EXPIRED';
+
   return (
     <HashRouter>
       <LoginModal />
       <Routes>
         <Route path="/" element={
           !user ? <LandingPage /> : 
-          (userData ? <Navigate to={userData.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace /> : <LoadingSplash />)
+          (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <LoadingSplash />)
         } />
         <Route path="/login" element={
-          user ? <Navigate to={userData?.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard'} replace /> : <Login />
+          user ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <Login />
         } />
+        <Route path="/subscription-required" element={<SubscriptionRequired />} />
         
         <Route path="/*" element={
           !user ? <Navigate to="/login" replace /> : (
@@ -92,30 +96,28 @@ function App() {
 
                     {/* 구독 관리 (전용) - 블로킹 대상 제외 */}
                     <Route path="subscription" element={<ProtectedRoute requireAdmin><SubscriptionManagement /></ProtectedRoute>} />
-                    <Route path="subscription-required" element={<SubscriptionRequired />} />
 
                     {/* 일반 사용자 및 블로킹 로직 */}
-                    <Route path="*" element={
-                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> :
-                      (companyData?.subscriptionStatus === 'EXPIRED' ? <Navigate to="/subscription-required" replace /> : (
-                        <Routes>
-                          <Route path="/" element={<AttendanceDashboard />} />
-                          <Route path="dashboard" element={<AttendanceDashboard />} />
-                          <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
-                          <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                          <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+                    {isExpired ? (
+                      <Route path="*" element={<Navigate to="/subscription-required" replace />} />
+                    ) : (
+                      <>
+                        <Route path="/" element={<AttendanceDashboard />} />
+                        <Route path="dashboard" element={<AttendanceDashboard />} />
+                        <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
+                        <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                        <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
-                          <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                          <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
-                          <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                          <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
-                          <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                          <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
-                          
-                          <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                      ))
-                    } />
+                        <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
+                        <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
+                        <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
+                        <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
+                        <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
+                        <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
+                        
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </>
+                    )}
                   </Routes>
                 </div>
               </div>
