@@ -6,7 +6,7 @@ import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
   ToggleLeft, ToggleRight, Crown, Calendar,
-  TrendingUp, Briefcase, AlertTriangle, Key, Trash2, Lock, Loader2
+  TrendingUp, Briefcase, AlertTriangle, Key, Trash2, Lock, Loader2, CreditCard
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
@@ -49,21 +49,6 @@ export const SuperAdminDashboard: React.FC = () => {
       setBackendStatus(result.data as any);
     } catch (e) {
       console.warn("Backend status check failed:", e);
-    }
-  };
-
-  const calculateDDay = (createdAt: string) => {
-    if (!createdAt) return 'D+0';
-    try {
-      const start = new Date(createdAt);
-      start.setHours(0, 0, 0, 0);
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-      const diffTime = now.getTime() - start.getTime();
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1;
-      return `D+${diffDays}`;
-    } catch (e) {
-      return 'D+0';
     }
   };
 
@@ -737,5 +722,6 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
       )}
     </div>
-  );
+  </div>
+);
 };
