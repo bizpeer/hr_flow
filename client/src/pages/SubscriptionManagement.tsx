@@ -173,17 +173,18 @@ export const SubscriptionManagement: React.FC = () => {
               </ul>
             </div>
 
-            <div className="w-full md:w-[350px] space-y-6">
+            <div className="w-full md:w-[400px] space-y-6">
               <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
                 <div className="text-center mb-6">
                   <p className="text-slate-400 font-black text-xs uppercase tracking-widest mb-2">Subscription Fee</p>
-                  <p className="text-5xl font-black text-slate-900">$29.99<span className="text-lg text-slate-400">/mo</span></p>
+                  <p className="text-4xl font-black text-slate-900">$15<span className="text-lg text-slate-400">/mo</span></p>
+                  <p className="text-sm font-bold text-indigo-600 mt-1">또는 연간 $150 (특별 할인 적용)</p>
                 </div>
                 
                 {/* PayPal Container */}
-                <div id="paypal-container-36DMV6NKPEZYW" className="min-h-[150px] flex items-center justify-center">
+                <div id="paypal-container-36DMV6NKPEZYW" className="min-h-[150px] w-full overflow-hidden">
                   {!paypalLoaded && (
-                    <div className="flex flex-col items-center gap-3">
+                    <div className="flex flex-col items-center justify-center gap-3 py-10">
                       <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
                       <p className="text-xs font-bold text-slate-400">PayPal 결제 모듈 로딩 중...</p>
                     </div>
@@ -192,7 +193,7 @@ export const SubscriptionManagement: React.FC = () => {
 
                 <p className="text-[10px] text-slate-400 text-center mt-6 font-medium leading-relaxed">
                   결제 즉시 서비스 이용 기간이 연장됩니다.<br />
-                  환불 규정은 이용 약관을 확인해 주세요.
+                  연간 구독 시 더욱 저렴하게 이용하실 수 있습니다.
                 </p>
               </div>
             </div>
