@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, CalendarClock, Network, Settings, FileText, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2 } from 'lucide-react';
+import { Home, CalendarClock, Network, Settings, FileText, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2, CreditCard } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { useAuthStore } from '../store/authStore';
 
@@ -108,6 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
             {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
             {isDirector && <NavItem to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
             {isDirector && <NavItem to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
+            {isDirector && <NavItem to="/subscription" icon={CreditCard} label="결제/구독 관리" colorClass="amber" />}
           </>
         )}
       </nav>

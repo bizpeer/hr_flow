@@ -21,6 +21,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'COMPANIES' | 'PAYMENTS'>('COMPANIES');
   
   // 비밀번호 초기화 모달 상태
   const [showResetModal, setShowResetModal] = useState(false);
@@ -35,6 +36,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [backendStatus, setBackendStatus] = useState<{ version: string; deployedAt: string } | null>(null);
   const [isUploadingTaxTable, setIsUploadingTaxTable] = useState(false);
   const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number; fileName?: string } | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
 
   useEffect(() => {
     checkBackend();
@@ -89,7 +91,12 @@ export const SuperAdminDashboard: React.FC = () => {
       }
     });
 
-    return () => { unsubCompanies(); unsubUsers(); unsubTax(); };
+    const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPayments(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    });
+
+    return () => { unsubCompanies(); unsubUsers(); unsubTax(); unsubPayments(); };
   }, [userData]);
 
   const handleToggleStatus = async (companyId: string, currentStatus: string) => {
@@ -133,6 +140,22 @@ export const SuperAdminDashboard: React.FC = () => {
       setNewPassword('');
     } catch (err) {
       alert('비밀번호 초기화 실패: ' + (err as Error).message);
+    }
+  };
+
+  const handleUpdateSubscription = async (companyId: string, days: number) => {
+    try {
+      const companyRef = doc(db, 'companies', companyId);
+      const newEndDate = new Date();
+      newEndDate.setDate(newEndDate.getDate() + days);
+      
+      await updateDoc(companyRef, {
+        subscriptionStatus: 'ACTIVE',
+        subscriptionEndDate: newEndDate.toISOString()
+      });
+      alert('구독 기간이 업데이트되었습니다.');
+    } catch (err) {
+      alert('업데이트 실패: ' + (err as Error).message);
     }
   };
 
@@ -335,7 +358,29 @@ export const SuperAdminDashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* 세액표 관리 섹션 (SUPER_ADMIN 전용) */}
+        {/* Tab Selector */}
+        <div className="flex items-center gap-2 p-1.5 bg-white rounded-2xl shadow-sm border border-slate-100 w-fit">
+          <button 
+            onClick={() => setActiveTab('COMPANIES')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+              activeTab === 'COMPANIES' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            조직 관리
+          </button>
+          <button 
+            onClick={() => setActiveTab('PAYMENTS')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+              activeTab === 'PAYMENTS' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            결제 및 구독 내역
+          </button>
+        </div>
+
+        {activeTab === 'COMPANIES' ? (
+          <>
+            {/* 세액표 관리 섹션 (기존 코드 유지) */}
         <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white border border-slate-800">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
@@ -429,17 +474,32 @@ export const SuperAdminDashboard: React.FC = () => {
                             <span className="text-xs text-slate-400 flex items-center gap-1">
                               <Users className="w-3 h-3" /> {companyUsers.length}명
                             </span>
-                            <span className="text-xs text-slate-400 flex items-center gap-1">
-                              <Calendar className="w-3 h-3" /> {new Date(company.createdAt).toLocaleDateString('ko-KR')}
-                            </span>
-                            <span className="text-xs font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100 flex items-center gap-1">
-                              {calculateDDay(company.createdAt)}
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                              company.subscriptionStatus === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                              company.subscriptionStatus === 'EXPIRED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                              'bg-indigo-50 text-indigo-600 border-indigo-100'
+                            }`}>
+                              {company.subscriptionStatus || 'TRIAL'}
                             </span>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleUpdateSubscription(company.id, 30); }}
+                            className="px-3 py-1.5 text-[9px] font-black hover:bg-white rounded-lg transition-all"
+                          >
+                            +30일
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleUpdateSubscription(company.id, 365); }}
+                            className="px-3 py-1.5 text-[9px] font-black hover:bg-white rounded-lg transition-all"
+                          >
+                            +1년
+                          </button>
+                        </div>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleToggleStatus(company.id, company.status); }}
                           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -624,6 +684,55 @@ export const SuperAdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'PAYMENTS' && (
+        <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden p-8">
+           <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
+             <CreditCard className="w-6 h-6 text-indigo-600" /> 전체 결제 승인 내역
+           </h2>
+           <p className="text-slate-400 text-sm font-medium mb-8">
+             각 조직의 ADMIN이 PayPal을 통해 결제한 내역입니다. 실제 입금 여부를 대조하여 구독 상태를 관리하세요.
+           </p>
+           
+           <div className="overflow-x-auto">
+             <table className="w-full text-left">
+               <thead>
+                 <tr className="border-b border-slate-50">
+                   <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">조직 / 관리자</th>
+                   <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">거래 ID</th>
+                   <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">금액 / 통화</th>
+                   <th className="pb-4 text-[10px] font-black text-slate-400 uppercase tracking-widest px-4">날짜</th>
+                 </tr>
+               </thead>
+               <tbody className="divide-y divide-slate-50">
+                 {payments.map(p => (
+                   <tr key={p.id} className="hover:bg-slate-50 transition-all">
+                     <td className="py-4 px-4">
+                       <div className="font-black text-slate-800">{p.companyName}</div>
+                       <div className="text-[10px] text-slate-400 font-bold">{p.adminName} ({p.adminEmail || p.adminUid})</div>
+                     </td>
+                     <td className="py-4 px-4 text-[10px] font-mono text-slate-400">{p.transactionId}</td>
+                     <td className="py-4 px-4">
+                       <span className="font-black text-indigo-600">${p.amount || '29.99'}</span>
+                       <span className="text-[10px] text-slate-400 ml-1">{p.currency}</span>
+                     </td>
+                     <td className="py-4 px-4 text-[10px] text-slate-500 font-bold">
+                       {p.createdAt ? new Date(p.createdAt.seconds * 1000).toLocaleString() : '-'}
+                     </td>
+                   </tr>
+                 ))}
+                 {payments.length === 0 && (
+                   <tr>
+                     <td colSpan={4} className="py-20 text-center text-slate-300 font-bold">
+                       결제 내역이 아직 없습니다.
+                     </td>
+                   </tr>
+                 )}
+               </tbody>
+             </table>
+           </div>
         </div>
       )}
     </div>

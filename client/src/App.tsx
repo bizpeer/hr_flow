@@ -19,6 +19,8 @@ import { EmployeeManagement } from './pages/EmployeeManagement';
 import { SalaryManagement } from './pages/SalaryManagement';
 import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { LandingPage } from './pages/LandingPage';
+import { SubscriptionManagement } from './pages/SubscriptionManagement';
+import { SubscriptionRequired } from './pages/SubscriptionRequired';
 
 function App() {
   const { initAuth, userData, user, loading } = useAuthStore();
@@ -88,26 +90,32 @@ function App() {
                     {/* SUPER_ADMIN 전용 */}
                     <Route path="super-admin" element={<ProtectedRoute requireSuperAdmin><SuperAdminDashboard /></ProtectedRoute>} />
 
-                    {/* 일반 사용자 */}
-                    <Route path="" element={
-                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
-                    } />
-                    <Route path="dashboard" element={
-                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> : <AttendanceDashboard />
-                    } />
-                    
-                    <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
-                    <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                    <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+                    {/* 구독 관리 (전용) - 블로킹 대상 제외 */}
+                    <Route path="subscription" element={<ProtectedRoute requireAdmin><SubscriptionManagement /></ProtectedRoute>} />
+                    <Route path="subscription-required" element={<SubscriptionRequired />} />
 
-                    <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                    <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
-                    <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                    <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
-                    <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                    <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
+                    {/* 일반 사용자 및 블로킹 로직 */}
+                    <Route path="*" element={
+                      userData?.role === 'SUPER_ADMIN' ? <Navigate to="/super-admin" replace /> :
+                      (companyData?.subscriptionStatus === 'EXPIRED' ? <Navigate to="/subscription-required" replace /> : (
+                        <Routes>
+                          <Route path="/" element={<AttendanceDashboard />} />
+                          <Route path="dashboard" element={<AttendanceDashboard />} />
+                          <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
+                          <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                          <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
-                    <Route path="*" element={<Navigate to="/" replace />} />
+                          <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
+                          <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
+                          <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
+                          <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
+                          <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
+                          <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
+                          
+                          <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                      ))
+                    } />
                   </Routes>
                 </div>
               </div>

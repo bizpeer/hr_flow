@@ -21,6 +21,10 @@ export interface CompanyData {
   adminUid: string;
   createdAt: string;
   status: 'ACTIVE' | 'SUSPENDED';
+  subscriptionStatus?: 'ACTIVE' | 'EXPIRED' | 'TRIAL';
+  subscriptionEndDate?: string;
+  planType?: 'MONTHLY' | 'YEARLY';
+  lastPaymentDate?: string;
 }
 
 export interface UserData {
@@ -98,11 +102,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const companyDoc = await getDoc(doc(db, 'companies', companyId));
       if (companyDoc.exists()) {
         const data = companyDoc.data() as CompanyData;
+        
+        // 구독 상태 자동 계산 (실시간 반영을 위해 클라이언트 사이드에서 체크)
+        const trialDays = 90;
+        const createdDate = new Date(data.createdAt);
+        const expiryDate = new Date(createdDate.getTime() + trialDays * 24 * 60 * 60 * 1000);
+        const isTrialActive = new Date() < expiryDate;
+        
+        let subStatus = data.subscriptionStatus || 'TRIAL';
+        
+        // 체험 기간이 끝났는데 유효한 구독 종료일이 없거나 지난 경우 EXPIRED
+        if (!isTrialActive) {
+          if (!data.subscriptionEndDate || new Date() > new Date(data.subscriptionEndDate)) {
+            subStatus = 'EXPIRED';
+          } else {
+            subStatus = 'ACTIVE';
+          }
+        } else if (!data.subscriptionEndDate) {
+          subStatus = 'TRIAL';
+        } else if (new Date() < new Date(data.subscriptionEndDate)) {
+          subStatus = 'ACTIVE';
+        }
+
         set({ 
-          companyData: { ...data, id: companyDoc.id },
+          companyData: { ...data, id: companyDoc.id, subscriptionStatus: subStatus as any },
           systemDomain: data.domain || 'company.com'
         });
-        console.log("[System] Company Domain:", data.domain);
+        console.log("[System] Company Domain:", data.domain, "| Sub Status:", subStatus);
       }
     } catch (err) {
       console.error("[System] Failed to fetch company domain:", err);
