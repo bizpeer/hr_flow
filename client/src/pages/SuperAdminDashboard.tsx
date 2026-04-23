@@ -378,7 +378,7 @@ export const SuperAdminDashboard: React.FC = () => {
           </button>
         </div>
 
-        {activeTab === 'COMPANIES' ? (
+        {activeTab === 'COMPANIES' && (
           <>
             {/* 세액표 관리 섹션 (기존 코드 유지) */}
         <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white border border-slate-800">
@@ -581,7 +581,8 @@ export const SuperAdminDashboard: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
+      </>
+    )}
 
       {/* 비밀번호 초기화 모달 */}
       {showResetModal && (
