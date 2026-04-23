@@ -41,10 +41,14 @@ export const SubscriptionManagement: React.FC = () => {
             // 결제 정보 저장 및 회사 정보 업데이트
             const companyRef = doc(db, 'companies', companyData.id);
             
-            // 연간 구독 혹은 월간 구독 여부는 PayPal 버튼 설정에 따르지만, 
-            // 여기서는 기본적으로 결제 시 1개월(30일) 연장하는 예시로 작성 (실제 플랜에 맞춰 조정 가능)
-            const newEndDate = new Date();
-            newEndDate.setDate(newEndDate.getDate() + 30); // 30일 추가
+            // 기존 만료일 확인 및 연장 로직 개선
+            const currentEndDate = companyData.subscriptionEndDate ? new Date(companyData.subscriptionEndDate) : new Date();
+            const now = new Date();
+            
+            // 이미 만료되었다면 오늘부터 30일, 아니면 기존 날짜에 30일 추가
+            const baseDate = currentEndDate.getTime() < now.getTime() ? now : currentEndDate;
+            const newEndDate = new Date(baseDate);
+            newEndDate.setDate(newEndDate.getDate() + 30);
 
             await updateDoc(companyRef, {
               subscriptionStatus: 'ACTIVE',
@@ -58,7 +62,7 @@ export const SubscriptionManagement: React.FC = () => {
               companyName: companyData.nameKo,
               adminUid: userData?.uid,
               adminName: userData?.name,
-              amount: 0, // Hosted Buttons에서는 직접 금액을 가져오기 어려울 수 있음 (PayPal Dashboard 확인 필요)
+              amount: 15.00, // 월 $15 기준 (연간 구독일 경우 데이터 확인 필요)
               currency: 'USD',
               transactionId: data.orderID,
               createdAt: serverTimestamp(),
