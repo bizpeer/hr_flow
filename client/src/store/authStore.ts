@@ -25,6 +25,7 @@ export interface CompanyData {
   subscriptionEndDate?: string;
   planType?: 'MONTHLY' | 'YEARLY';
   lastPaymentDate?: string;
+  lastBackupAt?: string;
 }
 
 export interface UserData {

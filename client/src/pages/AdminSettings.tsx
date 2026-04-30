@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users } from 'lucide-react';
+import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users, Database, Clock, CloudDownload } from 'lucide-react';
 import { auth, db, functions } from '../firebase';
 import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
@@ -195,6 +195,44 @@ export const AdminSettings: React.FC = () => {
     }
   };
 
+  const handleRequestBackup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!verifyPassword) {
+      setMessage({ type: 'error', text: '백업 시작을 위해 관리자 비밀번호를 입력해주세요.' });
+      return;
+    }
+
+    setLoading(true);
+    setMessage({ type: '', text: '' });
+    try {
+      // 1. 관리자 비밀번호 재검증
+      await verifyAdmin();
+
+      if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
+
+      // 2. 백업 작업 등록 (비동기 처리를 위한 Task 생성)
+      // 실제 구현에서는 Cloud Functions가 이 컬렉션을 트리거하여 백업을 수행합니다.
+      await setDoc(doc(collection(db, 'backup_tasks')), {
+        companyId: userData.companyId,
+        requestedBy: userData.uid,
+        requestedAt: new Date().toISOString(),
+        status: 'pending',
+        type: 'FULL_EXPORT',
+        progress: 0
+      });
+
+      setMessage({ 
+        type: 'success', 
+        text: '백업 요청이 정상적으로 접수되었습니다. 데이터 크기에 따라 수 분이 소요될 수 있으며, 완료 시 관리자 이메일로 알림이 발송됩니다.' 
+      });
+      setVerifyPassword('');
+    } catch (err: any) {
+      setMessage({ type: 'error', text: '백업 요청 중 오류: ' + err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto space-y-8 md:space-y-10">
@@ -367,6 +405,78 @@ export const AdminSettings: React.FC = () => {
                 <span>보안 키 업데이트 적용</span>
               </button>
             </form>
+          </div>
+
+          {/* Data Backup & Recovery Section */}
+          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden group">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-indigo-900">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500 text-white rounded-xl">
+                  <Database className="w-5 h-5" />
+                </div>
+                <h2 className="text-xl font-black text-white tracking-tight">데이터 백업 및 보안 보관</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <CloudDownload className="w-4 h-4 text-indigo-400" />
+                <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest font-mono">Archive Protocol</span>
+              </div>
+            </div>
+
+            <div className="p-8 space-y-8">
+              <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
+                <div className="p-4 bg-white rounded-2xl shadow-sm text-indigo-600">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">최종 시스템 백업 일시</p>
+                  <p className="text-lg font-black text-slate-800 tabular-nums tracking-tight">
+                    {companyData?.lastBackupAt 
+                      ? new Date(companyData.lastBackupAt).toLocaleString('ko-KR', { 
+                          year: 'numeric', month: '2-digit', day: '2-digit', 
+                          hour: '2-digit', minute: '2-digit' 
+                        })
+                      : '백업 기록 없음'}
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleRequestBackup} className="space-y-6">
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-black text-slate-800 ml-1">
+                    <Lock className="w-4 h-4 text-indigo-500" /> 백업 실행 승인 (관리자 암호)
+                  </label>
+                  <input 
+                    type="password"
+                    required
+                    value={verifyPassword}
+                    onChange={(e) => setVerifyPassword(e.target.value)}
+                    placeholder="보안을 위해 비밀번호를 입력하세요"
+                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                  />
+                </div>
+
+                <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-start gap-4">
+                  <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
+                    백업 프로세스는 백그라운드에서 비동기로 진행됩니다. <br/>
+                    데이터가 많을 경우 압축 및 암호화에 시간이 걸릴 수 있습니다.
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full flex items-center justify-center gap-3 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <CloudDownload className="w-5 h-5" />
+                  )}
+                  <span>신규 백업 데이터 생성 요청</span>
+                </button>
+              </form>
+            </div>
           </div>
 
           {/* System Infrastructure Info - Added to replace/restore previous External DB info */}

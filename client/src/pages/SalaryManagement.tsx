@@ -3,7 +3,7 @@ import {
   Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart
 } from 'lucide-react';
 import { 
-  collection, query, onSnapshot, doc, updateDoc, where 
+  collection, query, onSnapshot, doc, updateDoc, where, addDoc, getDocs, orderBy, limit, serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
@@ -134,11 +134,18 @@ export const SalaryManagement: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
+  // Period Filters
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  
   // States for individual edits
   const [editingData, setEditingData] = useState<Record<string, Partial<UserData>>>({});
   const [isSaving, setIsSaving] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
   const [selectedDetails, setSelectedDetails] = useState<UserData | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -259,6 +266,79 @@ export const SalaryManagement: React.FC = () => {
              (emp.name.toLowerCase().includes(searchTerm.toLowerCase()));
     });
 
+  // Calculate totals for the filtered list
+  const totals = filteredEmployees.reduce((acc, emp) => {
+    const data = editingData[emp.uid] || {};
+    const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
+    if (res) {
+      acc.gross += res.monthlyGross;
+      acc.net += res.netPay;
+      acc.deductions += res.totalDeductions;
+      acc.tax += (res.incomeTax + res.localTax);
+      acc.insurance += res.totalInsurance;
+    }
+    return acc;
+  }, { gross: 0, net: 0, deductions: 0, tax: 0, insurance: 0 });
+
+  const handleApprovePayroll = async () => {
+    if (!isAdminOrMaster) return;
+    if (filteredEmployees.length === 0) {
+      alert('승인할 데이터가 없습니다.');
+      return;
+    }
+
+    const confirmMsg = `${selectedYear}년 ${selectedMonth}월 [${selectedDivision === 'ALL' ? '전체 본부' : divisions.find(d => d.id === selectedDivision)?.name}]의 
+총 급여 지출액 ${totals.gross.toLocaleString()}원을 승인하고 저장하시겠습니까?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsApproving(true);
+    try {
+      await addDoc(collection(db, 'payroll_records'), {
+        companyId: userData?.companyId,
+        year: selectedYear,
+        month: selectedMonth,
+        divisionId: selectedDivision,
+        divisionName: selectedDivision === 'ALL' ? '전체 본부' : (divisions.find(d => d.id === selectedDivision)?.name || '알 수 없음'),
+        employeeCount: filteredEmployees.length,
+        totalGross: totals.gross,
+        totalNet: totals.net,
+        totalDeductions: totals.deductions,
+        totalTax: totals.tax,
+        totalInsurance: totals.insurance,
+        approvedAt: serverTimestamp(),
+        approvedBy: userData?.uid,
+        approvedByName: userData?.name
+      });
+      alert('급여 지출 승인이 완료되었습니다.');
+      fetchHistory();
+    } catch (e) {
+      alert('승인 실패: ' + (e as Error).message);
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
+  const fetchHistory = async () => {
+    if (!userData?.companyId) return;
+    try {
+      const q = query(
+        collection(db, 'payroll_records'),
+        where('companyId', '==', userData.companyId),
+        orderBy('approvedAt', 'desc'),
+        limit(10)
+      );
+      const snap = await getDocs(q);
+      setHistoryRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      console.error('Error fetching history:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [userData?.companyId]);
+
   const handlePrint = () => {
     window.print();
   };
@@ -291,9 +371,13 @@ export const SalaryManagement: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            {isChangedAny && (
-               <div className="px-4 py-2 bg-rose-50 text-rose-500 text-[10px] font-black rounded-lg animate-pulse border border-rose-100">저장되지 않은 변경사항이 있습니다</div>
-            )}
+            <button 
+              onClick={() => setShowHistory(true)}
+              className="flex items-center gap-2 px-6 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+            >
+              <Info className="w-4 h-4 text-indigo-500" />
+              과거 승인 내역
+            </button>
             <div className="relative group w-full lg:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input 
@@ -303,6 +387,64 @@ export const SalaryManagement: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+
+        {/* Period & Summary Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+           {/* Period Selector */}
+           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                 <Filter className="w-4 h-4" />
+                 <span className="text-[10px] font-black uppercase tracking-widest">지출 대상 기간 선택</span>
+              </div>
+              <div className="flex gap-3">
+                 <select 
+                   value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
+                   className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                 >
+                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
+                 </select>
+                 <select 
+                   value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                   className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
+                 >
+                    {Array.from({length: 12}, (_, i) => i + 1).map(m => <option key={m} value={m}>{m}월</option>)}
+                 </select>
+              </div>
+              <p className="text-[10px] font-bold text-slate-400">지출액 저장 시 해당 연도/월로 기록됩니다.</p>
+           </div>
+
+           {/* Summary Stats */}
+           <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-100 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-8 opacity-10">
+                 <PieChart className="w-32 h-32" />
+              </div>
+              
+              <div className="flex-1 grid grid-cols-3 gap-6 relative z-10 w-full">
+                 <div className="space-y-1">
+                    <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest">총 지급액 (Gross)</p>
+                    <p className="text-xl font-black">{totals.gross.toLocaleString()}<span className="text-xs ml-1 opacity-60">원</span></p>
+                 </div>
+                 <div className="space-y-1 border-l border-white/10 pl-6">
+                    <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest">총 공제액 (Deduction)</p>
+                    <p className="text-xl font-black">{totals.deductions.toLocaleString()}<span className="text-xs ml-1 opacity-60">원</span></p>
+                 </div>
+                 <div className="space-y-1 border-l border-white/10 pl-6">
+                    <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest">총 실지급액 (Net)</p>
+                    <p className="text-xl font-black text-emerald-300">{totals.net.toLocaleString()}<span className="text-xs ml-1 opacity-60">원</span></p>
+                 </div>
+              </div>
+
+              <div className="relative z-10 w-full md:w-auto">
+                 <button 
+                   onClick={handleApprovePayroll}
+                   disabled={isApproving}
+                   className="w-full md:w-48 py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                 >
+                    {isApproving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Banknote className="w-5 h-5" /> 지출 승인 및 저장</>}
+                 </button>
+              </div>
+           </div>
         </div>
 
         {/* Filters */}
@@ -761,7 +903,62 @@ export const SalaryManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Global CSS for Print */}
+      {/* History Modal */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl border border-slate-100 overflow-hidden">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                 <div className="flex items-center gap-3">
+                    <PieChart className="w-6 h-6 text-indigo-600" />
+                    <div>
+                       <h2 className="text-xl font-black text-slate-900">급여 지출 승인 이력</h2>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">최근 10건의 지출 승인 내역을 표시합니다.</p>
+                    </div>
+                 </div>
+                 <button onClick={() => setShowHistory(false)} className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm"><X className="w-5 h-5 text-slate-400" /></button>
+              </div>
+              
+              <div className="p-8">
+                 <div className="overflow-hidden border border-slate-100 rounded-2xl">
+                    <table className="w-full">
+                       <thead className="bg-slate-50">
+                          <tr>
+                             <th className="px-6 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">승인 기간/대상</th>
+                             <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">인원</th>
+                             <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">총 지급액</th>
+                             <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">실 수령액</th>
+                             <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">승인 일시</th>
+                          </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                          {historyRecords.length === 0 ? (
+                             <tr>
+                                <td colSpan={5} className="px-6 py-20 text-center text-xs font-bold text-slate-300">승인 내역이 없습니다.</td>
+                             </tr>
+                          ) : (
+                             historyRecords.map(rec => (
+                                <tr key={rec.id} className="hover:bg-slate-50/50 transition-colors">
+                                   <td className="px-6 py-4">
+                                      <div className="text-xs font-black text-slate-800">{rec.year}년 {rec.month}월</div>
+                                      <div className="text-[10px] font-bold text-indigo-500">{rec.divisionName}</div>
+                                   </td>
+                                   <td className="px-6 py-4 text-right font-bold text-slate-600 text-xs">{rec.employeeCount}명</td>
+                                   <td className="px-6 py-4 text-right font-black text-slate-800 text-xs">{rec.totalGross.toLocaleString()}원</td>
+                                   <td className="px-6 py-4 text-right font-black text-emerald-600 text-xs">{rec.totalNet.toLocaleString()}원</td>
+                                   <td className="px-6 py-4 text-right">
+                                      <div className="text-[10px] font-bold text-slate-500">{rec.approvedAt?.toDate().toLocaleDateString()}</div>
+                                      <div className="text-[9px] font-medium text-slate-400">{rec.approvedByName}</div>
+                                   </td>
+                                </tr>
+                             ))
+                          )}
+                       </tbody>
+                    </table>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
           body * { visibility: hidden; }

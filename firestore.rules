@@ -162,6 +162,13 @@ service cloud.firestore {
       allow write: if isSuperAdmin();
     }
 
+    // 데이터 백업 작업 (backup_tasks)
+    match /backup_tasks/{taskId} {
+      allow read: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
+      allow create: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(request.resource.data.companyId)));
+      allow delete: if isSuperAdmin();
+    }
+
     // 기본 규칙: 그 외 명시되지 않은 모든 컬렉션은 SUPER_ADMIN만 접근 가능
     match /{document=**} {
       allow read, write: if isSuperAdmin();
