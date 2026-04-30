@@ -209,25 +209,72 @@ export const AdminSettings: React.FC = () => {
       await verifyAdmin();
 
       if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
+      const companyId = userData.companyId;
 
-      // 2. 백업 작업 등록 (비동기 처리를 위한 Task 생성)
-      // 실제 구현에서는 Cloud Functions가 이 컬렉션을 트리거하여 백업을 수행합니다.
+      setMessage({ type: 'success', text: '데이터를 수집 중입니다. 잠시만 기다려주세요...' });
+
+      // 2. 회사 관련 전체 데이터 수집 (Client-Side)
+      const collectionsToBackup = [
+        'UserProfile', 'divisions', 'teams', 'expenses', 
+        'leaves', 'attendance', 'payroll_records', 'notices', 'AuditLogs'
+      ];
+      
+      const backupData: Record<string, any[]> = {};
+
+      for (const colName of collectionsToBackup) {
+        const q = query(collection(db, colName), where('companyId', '==', companyId));
+        const snap = await getDocs(q);
+        backupData[colName] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      }
+
+      // 회사 기본 정보도 포함
+      const companyDataObj = companyData ? { ...companyData } : {};
+      const finalBackup = {
+        companyInfo: companyDataObj,
+        exportDate: new Date().toISOString(),
+        exportedBy: userData.email,
+        data: backupData
+      };
+
+      // 3. JSON 파일 생성 및 다운로드 (Blob)
+      const dataStr = JSON.stringify(finalBackup, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const dateString = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup_${companyData?.domain || companyId}_${dateString}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // 4. 마지막 백업 일시 업데이트
+      await setDoc(doc(db, 'companies', companyId), {
+        lastBackupAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+
+      // 5. backup_tasks에도 기록 남기기
       await setDoc(doc(collection(db, 'backup_tasks')), {
-        companyId: userData.companyId,
+        companyId: companyId,
         requestedBy: userData.uid,
         requestedAt: new Date().toISOString(),
-        status: 'pending',
-        type: 'FULL_EXPORT',
-        progress: 0
+        status: 'completed',
+        type: 'FULL_EXPORT_DOWNLOAD'
       });
+
+      // 스토어 갱신 (마지막 백업 일시 화면 반영)
+      await fetchCompanyDomain(companyId);
 
       setMessage({ 
         type: 'success', 
-        text: '백업 요청이 정상적으로 접수되었습니다. 데이터 크기에 따라 수 분이 소요될 수 있으며, 완료 시 관리자 이메일로 알림이 발송됩니다.' 
+        text: '백업 데이터 다운로드가 완료되었습니다. 안전한 곳에 보관해 주세요.' 
       });
       setVerifyPassword('');
     } catch (err: any) {
-      setMessage({ type: 'error', text: '백업 요청 중 오류: ' + err.message });
+      setMessage({ type: 'error', text: '백업 처리 중 오류: ' + err.message });
     } finally {
       setLoading(false);
     }
@@ -458,8 +505,8 @@ export const AdminSettings: React.FC = () => {
                 <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-start gap-4">
                   <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
-                    백업 프로세스는 백그라운드에서 비동기로 진행됩니다. <br/>
-                    데이터가 많을 경우 압축 및 암호화에 시간이 걸릴 수 있습니다.
+                    백업 프로세스는 브라우저 내에서 안전하게 처리되며 즉시 JSON 파일로 다운로드됩니다. <br/>
+                    데이터 크기에 따라 수 초에서 수십 초가 소요될 수 있으니 창을 닫지 말고 기다려주세요.
                   </p>
                 </div>
 
@@ -473,7 +520,7 @@ export const AdminSettings: React.FC = () => {
                   ) : (
                     <CloudDownload className="w-5 h-5" />
                   )}
-                  <span>신규 백업 데이터 생성 요청</span>
+                  <span>전체 데이터 로컬 백업 다운로드</span>
                 </button>
               </form>
             </div>
