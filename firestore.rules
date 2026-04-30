@@ -69,26 +69,24 @@ service cloud.firestore {
 
     // 유저/직원 프로필 관리 (UserProfile)
     match /UserProfile/{userId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || request.auth.uid == userId || isSameCompany(resource.data.companyId));
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin() || isSameCompany(resource.data.companyId));
       
       allow create: if isAuthenticated();
 
       allow update: if isAuthenticated() && (
-        isSuperAdmin() || 
-        (isAdmin() && (
-          // 1. 본인 문서인 경우: role, companyId, status 필드 수정 금지 (자가 보호)
-          (request.auth.uid == userId && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'status'])) ||
-          // 2. 타인 문서인 경우: 대상자가 Owner인 경우 role 및 status 덮어쓰기 금지
-          (request.auth.uid != userId && (
-             !isDocCompanyOwner(resource.data.companyId, userId) || 
-             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
-          ))
+        (request.auth.uid == userId && (
+          // 1. 본인 정보 수정 (resource.data 직접 참조로 재귀 방지)
+          (resource.data.role == 'ADMIN' && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'status'])) ||
+          (resource.data.role != 'ADMIN' && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId', 'status']))
         )) ||
-        ( 
-          // 3. MEMBER / SUB_ADMIN 의 본인 단순 정보 수정 (민감 및 권한 정보 불가)
-          (request.auth.uid == userId) && 
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId', 'status'])
-        )
+        (request.auth.uid != userId && (
+          isSuperAdmin() || 
+          (isAdmin() && isSameCompany(resource.data.companyId) && (
+            // 대상자가 Owner인 경우 role 및 status 수정 불가
+            !isDocCompanyOwner(resource.data.companyId, userId) || 
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
+          ))
+        ))
       );
 
       allow delete: if isAuthenticated() && (isSuperAdmin() || isAdmin());

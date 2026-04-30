@@ -188,18 +188,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 }
               }
               // [중요 가드] fallback도 없고 currentData도 없는 경우 -> 가입 직후 프로필 생성 전!
-              console.log("[Auth] Profile document not found yet. Waiting for register completion...");
-              
               // [해결] 찌꺼기 계정 방어 로직 (DB Profile 누락된 고스트 세션)
-              // 3초 대기 후에도 userData가 채워지지 않으면 무한 로딩을 막기 위해 강제 로그아웃
+              // 7초 대기 후에도 userData가 채워지지 않으면 무한 로딩을 막기 위해 강제 로그아웃 처리 검토
               setTimeout(() => {
-                if (get().loading && !get().userData) {
-                  console.log("[Auth] ERROR: No profile found after timeout. Forcing sign out.");
-                  auth.signOut();
+                if (get().loading && !get().userData && auth.currentUser) {
+                  console.warn("[Auth] WARNING: No profile found after 7s timeout. Please check 'weberp' database.");
+                  // 강제 로그아웃은 사용자 경험을 해칠 수 있으므로, 로딩 상태만 해제하고 로그인 페이지에서 처리하도록 유도
+                  set({ loading: false });
                 }
-              }, 3000);
+              }, 7000);
 
-              return; // 프로필이 정상적으로 생성될 때까지 즉각적인 렌더링을 지연시킴
+              return; 
             }
 
 

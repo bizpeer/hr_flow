@@ -46,7 +46,8 @@ function App() {
       <Routes>
         <Route path="/" element={
           !user ? <LandingPage /> : 
-          (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <LoadingSplash />)
+          (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : 
+           (loading ? <LoadingSplash /> : <Navigate to="/login" replace />))
         } />
         <Route path="/login" element={
           user ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <Login />

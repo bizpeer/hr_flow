@@ -38,6 +38,13 @@ export const SuperAdminDashboard: React.FC = () => {
   const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number; fileName?: string } | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
 
+  // 구독 기간 연장 모달 상태
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [subscriptionTarget, setSubscriptionTarget] = useState<{ id: string, name: string, currentEndDate: string } | null>(null);
+  const [subscriptionDaysToAdd, setSubscriptionDaysToAdd] = useState<number>(30);
+  const [subscriptionPassword, setSubscriptionPassword] = useState('');
+  const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
+
   useEffect(() => {
     checkBackend();
   }, []);
@@ -128,19 +135,43 @@ export const SuperAdminDashboard: React.FC = () => {
     }
   };
 
-  const handleUpdateSubscription = async (companyId: string, days: number) => {
+  const handleSubscriptionUpdateWithAuth = async () => {
+    if (!subscriptionTarget || !subscriptionPassword || !auth.currentUser?.email) return;
+    
+    setIsUpdatingSubscription(true);
     try {
-      const companyRef = doc(db, 'companies', companyId);
-      const newEndDate = new Date();
-      newEndDate.setDate(newEndDate.getDate() + days);
+      // 1. SUPER_ADMIN 비밀번호 재확인 (보안)
+      const credential = EmailAuthProvider.credential(auth.currentUser.email, subscriptionPassword);
+      await reauthenticateWithCredential(auth.currentUser, credential);
+
+      // 2. DB 업데이트
+      const companyRef = doc(db, 'companies', subscriptionTarget.id);
+      
+      // 현재 종료일이 미래면 그 기준, 과거거나 없으면 오늘 기준
+      const currentEnd = subscriptionTarget.currentEndDate ? new Date(subscriptionTarget.currentEndDate) : new Date();
+      const baseDate = currentEnd > new Date() ? currentEnd : new Date();
+      const newEndDate = new Date(baseDate);
+      newEndDate.setDate(newEndDate.getDate() + subscriptionDaysToAdd);
       
       await updateDoc(companyRef, {
         subscriptionStatus: 'ACTIVE',
         subscriptionEndDate: newEndDate.toISOString()
       });
-      alert('구독 기간이 업데이트되었습니다.');
-    } catch (err) {
-      alert('업데이트 실패: ' + (err as Error).message);
+      
+      alert(`[완료] 해당 조직의 구독 기간이 ${subscriptionDaysToAdd}일 연장되었습니다.`);
+      setShowSubscriptionModal(false);
+      setSubscriptionTarget(null);
+      setSubscriptionPassword('');
+      setSubscriptionDaysToAdd(30);
+    } catch (err: any) {
+      console.error('[Subscription Update Error]', err);
+      let msg = err.message || '알 수 없는 오류가 발생했습니다.';
+      if (err.code === 'auth/wrong-password' || err.message?.includes('password')) {
+        msg = '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
+      }
+      alert('기간 연장 실패:\n' + msg);
+    } finally {
+      setIsUpdatingSubscription(false);
     }
   };
 
@@ -255,6 +286,15 @@ export const SuperAdminDashboard: React.FC = () => {
       alert('세액표 업로드 실패: ' + err.message);
       setIsUploadingTaxTable(false);
     }
+  };
+
+  const calculateRemainingDays = (endDateStr?: string) => {
+    if (!endDateStr) return null;
+    const end = new Date(endDateStr);
+    const now = new Date();
+    const diffTime = end.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
   };
 
   if (loading) {
@@ -466,25 +506,29 @@ export const SuperAdminDashboard: React.FC = () => {
                             }`}>
                               {company.subscriptionStatus || 'TRIAL'}
                             </span>
+                            {calculateRemainingDays(company.subscriptionEndDate) !== null && (
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${
+                                calculateRemainingDays(company.subscriptionEndDate)! > 0 ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-rose-50 text-rose-600 border-rose-100'
+                              }`}>
+                                {calculateRemainingDays(company.subscriptionEndDate)! > 0 ? `${calculateRemainingDays(company.subscriptionEndDate)}일 남음` : '만료됨'}
+                                {company.subscriptionEndDate && ` (~${new Date(company.subscriptionEndDate).toLocaleDateString()})`}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleUpdateSubscription(company.id, 30); }}
-                            className="px-3 py-1.5 text-[9px] font-black hover:bg-white rounded-lg transition-all"
-                          >
-                            +30일
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleUpdateSubscription(company.id, 365); }}
-                            className="px-3 py-1.5 text-[9px] font-black hover:bg-white rounded-lg transition-all"
-                          >
-                            +1년
-                          </button>
-                        </div>
+                        <button
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setSubscriptionTarget({ id: company.id, name: company.nameKo || '', currentEndDate: company.subscriptionEndDate || '' }); 
+                            setShowSubscriptionModal(true); 
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all bg-indigo-50 text-indigo-600 hover:bg-indigo-100 border border-indigo-100"
+                        >
+                          <Calendar className="w-4 h-4" /> 기간 연장
+                        </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleToggleStatus(company.id, company.status); }}
                           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
@@ -568,6 +612,81 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
       </>
     )}
+
+      {/* 구독 기간 변경 모달 */}
+      {showSubscriptionModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-900">사용기간 변경</h3>
+                <p className="text-xs text-slate-400 font-bold">{subscriptionTarget?.name}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">연장할 기간 (일)</label>
+                <div className="flex items-center gap-2 mt-1">
+                  {[30, 90, 365].map(days => (
+                    <button
+                      key={days}
+                      onClick={() => setSubscriptionDaysToAdd(days)}
+                      className={`flex-1 py-2 rounded-xl text-xs font-black transition-all ${
+                        subscriptionDaysToAdd === days ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'bg-slate-50 text-slate-500 hover:bg-slate-100'
+                      }`}
+                    >
+                      {days}일
+                    </button>
+                  ))}
+                  <input 
+                    type="number"
+                    value={subscriptionDaysToAdd}
+                    onChange={(e) => setSubscriptionDaysToAdd(parseInt(e.target.value) || 0)}
+                    className="w-20 p-2 text-center bg-slate-50 border border-slate-100 rounded-xl outline-none focus:border-indigo-500 transition-all font-bold text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5 ml-1 mt-4">
+                  <Lock className="w-3 h-3 text-slate-400" />
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">본인 비밀번호 재확인</label>
+                </div>
+                <input 
+                  type="password" 
+                  value={subscriptionPassword}
+                  onChange={(e) => setSubscriptionPassword(e.target.value)}
+                  placeholder="비밀번호를 입력하세요"
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-50/50 transition-all font-bold"
+                />
+              </div>
+              <div className="pt-2 flex flex-col gap-2">
+                <button 
+                  disabled={isUpdatingSubscription || !subscriptionPassword}
+                  onClick={handleSubscriptionUpdateWithAuth}
+                  className={`w-full p-4 bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 ${
+                    isUpdatingSubscription ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isUpdatingSubscription ? (
+                    <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  ) : '변경사항 저장'}
+                </button>
+                <button 
+                  disabled={isUpdatingSubscription}
+                  onClick={() => { setShowSubscriptionModal(false); setSubscriptionPassword(''); }}
+                  className="w-full p-4 text-slate-400 font-bold text-sm hover:bg-slate-50 rounded-2xl transition-all"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 비밀번호 초기화 모달 */}
       {showResetModal && (

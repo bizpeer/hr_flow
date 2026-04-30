@@ -42,13 +42,8 @@ export const Login: React.FC = () => {
         const profileSnap = await getDoc(doc(db, 'UserProfile', userCredential.user.uid));
         
         if (!profileSnap.exists()) {
-          try {
-            await userCredential.user.delete(); // 즉각적인 Auth DB 찌꺼기 삭제
-            setError('이전 테넌트(조직) 정보가 제거된 계정입니다. 안전하게 초기화되었으므로, [회원가입] 탭에서 새로운 조직을 생성해주세요.');
-          } catch (e) {
-            await auth.signOut();
-            setError('접근할 수 없는 계정입니다 (데이터 유실). 원활한 처리를 위해 관리자에게 문의해주세요.');
-          }
+          await auth.signOut();
+          setError('해당 계정의 프로필 정보를 찾을 수 없습니다. (데이터베이스 ID: weberp)');
           setLoading(false);
           return;
         }
