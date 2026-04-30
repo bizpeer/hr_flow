@@ -213,19 +213,7 @@ export const SalaryManagement: React.FC = () => {
     }));
   };
 
-  const isChangedAny = Object.keys(editingData).some((uid: any) => {
-    const emp = employees.find((e: any) => e.uid === uid);
-    if (!emp) return false;
-    const data = editingData[uid];
-    return JSON.stringify(data) !== JSON.stringify({
-       annualSalary: emp.annualSalary || 0,
-       salaryType: emp.salaryType || 'ANNUAL',
-       isSeveranceIncluded: emp.isSeveranceIncluded || false,
-       dependents: emp.dependents || 1,
-       childrenUnder20: emp.childrenUnder20 || 0,
-       nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
-    });
-  });
+
 
   const handleSalaryAdd = (uid: string, amount: number) => {
     const currentData = editingData[uid] || {};
