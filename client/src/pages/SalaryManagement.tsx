@@ -147,6 +147,12 @@ export const SalaryManagement: React.FC = () => {
   const [historyRecords, setHistoryRecords] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
+  // History Range Filters
+  const [historyStartYear, setHistoryStartYear] = useState<number>(new Date().getFullYear());
+  const [historyStartMonth, setHistoryStartMonth] = useState<number>(1);
+  const [historyEndYear, setHistoryEndYear] = useState<number>(new Date().getFullYear());
+  const [historyEndMonth, setHistoryEndMonth] = useState<number>(new Date().getMonth() + 1);
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleGlobalClick = () => setActiveMenuId(null);
@@ -314,10 +320,19 @@ export const SalaryManagement: React.FC = () => {
         collection(db, 'payroll_records'),
         where('companyId', '==', userData.companyId),
         orderBy('approvedAt', 'desc'),
-        limit(10)
+        limit(1000)
       );
       const snap = await getDocs(q);
-      setHistoryRecords(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+      
+      const filteredRecords = allRecords.filter(r => {
+        const recordValue = r.year * 12 + r.month;
+        const startValue = historyStartYear * 12 + historyStartMonth;
+        const endValue = historyEndYear * 12 + historyEndMonth;
+        return recordValue >= startValue && recordValue <= endValue;
+      });
+      
+      setHistoryRecords(filteredRecords);
     } catch (e) {
       console.error('Error fetching history:', e);
     }
@@ -325,7 +340,7 @@ export const SalaryManagement: React.FC = () => {
 
   useEffect(() => {
     fetchHistory();
-  }, [userData?.companyId]);
+  }, [userData?.companyId, historyStartYear, historyStartMonth, historyEndYear, historyEndMonth]);
 
   const handlePrint = () => {
     window.print();
@@ -894,19 +909,51 @@ export const SalaryManagement: React.FC = () => {
       {/* History Modal */}
       {showHistory && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl border border-slate-100 overflow-hidden">
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl border border-slate-100 flex flex-col max-h-[90vh]">
+              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
                  <div className="flex items-center gap-3">
                     <PieChart className="w-6 h-6 text-indigo-600" />
                     <div>
                        <h2 className="text-xl font-black text-slate-900">급여 지출 승인 이력</h2>
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">최근 10건의 지출 승인 내역을 표시합니다.</p>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">지정된 기간 내의 급여 지출 승인 내역을 표시합니다.</p>
                     </div>
                  </div>
                  <button onClick={() => setShowHistory(false)} className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm"><X className="w-5 h-5 text-slate-400" /></button>
               </div>
               
-              <div className="p-8">
+              <div className="p-6 border-b border-slate-100 bg-white flex flex-wrap gap-4 items-end flex-shrink-0">
+                <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">시작 연/월</label>
+                   <div className="flex gap-2">
+                     <select className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 bg-slate-50" value={historyStartYear} onChange={e => setHistoryStartYear(Number(e.target.value))}>
+                       {Array.from({length: 5}).map((_, i) => {
+                         const y = new Date().getFullYear() - i;
+                         return <option key={y} value={y}>{y}년</option>;
+                       })}
+                     </select>
+                     <select className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 bg-slate-50" value={historyStartMonth} onChange={e => setHistoryStartMonth(Number(e.target.value))}>
+                       {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>{i+1}월</option>)}
+                     </select>
+                   </div>
+                </div>
+                <div className="text-slate-400 font-bold mb-2 pb-2">~</div>
+                <div>
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">종료 연/월</label>
+                   <div className="flex gap-2">
+                     <select className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 bg-slate-50" value={historyEndYear} onChange={e => setHistoryEndYear(Number(e.target.value))}>
+                       {Array.from({length: 5}).map((_, i) => {
+                         const y = new Date().getFullYear() - i;
+                         return <option key={y} value={y}>{y}년</option>;
+                       })}
+                     </select>
+                     <select className="border border-slate-200 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 bg-slate-50" value={historyEndMonth} onChange={e => setHistoryEndMonth(Number(e.target.value))}>
+                       {Array.from({length: 12}).map((_, i) => <option key={i+1} value={i+1}>{i+1}월</option>)}
+                     </select>
+                   </div>
+                </div>
+              </div>
+
+              <div className="p-8 overflow-y-auto">
                  <div className="overflow-hidden border border-slate-100 rounded-2xl">
                     <table className="w-full">
                        <thead className="bg-slate-50">
