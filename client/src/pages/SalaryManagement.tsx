@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart
+  Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart, Trash2
 } from 'lucide-react';
 import { 
-  collection, query, onSnapshot, doc, updateDoc, where, addDoc, getDocs, orderBy, limit, serverTimestamp 
+  collection, query, onSnapshot, doc, updateDoc, where, addDoc, getDocs, orderBy, limit, serverTimestamp, deleteDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
@@ -335,6 +335,17 @@ export const SalaryManagement: React.FC = () => {
       setHistoryRecords(filteredRecords);
     } catch (e) {
       console.error('Error fetching history:', e);
+    }
+  };
+
+  const handleDeleteRecord = async (recordId: string) => {
+    if (!window.confirm('해당 급여 지출 승인 내역을 삭제하시겠습니까?')) return;
+    try {
+      await deleteDoc(doc(db, 'payroll_records', recordId));
+      alert('승인 내역이 삭제되었습니다.');
+      fetchHistory();
+    } catch (e) {
+      alert('삭제 실패: ' + (e as Error).message);
     }
   };
 
@@ -963,12 +974,13 @@ export const SalaryManagement: React.FC = () => {
                              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">총 지급액</th>
                              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">실 수령액</th>
                              <th className="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">승인 일시</th>
+                             <th className="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest w-16">관리</th>
                           </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
                           {historyRecords.length === 0 ? (
                              <tr>
-                                <td colSpan={5} className="px-6 py-20 text-center text-xs font-bold text-slate-300">승인 내역이 없습니다.</td>
+                                <td colSpan={6} className="px-6 py-20 text-center text-xs font-bold text-slate-300">승인 내역이 없습니다.</td>
                              </tr>
                           ) : (
                              historyRecords.map(rec => (
@@ -983,6 +995,15 @@ export const SalaryManagement: React.FC = () => {
                                    <td className="px-6 py-4 text-right">
                                       <div className="text-[10px] font-bold text-slate-500">{rec.approvedAt?.toDate().toLocaleDateString()}</div>
                                       <div className="text-[9px] font-medium text-slate-400">{rec.approvedByName}</div>
+                                   </td>
+                                   <td className="px-6 py-4 text-center">
+                                      <button 
+                                        onClick={() => handleDeleteRecord(rec.id)}
+                                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                        title="기록 삭제"
+                                      >
+                                        <Trash2 className="w-4 h-4 mx-auto" />
+                                      </button>
                                    </td>
                                 </tr>
                              ))
