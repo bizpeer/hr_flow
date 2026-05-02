@@ -3,7 +3,7 @@ import {
   Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart, Trash2
 } from 'lucide-react';
 import { 
-  collection, query, onSnapshot, doc, updateDoc, where, addDoc, getDocs, orderBy, limit, serverTimestamp, deleteDoc 
+  collection, query, onSnapshot, doc, updateDoc, where, addDoc, getDocs, serverTimestamp, deleteDoc 
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
@@ -305,7 +305,9 @@ export const SalaryManagement: React.FC = () => {
         approvedByName: userData?.name
       });
       alert('급여 지출 승인이 완료되었습니다.');
-      fetchHistory();
+      if (userData?.companyId) {
+        fetchHistory(userData.companyId, historyStartYear, historyStartMonth, historyEndYear, historyEndMonth);
+      }
     } catch (e) {
       alert('승인 실패: ' + (e as Error).message);
     } finally {
@@ -313,28 +315,33 @@ export const SalaryManagement: React.FC = () => {
     }
   };
 
-  const fetchHistory = async () => {
-    if (!userData?.companyId) return;
+  const fetchHistory = async (
+    companyId: string,
+    startYear: number, startMonth: number,
+    endYear: number, endMonth: number
+  ) => {
     try {
       const q = query(
         collection(db, 'payroll_records'),
-        where('companyId', '==', userData.companyId),
-        orderBy('approvedAt', 'desc'),
-        limit(1000)
+        where('companyId', '==', companyId)
       );
       const snap = await getDocs(q);
       const allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
-      
-      const filteredRecords = allRecords.filter(r => {
-        const recordValue = r.year * 12 + r.month;
-        const startValue = historyStartYear * 12 + historyStartMonth;
-        const endValue = historyEndYear * 12 + historyEndMonth;
-        return recordValue >= startValue && recordValue <= endValue;
-      });
-      
+
+      const startValue = startYear * 12 + startMonth;
+      const endValue = endYear * 12 + endMonth;
+
+      const filteredRecords = allRecords
+        .filter(r => {
+          const recordValue = r.year * 12 + r.month;
+          return recordValue >= startValue && recordValue <= endValue;
+        })
+        .sort((a, b) => (b.year * 12 + b.month) - (a.year * 12 + a.month));
+
+      console.log(`[SalaryHistory] total=${allRecords.length}, filtered=${filteredRecords.length}`);
       setHistoryRecords(filteredRecords);
-    } catch (e) {
-      console.error('Error fetching history:', e);
+    } catch (e: any) {
+      console.error('[SalaryHistory] fetch error:', e);
     }
   };
 
@@ -343,14 +350,17 @@ export const SalaryManagement: React.FC = () => {
     try {
       await deleteDoc(doc(db, 'payroll_records', recordId));
       alert('승인 내역이 삭제되었습니다.');
-      fetchHistory();
+      if (userData?.companyId) {
+        fetchHistory(userData.companyId, historyStartYear, historyStartMonth, historyEndYear, historyEndMonth);
+      }
     } catch (e) {
       alert('삭제 실패: ' + (e as Error).message);
     }
   };
 
   useEffect(() => {
-    fetchHistory();
+    if (!userData?.companyId) return;
+    fetchHistory(userData.companyId, historyStartYear, historyStartMonth, historyEndYear, historyEndMonth);
   }, [userData?.companyId, historyStartYear, historyStartMonth, historyEndYear, historyEndMonth]);
 
   const handlePrint = () => {
