@@ -325,6 +325,94 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
 });
 
 /**
+ * 회사 도메인 변경 시 모든 직원의 로그인 ID(Email)를 일괄 업데이트합니다.
+ * Auth 이메일과 UserProfile 문서를 동시에 수정합니다.
+ */
+exports.adminSyncCompanyDomain = onCall(async (request) => {
+  // 1. 인증 확인
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
+  }
+
+  const { newDomain } = request.data;
+  if (!newDomain) {
+    throw new HttpsError("invalid-argument", "변경할 도메인이 누락되었습니다.");
+  }
+
+  const cleanDomain = newDomain.replace("@", "").toLowerCase().trim();
+  const { getFirestore } = require("firebase-admin/firestore");
+  const db = getFirestore(DATABASE_ID);
+
+  try {
+    // 2. 호출자 권한 확인
+    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
+    if (!callerSnap.exists) {
+      throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
+    }
+    const callerData = callerSnap.data();
+
+    if (callerData.role !== "ADMIN" && callerData.role !== "SUPER_ADMIN") {
+      throw new HttpsError("permission-denied", "도메인 일괄 변경 권한이 없습니다.");
+    }
+
+    const companyId = callerData.companyId;
+    if (!companyId) {
+      throw new HttpsError("failed-precondition", "소속 회사 정보가 없습니다.");
+    }
+
+    // 3. 해당 회사 모든 사용자 조회
+    const qSnap = await db.collection("UserProfile")
+      .where("companyId", "==", companyId)
+      .get();
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // 순차적으로 업데이트 (Auth API 제한 고려 및 안정성 확보)
+    for (const userDoc of qSnap.docs) {
+      const userData = userDoc.data();
+      
+      // SUPER_ADMIN이나 타사 계정은 건드리지 않음 (혹시 모를 안전장치)
+      if (userData.role === "SUPER_ADMIN") continue;
+
+      if (userData.email && userData.email.includes("@")) {
+        const [id] = userData.email.split("@");
+        const newEmail = `${id}@${cleanDomain}`;
+
+        if (userData.email !== newEmail) {
+          try {
+            // A. Firebase Auth 이메일 업데이트
+            await admin.auth().updateUser(userDoc.id, { email: newEmail });
+            
+            // B. Firestore UserProfile 이메일 업데이트
+            await userDoc.ref.update({ email: newEmail });
+            
+            successCount++;
+          } catch (e) {
+            console.error(`[SyncDomainError] Failed to update user ${userDoc.id}:`, e);
+            failCount++;
+          }
+        }
+      }
+    }
+
+    console.log(`[AdminSyncDomain] Company ${companyId} domain sync: Success ${successCount}, Fail ${failCount} by ${request.auth.uid}`);
+
+    return {
+      success: true,
+      successCount,
+      failCount,
+      message: `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명)` : ""}`
+    };
+
+  } catch (error) {
+    console.error(`[AdminSyncDomainError]`, error);
+    if (error instanceof HttpsError) throw error;
+    throw new HttpsError("internal", "도메인 일괄 업데이트 중 오류가 발생했습니다.");
+  }
+});
+
+/**
  * 백엔드 함수의 배포 상태 및 버전을 확인하기 위한 헬퍼 함수입니다.
  */
 exports.checkDeploymentStatus = onCall(async (request) => {

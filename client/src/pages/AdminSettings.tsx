@@ -149,7 +149,7 @@ export const AdminSettings: React.FC = () => {
   };
 
   const handleSyncAllUsersDomain = async () => {
-    if (!window.confirm("모든 기존 사용자의 프로필 도메인을 현재 설정된 도메인으로 동기화하시겠습니까?")) return;
+    if (!window.confirm("모든 기존 사용자의 로그인 ID(Auth)와 프로필 도메인을 현재 설정된 도메인으로 일괄 동기화하시겠습니까? \n\n※ 주의: 동기화 완료 후 직원들은 변경된 도메인 이메일로 로그인해야 합니다.")) return;
     if (!verifyPassword) {
       setMessage({ type: 'error', text: '동기화를 위해 관리자 비밀번호를 입력해주세요.' });
       return;
@@ -161,35 +161,34 @@ export const AdminSettings: React.FC = () => {
       // 1. 비밀번호 재검증 (공통 로직 사용)
       await verifyAdmin();
 
-      // 2. 해당 회사 사용자 프로필 조회 및 일괄 업데이트 (Batch)
-      if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
+      // 2. Cloud Function 호출 (Auth 이메일 + Firestore 일괄 업데이트)
+      if (!companyData?.domain) throw new Error("먼저 회사 도메인을 설정하고 저장해주세요.");
       
-      const q = query(collection(db, 'UserProfile'), where('companyId', '==', userData.companyId));
-      const querySnapshot = await getDocs(q);
-      const batch = writeBatch(db);
-      let count = 0;
-
-      querySnapshot.forEach((userDoc) => {
-        const data = userDoc.data();
-        if (data.email && data.email.includes('@')) {
-          const [id] = data.email.split('@');
-          const newEmail = `${id}@${tempDomain}`;
-          if (data.email !== newEmail) {
-            batch.update(userDoc.ref, { email: newEmail });
-            count++;
-          }
-        }
+      const syncDomain = httpsCallable(functions, 'adminSyncCompanyDomain');
+      const result = await syncDomain({ 
+        newDomain: companyData.domain 
       });
 
-      if (count > 0) {
-        await batch.commit();
-        setMessage({ type: 'success', text: `${count}명의 사용자 도메인 동기화가 완료되었습니다.` });
+      const { success, message: syncMsg, successCount, failCount } = result.data as { 
+        success: boolean; 
+        message: string;
+        successCount: number;
+        failCount: number;
+      };
+
+      if (success) {
+        setMessage({ 
+          type: 'success', 
+          text: syncMsg || `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.` 
+        });
       } else {
-        setMessage({ type: 'success', text: '이미 모든 사용자가 최신 도메인을 사용 중입니다.' });
+        throw new Error(syncMsg || "동기화 중 오류가 발생했습니다.");
       }
+
       setVerifyPassword('');
     } catch (err: any) {
-      setMessage({ type: 'error', text: '동기화 중 오류: ' + err.message });
+      console.error("Sync Error:", err);
+      setMessage({ type: 'error', text: '동기화 중 오류: ' + (err.message || '알 수 없는 오류') });
     } finally {
       setLoading(false);
     }
