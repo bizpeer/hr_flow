@@ -41,6 +41,10 @@ function App() {
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
   const isExpired = !isSuperAdmin && companyData?.subscriptionStatus === 'EXPIRED';
 
+  if (user && !loading && !userData) {
+    return <ProfileSetup />;
+  }
+
   return (
     <HashRouter>
       <LoginModal />
@@ -57,7 +61,7 @@ function App() {
         <Route path="/subscription-required" element={<SubscriptionRequired />} />
         
         <Route path="/*" element={
-          !user ? <Navigate to="/login" replace /> : (
+          !user ? <Navigate to="/login" replace /> : !userData ? <Navigate to="/profile-setup" replace /> : (
             <div className="flex h-screen bg-slate-50 overflow-hidden relative font-sans">
               {/* Mobile Header */}
               <div className="md:hidden print:hidden flex items-center justify-between bg-slate-900 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-lg border-b border-indigo-500/20">

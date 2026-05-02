@@ -21,7 +21,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'COMPANIES' | 'PAYMENTS'>('COMPANIES');
+  const [activeTab, setActiveTab] = useState<'COMPANIES' | 'PAYMENTS' | 'USERS'>('COMPANIES');
   
   // 비밀번호 초기화 모달 상태
   const [showResetModal, setShowResetModal] = useState(false);
@@ -75,7 +75,7 @@ export const SuperAdminDashboard: React.FC = () => {
 
     const unsubUsers = onSnapshot(collection(db, 'UserProfile'), (snap) => {
       console.log(`[SuperAdmin] Successfully fetched ${snap.docs.length} users.`);
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as UserData & { id: string }));
+      const data = snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserData));
       setAllUsers(data);
     }, (err) => {
       console.error("[SuperAdmin] Failed to fetch users:", err);
@@ -410,6 +410,14 @@ export const SuperAdminDashboard: React.FC = () => {
           >
             결제 및 구독 내역
           </button>
+          <button 
+            onClick={() => setActiveTab('USERS')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-black transition-all ${
+              activeTab === 'USERS' ? 'bg-slate-900 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            전체 사용자 관리
+          </button>
         </div>
 
         {activeTab === 'COMPANIES' && (
@@ -621,6 +629,47 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
       </>
     )}
+
+    {activeTab === 'USERS' && (
+          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Users className="w-5 h-5" />
+                </div>
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">전체 사용자 목록</h2>
+                <span className="text-xs font-bold text-slate-400 bg-slate-50 px-3 py-1 rounded-full">{allUsers.length}명</span>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {allUsers.sort((a,b) => (a.companyId || '').localeCompare(b.companyId || '')).map(user => (
+                  <div key={user.uid} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-black text-lg ${
+                      user.role === 'SUPER_ADMIN' ? 'bg-amber-500' :
+                      user.role === 'ADMIN' ? 'bg-violet-600' : 'bg-slate-400'
+                    }`}>
+                      {user.name?.[0] || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-slate-900 truncate">{user.name}</p>
+                      <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md uppercase">
+                          {user.companyId || 'No Company'}
+                        </span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase">
+                          {user.role}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
 
       {/* 구독 기간 변경 모달 */}
       {showSubscriptionModal && (

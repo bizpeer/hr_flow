@@ -2,33 +2,52 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // 유틸리티 함수
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    function getUserProfile() {
+      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid));
+    }
+
+    function getUserData() {
+      let profile = getUserProfile();
+      return profile != null ? profile.data : null;
+    }
+
     function isSuperAdmin() {
-      return isAuthenticated() && firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
+      let data = getUserData();
+      return isAuthenticated() && data != null && data.role == 'SUPER_ADMIN';
     }
 
-    // 사용자의 소속 회사 ID를 Firestore((default))에서 조회
-    function getMyCompanyId() {
-      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data.companyId;
+    // 특정 회사의 관리자인지 확인
+    function isCompanyAdmin(companyId) {
+      let data = getUserData();
+      return isAuthenticated() && data != null && 
+             data.companyId == companyId && 
+             (data.role == 'ADMIN' || data.role == 'SUB_ADMIN');
     }
 
-    // 신규 구조: /companies/{companyId}/...
+    // 지출결의 전용 경로: /companies/{companyId}/expenses/{userId}/...
+    match /companies/{companyId}/expenses/{userId}/{allPaths=**} {
+      // 본인이거나, 해당 회사의 관리자/슈퍼어드민이면 허용
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid == userId || 
+        isCompanyAdmin(companyId) ||
+        isSuperAdmin()
+      );
+    }
+
+    // 일반 회사 경로
     match /companies/{companyId}/{allPaths=**} {
       allow read, write: if isAuthenticated() && (
         isSuperAdmin() || 
-        getMyCompanyId() == companyId
+        (getUserData() != null && getUserData().companyId == companyId)
       );
     }
     
-    // 레거시 대응: 기존 업로드된 파일들은 URL 내 토큰으로 읽기 가능하므로, 
-    // 직접적인 경로 접근은 차단하거나 어드민만 허용
     match /{allPaths=**} {
-      allow read: if isSuperAdmin();
-      allow write: if isSuperAdmin();
+      allow read, write: if isSuperAdmin();
     }
   }
 }

@@ -4,7 +4,7 @@ import {
   KeyRound 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
@@ -67,9 +67,11 @@ export const AttendanceDashboard: React.FC = () => {
     const start = startOfMonth(currentMonth).toISOString();
     const end = endOfMonth(currentMonth).toISOString();
 
+    if (!userData?.companyId) return;
+
     const q = query(
       collection(db, 'attendance'),
-      where('companyId', '==', userData?.companyId),
+      where('companyId', '==', userData.companyId),
       where('userId', '==', selectedUserId),
       where('timestamp', '>=', start),
       where('timestamp', '<=', end)
@@ -203,18 +205,20 @@ export const AttendanceDashboard: React.FC = () => {
   // 연차 요약 로직
   const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
   useEffect(() => {
-    if (!user?.uid) return;
+    if (!userData?.companyId || !selectedUserId) return;
+
     const q = query(
       collection(db, 'leaves'), 
-      where('companyId', '==', userData?.companyId || 'UNKNOWN'),
-      where('userId', '==', user.uid)
+      where('companyId', '==', userData.companyId),
+      where('userId', '==', selectedUserId),
+      orderBy('startDate', 'desc')
     );
     return onSnapshot(q, (snap) => {
       setLeaveRequests(snap.docs.map(doc => doc.data()));
     }, (err) => {
       console.error("Leave Snapshot Error:", err);
     });
-  }, [user?.uid]);
+  }, [user?.uid, selectedUserId, userData?.companyId]);
 
   const joinDate = userData?.joinDate ? new Date(userData.joinDate) : new Date();
   const totalLeave = calculateLeaveEntitlement(joinDate);
