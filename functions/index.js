@@ -340,6 +340,8 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
   }
 
   const cleanDomain = newDomain.replace("@", "").toLowerCase().trim();
+  console.log(`[AdminSyncDomain] Starting sync to @${cleanDomain} requested by ${request.auth.uid}`);
+  
   const { getFirestore } = require("firebase-admin/firestore");
   const db = getFirestore(DATABASE_ID);
 
@@ -347,9 +349,11 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
     // 2. 호출자 권한 확인
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
     if (!callerSnap.exists) {
+      console.error(`[AdminSyncDomain] Caller ${request.auth.uid} not found in UserProfile`);
       throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
     }
     const callerData = callerSnap.data();
+    console.log(`[AdminSyncDomain] Caller role: ${callerData.role}, company: ${callerData.companyId}`);
 
     if (callerData.role !== "ADMIN" && callerData.role !== "SUPER_ADMIN") {
       throw new HttpsError("permission-denied", "도메인 일괄 변경 권한이 없습니다.");
@@ -361,9 +365,12 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
     }
 
     // 3. 해당 회사 모든 사용자 조회
+    console.log(`[AdminSyncDomain] Fetching users for company: ${companyId}`);
     const qSnap = await db.collection("UserProfile")
       .where("companyId", "==", companyId)
       .get();
+    
+    console.log(`[AdminSyncDomain] Found ${qSnap.docs.length} users to process.`);
 
     let successCount = 0;
     let failCount = 0;
@@ -418,9 +425,10 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
     };
 
   } catch (error) {
-    console.error(`[AdminSyncDomainError]`, error);
+    console.error(`[AdminSyncDomainError] Global Catch:`, error);
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", "도메인 일괄 업데이트 중 오류가 발생했습니다.");
+    // 상세 에러 메시지 반환 (클라이언트에서 'internal'로 뭉뚱그려지는 것을 방지)
+    throw new HttpsError("internal", error.message || "도메인 일괄 업데이트 중 알 수 없는 오류가 발생했습니다.");
   }
 });
 
