@@ -8,12 +8,12 @@ service firebase.storage {
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && firestore.get(/databases/weberp/documents/UserProfile/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
+      return isAuthenticated() && firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
     }
 
-    // 사용자의 소속 회사 ID를 Firestore(weberp)에서 조회
+    // 사용자의 소속 회사 ID를 Firestore((default))에서 조회
     function getMyCompanyId() {
-      return firestore.get(/databases/weberp/documents/UserProfile/$(request.auth.uid)).data.companyId;
+      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data.companyId;
     }
 
     // 신규 구조: /companies/{companyId}/...
