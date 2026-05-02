@@ -20,7 +20,7 @@ interface Expense {
 }
 
 export const ExpenseAdminDashboard: React.FC = () => {
-  const { userData } = useAuthStore();
+  const { userData, loading: authLoading } = useAuthStore();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -33,7 +33,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
 
   // Firestore 실시간 데이터 패칭 (companyId 기반 격리)
   useEffect(() => {
-    if (!userData?.companyId) return;
+    if (authLoading || !userData?.companyId) return;
     setLoading(true);
     const q = query(
       collection(db, 'expenses'),
@@ -111,7 +111,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
         <div className="flex flex-col items-center gap-4">

@@ -43,7 +43,7 @@ interface ExpenseRequest {
 }
 
 export const AdminApprovals: React.FC = () => {
-  const { userData } = useAuthStore();
+  const { userData, loading: authLoading } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE'>('LEAVE');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
@@ -61,7 +61,7 @@ export const AdminApprovals: React.FC = () => {
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
 
   useEffect(() => {
-    if (!userData?.companyId) return;
+    if (authLoading || !userData?.companyId) return;
     const companyId = userData.companyId;
 
     // 1. 신청 내역 구독 (companyId 기반 격리)
@@ -163,6 +163,17 @@ export const AdminApprovals: React.FC = () => {
       default: return 'bg-amber-50 text-amber-600 border-amber-100';
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-500 font-black tracking-tight text-lg">결재 서버 연결 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
