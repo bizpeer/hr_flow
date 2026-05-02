@@ -55,7 +55,6 @@ interface AuthState {
   user: User | null;
   userData: UserData | null;
   companyData: CompanyData | null; // 현재 소속 회사 정보
-  systemDomain: string; // 현재 회사의 도메인
   loading: boolean;
   isLoginModalOpen: boolean;
   isManualChangeMode: boolean;
@@ -73,7 +72,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   userData: null,
   companyData: null,
-  systemDomain: 'unconfigured.co.kr', // 기본값
   loading: true,
   isLoginModalOpen: false,
   isManualChangeMode: false,
@@ -91,7 +89,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     try {
       await auth.signOut();
-      set({ user: null, userData: null, companyData: null, systemDomain: 'unconfigured.co.kr' });
+      set({ user: null, userData: null, companyData: null });
     } catch (error) {
       console.error("Logout failed", error);
     }
@@ -126,8 +124,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
 
         set({ 
-          companyData: { ...data, id: companyDoc.id, subscriptionStatus: subStatus as any },
-          systemDomain: data.domain || (data.nameEn ? `${data.nameEn.toLowerCase().replace(/\s+/g, '')}.co.kr` : 'unconfigured.co.kr')
+          companyData: { ...data, id: companyDoc.id, subscriptionStatus: subStatus as any }
         });
         console.log("[System] Company Domain:", data.domain, "| Sub Status:", subStatus);
       }
