@@ -117,9 +117,10 @@ export const AdminSettings: React.FC = () => {
       await verifyAdmin();
 
       // 1.5 도메인 중복 체크 (Cloud Function 호출)
+      const cleanDomain = tempDomain.replace('@', '').trim();
       const checkDomain = httpsCallable(functions, 'checkDomainAvailability');
       const result = await checkDomain({ 
-        domain: tempDomain, 
+        domain: cleanDomain, 
         currentCompanyId: userData?.companyId 
       });
       
@@ -132,17 +133,21 @@ export const AdminSettings: React.FC = () => {
       // 2. 도메인 설정 저장 (회사 문서 업데이트)
       if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
       
+      console.log(`[AdminSettings] Saving domain: ${cleanDomain} for company: ${userData.companyId}`);
       await setDoc(doc(db, 'companies', userData.companyId), {
-        domain: tempDomain.replace('@', ''), // @ 기호 제거
+        domain: cleanDomain,
         updatedAt: new Date().toISOString(),
         updatedBy: auth.currentUser?.uid || 'unknown'
       }, { merge: true });
 
-      // 3. 스토어 갱신
+      // 3. 스토어 갱신 (저장된 최신 값 반영)
       await fetchCompanyDomain(userData.companyId);
       
-      setMessage({ type: 'success', text: `회원가입 기본 도메인이 @${tempDomain}으로 변경되었습니다.` });
+      setMessage({ type: 'success', text: `회사 도메인이 @${cleanDomain}으로 저장되었습니다. 이제 기존 사용자 일체화를 실행하세요.` });
       setVerifyPassword('');
+    } catch (err: any) {
+      console.error("[AdminSettings] Domain update error:", err);
+      setMessage({ type: 'error', text: '도메인 변경 중 오류: ' + (err.message || '알 수 없는 오류') });
     } finally {
       setLoading(false);
     }
@@ -162,12 +167,14 @@ export const AdminSettings: React.FC = () => {
       await verifyAdmin();
 
       // 2. Cloud Function 호출 (Auth 이메일 + Firestore 일괄 업데이트)
-      if (!companyData?.domain) throw new Error("먼저 회사 도메인을 설정하고 저장해주세요.");
+      // tempDomain(입력창)을 우선 사용, 없으면 스토어의 companyData.domain 사용
+      const domainToSync = (tempDomain || companyData?.domain || '').replace('@', '').trim();
+      if (!domainToSync) throw new Error("먼저 회사 도메인을 설정하고 저장해주세요.");
       
-      console.log("[AdminSettings] Syncing users to domain:", companyData.domain);
+      console.log("[AdminSettings] Syncing users to domain:", domainToSync);
       const syncDomain = httpsCallable(functions, 'adminSyncCompanyDomain');
       const result = await syncDomain({ 
-        newDomain: companyData.domain 
+        newDomain: domainToSync 
       });
 
       const { success, message: syncMsg, successCount, failCount } = result.data as { 
