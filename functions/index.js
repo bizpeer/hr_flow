@@ -4,8 +4,8 @@ const admin = require("firebase-admin");
 // 전역 초기화 (Functions v2 환경에서는 전역 범위 호출이 권장되며, 타임아웃을 유발하지 않습니다)
 admin.initializeApp();
 
-// (default) 데이터베이스 사용을 금지하기 위한 상수 정의
-const DATABASE_ID = 'weberp';
+// (default) 데이터베이스 사용
+const DATABASE_ID = '(default)';
 
 /**
  * 특정 도메인이 이미 다른 회사에 등록되어 있는지 확인합니다.
