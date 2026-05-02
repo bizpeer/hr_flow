@@ -21,7 +21,7 @@
 ## 4. 본 시스템은 단일 코드 베이스로 여러 기업을 서비스하는 
 - **Multi-tenant SaaS 모델을 채택하고 있습니다. 모든 데이터는 companyId를 기준으로 물리적/논리적으로 격리되어 보안을 보장합니다.
 - ** Frontend: React + TypeScript + Tailwind CSS + Zustand (상태 관리)
-- ** Backend/DB: Firebase Auth (인증) + Firestore (DB ID: weberp)
+- ** Backend/DB: Firebase Auth (인증) + Firestore
 - **Serverless Logic: Firebase Cloud Functions (비밀번호 강제 초기화 등 관리자 기능)
 
 ## 5. 권한별 접근 메뉴 (RBAC Matrix)

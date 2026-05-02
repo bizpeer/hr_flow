@@ -43,7 +43,7 @@ export const Login: React.FC = () => {
         
         if (!profileSnap.exists()) {
           await auth.signOut();
-          setError('해당 계정의 프로필 정보를 찾을 수 없습니다. (데이터베이스 ID: weberp)');
+          setError('해당 계정의 프로필 정보를 찾을 수 없습니다. (데이터베이스 ID: (default))');
           setLoading(false);
           return;
         }

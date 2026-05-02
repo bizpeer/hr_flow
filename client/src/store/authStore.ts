@@ -193,7 +193,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               // 7초 대기 후에도 userData가 채워지지 않으면 무한 로딩을 막기 위해 강제 로그아웃 처리 검토
               setTimeout(() => {
                 if (get().loading && !get().userData && auth.currentUser) {
-                  console.warn("[Auth] WARNING: No profile found after 7s timeout. Please check 'weberp' database.");
+                  console.warn("[Auth] WARNING: No profile found after 7s timeout. Please check '(default)' database.");
                   // 강제 로그아웃은 사용자 경험을 해칠 수 있으므로, 로딩 상태만 해제하고 로그인 페이지에서 처리하도록 유도
                   set({ loading: false });
                 }

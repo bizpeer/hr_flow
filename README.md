@@ -9,19 +9,19 @@
 - **CI/CD**: GitHub Actions (Node.js 24 최적화 배포)
 
 ## 2. 데이터베이스 및 보안 (SaaS 아키텍처)
-- **Firebase Database**: Firestore (**ID: `weberp`**, (default) 데이터베이스 사용 금지)
-- **데이터베이스 정책**: 모든 코드에서 Firestore 초기화 시 반드시 `weberp` ID를 명시해야 합니다.
+- **Firebase Database**: Firestore (**ID: `(default)`** 사용)
+- **데이터베이스 정책**: 모든 코드에서 Firestore 초기화 시 기본 데이터베이스인 `(default)`를 사용합니다.
 - **멀티테넌트 정책**: 모든 데이터 문서는 `companyId` 필드를 포함해야 하며, 모든 Firestore 쿼리는 반드시 이 필드를 통한 필터링을 포함해야 합니다.
 - **Null Safety**: `useAuthStore`의 `userData` 접근 시 반드시 옵셔널 체이닝(`?.`) 또는 조기 반환(early return)을 사용하여 런타임 에러를 방지합니다.
 
 ## 3. 주요 환경 변수 (.env)
-- `VITE_FIREBASE_DATABASE_ID=weberp`
+- `VITE_FIREBASE_DATABASE_ID=(default)`
 - `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN` 등 (GitHub Secrets에 등록됨)
 
 ## 4. 본 시스템은 단일 코드 베이스로 여러 기업을 서비스하는 
 - **Multi-tenant SaaS 모델을 채택하고 있습니다. 모든 데이터는 companyId를 기준으로 물리적/논리적으로 격리되어 보안을 보장합니다.
 - ** Frontend: React + TypeScript + Tailwind CSS + Zustand (상태 관리)
-- ** Backend/DB: Firebase Auth (인증) + Firestore (DB ID: weberp)
+- ** Backend/DB: Firebase Auth (인증) + Firestore
 - **Serverless Logic: Firebase Cloud Functions (비밀번호 강제 초기화 등 관리자 기능)
 
 ## 5. 권한별 접근 메뉴 (RBAC Matrix)

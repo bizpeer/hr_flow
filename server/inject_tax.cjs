@@ -12,7 +12,7 @@ if (admin.apps.length === 0) {
     });
 }
 
-const db = getFirestore('weberp');
+const db = getFirestore('(default)');
 
 async function run() {
     try {
@@ -21,7 +21,7 @@ async function run() {
         const data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
         
         await db.collection('system_config').doc('tax_table').set(data);
-        console.log('Successfully uploaded tax table to Firestore (weberp db)');
+        console.log('Successfully uploaded tax table to Firestore ((default) db)');
     } catch (e) {
         console.error('Error uploading tax table:', e);
     }

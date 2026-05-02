@@ -32,8 +32,8 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
-// 환경 변수에 따라 weberp 또는 특정 테넌트 DB로 연결합니다.
-const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "weberp";
+// 환경 변수에 따라 (default) 또는 특정 테넌트 DB로 연결합니다.
+const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)";
 export const db = getFirestore(app, dbId);
 
 // Initialize Cloud Storage and get a reference to the service
