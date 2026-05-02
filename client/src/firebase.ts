@@ -32,14 +32,12 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
-// 환경 변수에 따라 (default) 또는 특정 테넌트 DB로 연결합니다.
-import { initializeFirestore } from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)";
 console.log(`[Firebase] Initializing Firestore with Database ID: ${dbId}`);
-export const db = initializeFirestore(app, { 
-  databaseId: dbId,
-  ignoreUndefinedProperties: true
-});
+
+// (default) 데이터베이스일 경우와 특정 ID를 사용할 경우를 구분하여 초기화
+export const db = dbId === "(default)" ? getFirestore(app) : getFirestore(app, dbId);
 
 // Initialize Cloud Storage and get a reference to the service
 export const storage = getStorage(app);
