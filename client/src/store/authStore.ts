@@ -147,7 +147,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       initialized = true;
 
       unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-        console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out");
+        const dbId = '(default)';
+        console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out", "| UID:", user?.uid);
         
         if (unsubscribeProfile) {
           unsubscribeProfile();
@@ -156,49 +157,49 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         if (user) {
           set({ user, loading: true });
+          console.log(`[Auth] Fetching UserProfile for UID: ${user.uid} in Database: ${dbId}`);
           
           unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
+            if (!profileSnap.exists()) {
+              console.warn(`[Auth] No UserProfile found for UID: ${user.uid} in ${dbId}`);
+              // 프로필이 없는 경우 즉시 loading을 해제하여 UI에서 대응할 수 있게 함
+              set({ loading: false, userData: null });
+            } else {
+              console.log(`[Auth] UserProfile found:`, profileSnap.data());
+            }
+            
             const data = profileSnap.data();
             let currentData: UserData | null = profileSnap.exists() ? (data as UserData) : null;
 
-            // 1. 데이터가 아직 불완전한 경우 (예: 가입 중 가입 정보 누락)
             if (currentData && !currentData.role) {
               console.log("[Auth] Profile exists but incomplete (no role). Waiting...");
               return; 
             }
 
-            // 2. 임시 문서(temp) 마이그레이션 및 미생성 프로필 대기 로직
             if (!currentData) {
+              console.log(`[Auth] Attempting fallback query for email: ${user.email}`);
               if (user.email) {
                 try {
                   const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
                   const fallbackSnap = await getDocs(q);
                   if (!fallbackSnap.empty) {
                     const tempDoc = fallbackSnap.docs[0];
+                    console.log("[Auth] Found fallback profile by email:", tempDoc.id);
                     const tempData = tempDoc.data() as UserData;
                     currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
                     await setDoc(doc(db, 'UserProfile', user.uid), currentData);
                     if (tempDoc.id.startsWith('temp_')) {
                       try { await deleteDoc(tempDoc.ref); } catch (e) {}
                     }
-                    console.log("[Auth] Temp profile migrated.");
-                    return; // setDoc will trigger onSnapshot again
+                    return; 
+                  } else {
+                    console.warn("[Auth] No fallback profile found by email.");
                   }
                 } catch (err) {
                   console.error("[Auth] Fallback query error:", err);
                 }
               }
-              // [중요 가드] fallback도 없고 currentData도 없는 경우 -> 가입 직후 프로필 생성 전!
-              // [해결] 찌꺼기 계정 방어 로직 (DB Profile 누락된 고스트 세션)
-              // 7초 대기 후에도 userData가 채워지지 않으면 무한 로딩을 막기 위해 강제 로그아웃 처리 검토
-              setTimeout(() => {
-                if (get().loading && !get().userData && auth.currentUser) {
-                  console.warn("[Auth] WARNING: No profile found after 7s timeout. Please check '(default)' database.");
-                  // 강제 로그아웃은 사용자 경험을 해칠 수 있으므로, 로딩 상태만 해제하고 로그인 페이지에서 처리하도록 유도
-                  set({ loading: false });
-                }
-              }, 7000);
-
+              
               return; 
             }
 

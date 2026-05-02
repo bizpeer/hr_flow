@@ -21,6 +21,7 @@ import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { LandingPage } from './pages/LandingPage';
 import { SubscriptionManagement } from './pages/SubscriptionManagement';
 import { SubscriptionRequired } from './pages/SubscriptionRequired';
+import { ProfileSetup } from './pages/ProfileSetup';
 
 function App() {
   const { initAuth, userData, companyData, user, loading } = useAuthStore();
@@ -47,11 +48,12 @@ function App() {
         <Route path="/" element={
           !user ? <LandingPage /> : 
           (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : 
-           (loading ? <LoadingSplash /> : <Navigate to="/login" replace />))
+           (loading ? <LoadingSplash /> : <Navigate to="/profile-setup" replace />))
         } />
         <Route path="/login" element={
-          user ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <Login />
+          user ? (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <Navigate to="/profile-setup" replace />) : <Login />
         } />
+        <Route path="/profile-setup" element={user && !userData ? <ProfileSetup /> : <Navigate to="/" replace />} />
         <Route path="/subscription-required" element={<SubscriptionRequired />} />
         
         <Route path="/*" element={

@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app"; // Firebase 인증 및 설정 전체 복구 완료 (마스터 설정 작동 준비)
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+// import { getFirestore } from "firebase/firestore"; // 아래에서 initializeFirestore로 대체됨
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
@@ -33,8 +33,13 @@ export const auth = getAuth(app);
 
 // Initialize Cloud Firestore and get a reference to the service
 // 환경 변수에 따라 (default) 또는 특정 테넌트 DB로 연결합니다.
+import { initializeFirestore } from "firebase/firestore";
 const dbId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "(default)";
-export const db = getFirestore(app, dbId);
+console.log(`[Firebase] Initializing Firestore with Database ID: ${dbId}`);
+export const db = initializeFirestore(app, { 
+  databaseId: dbId,
+  ignoreUndefinedProperties: true
+});
 
 // Initialize Cloud Storage and get a reference to the service
 export const storage = getStorage(app);
