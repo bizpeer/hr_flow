@@ -50,6 +50,7 @@ export const ExpenseForm: React.FC = () => {
 
     const q = query(
       collection(db, 'expenses'),
+      where('companyId', '==', userData?.companyId || ''),
       where('userId', '==', user.uid)
     );
     
