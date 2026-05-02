@@ -109,7 +109,8 @@ service cloud.firestore {
     // 경비 신청 (expenses) - 같은 회사만
     match /expenses/{expenseId} {
       allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated();
+      // create: 인증된 사용자 + 본인 companyId 소속으로만 생성 (멀티테넌트 보호)
+      allow create: if isAuthenticated() && isSameCompany(request.resource.data.companyId);
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
         isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
@@ -120,7 +121,8 @@ service cloud.firestore {
     // 휴가 신청 (leaves) - 같은 회사만
     match /leaves/{leaveId} {
       allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated();
+      // create: 인증된 사용자 + 본인 companyId 소속으로만 생성 (멀티테넌트 보호)
+      allow create: if isAuthenticated() && isSameCompany(request.resource.data.companyId);
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
         isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
@@ -156,9 +158,9 @@ service cloud.firestore {
       allow write: if isAdmin() || isSuperAdmin();
     }
 
-    // 전역 시스템 설정 (system_config) - 세액표 등 (공개 데이터로 취급하여 권한 오류 방지)
+    // 전역 시스템 설정 (system_config) - 세액표 등
     match /system_config/{configId} {
-      allow read: if true;
+      allow read: if isAuthenticated(); // 미인증 사용자 차단
       allow write: if isSuperAdmin();
     }
 
