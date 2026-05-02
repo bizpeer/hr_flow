@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   userData: null,
   companyData: null,
-  systemDomain: 'company.com', // 기본값
+  systemDomain: 'unconfigured.co.kr', // 기본값
   loading: true,
   isLoginModalOpen: false,
   isManualChangeMode: false,
@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     try {
       await auth.signOut();
-      set({ user: null, userData: null, companyData: null, systemDomain: 'company.com' });
+      set({ user: null, userData: null, companyData: null, systemDomain: 'unconfigured.co.kr' });
     } catch (error) {
       console.error("Logout failed", error);
     }
@@ -127,7 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
         set({ 
           companyData: { ...data, id: companyDoc.id, subscriptionStatus: subStatus as any },
-          systemDomain: data.domain || 'company.com'
+          systemDomain: data.domain || (data.nameEn ? `${data.nameEn.toLowerCase().replace(/\s+/g, '')}.co.kr` : 'unconfigured.co.kr')
         });
         console.log("[System] Company Domain:", data.domain, "| Sub Status:", subStatus);
       }
