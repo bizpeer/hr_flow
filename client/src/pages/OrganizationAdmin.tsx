@@ -46,7 +46,7 @@ interface AuditLog {
 }
 
 export const OrganizationAdmin: React.FC = () => {
-  const { userData, companyData, systemDomain } = useAuthStore();
+  const { userData, companyData } = useAuthStore();
   const navigate = useNavigate();
 
   const [divisions, setDivisions] = useState<Division[]>([]);

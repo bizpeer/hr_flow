@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users, Database, Clock, CloudDownload } from 'lucide-react';
 import { auth, db, functions } from '../firebase';
-import { doc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
@@ -169,11 +169,10 @@ export const AdminSettings: React.FC = () => {
         newDomain: companyData.domain 
       });
 
-      const { success, message: syncMsg, successCount, failCount } = result.data as { 
+      const { success, message: syncMsg, successCount } = result.data as { 
         success: boolean; 
         message: string;
         successCount: number;
-        failCount: number;
       };
 
       if (success) {
