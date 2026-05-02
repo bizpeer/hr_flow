@@ -62,14 +62,23 @@ export const SuperAdminDashboard: React.FC = () => {
   useEffect(() => {
     if (userData?.role !== 'SUPER_ADMIN') return;
 
+    console.log("[SuperAdmin] Requesting companies collection...");
     const unsubCompanies = onSnapshot(collection(db, 'companies'), (snap) => {
+      console.log(`[SuperAdmin] Successfully fetched ${snap.docs.length} companies.`);
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as CompanyData & { id: string }));
       setCompanies(data.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+      setLoading(false);
+    }, (err) => {
+      console.error("[SuperAdmin] Failed to fetch companies:", err);
       setLoading(false);
     });
 
     const unsubUsers = onSnapshot(collection(db, 'UserProfile'), (snap) => {
-      setAllUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserData)));
+      console.log(`[SuperAdmin] Successfully fetched ${snap.docs.length} users.`);
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as UserData & { id: string }));
+      setAllUsers(data);
+    }, (err) => {
+      console.error("[SuperAdmin] Failed to fetch users:", err);
     });
 
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
