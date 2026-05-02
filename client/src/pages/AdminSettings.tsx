@@ -164,6 +164,7 @@ export const AdminSettings: React.FC = () => {
       // 2. Cloud Function 호출 (Auth 이메일 + Firestore 일괄 업데이트)
       if (!companyData?.domain) throw new Error("먼저 회사 도메인을 설정하고 저장해주세요.");
       
+      console.log("[AdminSettings] Syncing users to domain:", companyData.domain);
       const syncDomain = httpsCallable(functions, 'adminSyncCompanyDomain');
       const result = await syncDomain({ 
         newDomain: companyData.domain 
@@ -175,10 +176,9 @@ export const AdminSettings: React.FC = () => {
         successCount: number;
       };
 
-      if (success) {
         setMessage({ 
           type: 'success', 
-          text: syncMsg || `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.` 
+          text: syncMsg || `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명)` : ""}` 
         });
       } else {
         throw new Error(syncMsg || "동기화 중 오류가 발생했습니다.");

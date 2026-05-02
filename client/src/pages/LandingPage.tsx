@@ -260,7 +260,7 @@ export const LandingPage: React.FC = () => {
                        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                           <p className="text-sm font-bold text-slate-700">HR Flow는 여러 회사가 함께 쓰지만 데이터는 완전히 분리되는 SaaS입니다.</p>
                           <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                             {['개인 이메일 등록 가능', '회사 전용 ID 자동 생성 (user@company.com)', '자체 도메인 향후 변경 가능', '타사 데이터 접근 불가 (완전 격리)'].map((text, i) => (
+                             {['개인 이메일 등록 가능', '회사 전용 ID 자동 생성 (user@company.co.kr)', '자체 도메인 향후 변경 가능', '타사 데이터 접근 불가 (완전 격리)'].map((text, i) => (
                                <li key={i} className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                                   <div className="w-1 h-1 rounded-full bg-indigo-400" />
                                   {text}

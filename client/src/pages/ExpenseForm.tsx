@@ -24,7 +24,7 @@ interface ExpenseRequest {
 }
 
 export const ExpenseForm: React.FC = () => {
-  const { userData, user } = useAuthStore();
+  const { userData, user, loading: authLoading } = useAuthStore();
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState('');
@@ -46,7 +46,7 @@ export const ExpenseForm: React.FC = () => {
   const [filterMonth, setFilterMonth] = useState(format(new Date(), 'yyyy-MM'));
 
   useEffect(() => {
-    if (!user?.uid) return;
+    if (authLoading || !user?.uid) return;
 
     const q = query(
       collection(db, 'expenses'),
@@ -151,12 +151,13 @@ export const ExpenseForm: React.FC = () => {
         setEditingId(null);
         setEditingRequest(null);
         setSelectedRequest(null);
-      } else {
         // 신규 등록
+        if (!userData?.companyId) throw new Error("회사 정보(companyId)가 없습니다. 다시 로그인해 주세요.");
+        
         await addDoc(collection(db, 'expenses'), {
           ...payload,
           createdAt: new Date().toISOString(),
-          companyId: userData?.companyId || ''
+          companyId: userData.companyId
         });
         setIsSuccess(true);
       }
@@ -241,6 +242,17 @@ export const ExpenseForm: React.FC = () => {
       setSelectedFile(file);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+          <p className="text-slate-500 font-black tracking-tight text-lg">보안 세션 연결 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-4 md:p-6 bg-slate-50 min-h-screen font-sans">

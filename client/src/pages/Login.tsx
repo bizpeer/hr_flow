@@ -106,10 +106,15 @@ export const Login: React.FC = () => {
       const companyId = domain.replace(/\./g, '_'); // aeterno.co.kr → aeterno_co_kr
 
       // 3. 회사 문서 생성
+      // 회사 도메인 결정: 영문 사명이 있으면 이를 기반으로 .co.kr 도메인 생성 (사용자 요청 반영)
+      const finalCompanyDomain = regOrgEn.trim() 
+        ? `${regOrgEn.trim().toLowerCase().replace(/\s+/g, '')}.co.kr` 
+        : domain;
+
       await setDoc(doc(db, 'companies', companyId), {
         nameKo: regOrgKo.trim(),
         nameEn: regOrgEn.trim(),
-        domain: domain,
+        domain: finalCompanyDomain,
         adminUid: uid,
         createdAt: new Date().toISOString(),
         status: 'ACTIVE',
@@ -131,7 +136,7 @@ export const Login: React.FC = () => {
 
       // 5. 회사별 config 문서 생성
       await setDoc(doc(db, 'config', companyId), {
-        defaultDomain: domain,
+        defaultDomain: finalCompanyDomain,
         updatedAt: new Date().toISOString(),
         updatedBy: uid
       });
@@ -240,7 +245,7 @@ export const Login: React.FC = () => {
                       required
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="admin@company.com"
+                      placeholder="admin@yourcompany.co.kr"
                       className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
                     />
                   </div>
@@ -303,7 +308,7 @@ export const Login: React.FC = () => {
                       required
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="admin@company.com"
+                      placeholder="admin@yourcompany.co.kr"
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
                     />
                   </div>

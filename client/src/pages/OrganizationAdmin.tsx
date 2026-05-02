@@ -207,9 +207,10 @@ export const OrganizationAdmin: React.FC = () => {
       const loginInput = newEmp.email.trim().toLowerCase();
       
       // 도메인 배정 로직:
-      // 1. 입력값에 @가 포함된 경우 그대로 사용
-      // 2. @가 없는 경우: 회사 커스텀 도메인 -> 회사 영문명.co.kr 순서로 적용 (보안 및 격리를 위해 시스템 기본 도메인은 배제)
-      const companyDomain = companyData?.domain || (companyData?.nameEn ? `${companyData.nameEn.toLowerCase().replace(/\s+/g, '')}.co.kr` : 'unconfigured.co.kr');
+      // 1. 회사 영문명 기반 도메인 (id@회사영문.co.kr)을 최우선순위로 설정 (사용자 요청 3순위 반영)
+      // 2. 회사 영문명이 없는 경우에만 기존 설정된 domain 사용 (시스템 기본 도메인 .com 배제)
+      const nameEnDomain = companyData?.nameEn ? `${companyData.nameEn.toLowerCase().replace(/\s+/g, '')}.co.kr` : null;
+      const companyDomain = nameEnDomain || companyData?.domain || 'unconfigured.co.kr';
       const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${companyDomain}`;
 
       // 1. 중복 아이디 체크 (UX 차원)

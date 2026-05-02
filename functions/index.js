@@ -371,38 +371,50 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
     // 순차적으로 업데이트 (Auth API 제한 고려 및 안정성 확보)
     for (const userDoc of qSnap.docs) {
       const userData = userDoc.data();
+      const uid = userDoc.id;
       
       // SUPER_ADMIN이나 타사 계정은 건드리지 않음 (혹시 모를 안전장치)
-      if (userData.role === "SUPER_ADMIN") continue;
+      if (userData.role === "SUPER_ADMIN") {
+        console.log(`[AdminSyncDomain] Skipping SUPER_ADMIN: ${uid}`);
+        continue;
+      }
 
       if (userData.email && userData.email.includes("@")) {
         const [id] = userData.email.split("@");
-        const newEmail = `${id}@${cleanDomain}`;
+        const newEmail = `${id.trim()}@${cleanDomain}`;
 
-        if (userData.email !== newEmail) {
+        if (userData.email.toLowerCase().trim() !== newEmail.toLowerCase().trim()) {
           try {
+            console.log(`[AdminSyncDomain] Updating user ${uid}: ${userData.email} -> ${newEmail}`);
+            
             // A. Firebase Auth 이메일 업데이트
-            await admin.auth().updateUser(userDoc.id, { email: newEmail });
+            await admin.auth().updateUser(uid, { email: newEmail });
             
             // B. Firestore UserProfile 이메일 업데이트
             await userDoc.ref.update({ email: newEmail });
             
             successCount++;
           } catch (e) {
-            console.error(`[SyncDomainError] Failed to update user ${userDoc.id}:`, e);
+            console.error(`[AdminSyncDomainError] Failed to update user ${uid} (${userData.email}):`, e);
             failCount++;
           }
+        } else {
+          console.log(`[AdminSyncDomain] User ${uid} already has correct domain or matches: ${userData.email}`);
+          successCount++;
         }
+      } else {
+        console.warn(`[AdminSyncDomain] User ${uid} has invalid email format: ${userData.email}`);
+        failCount++;
       }
     }
 
-    console.log(`[AdminSyncDomain] Company ${companyId} domain sync: Success ${successCount}, Fail ${failCount} by ${request.auth.uid}`);
+    console.log(`[AdminSyncDomain] Company ${companyId} domain sync finished: Success ${successCount}, Fail ${failCount} by ${request.auth.uid}`);
 
     return {
       success: true,
       successCount,
       failCount,
-      message: `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명)` : ""}`
+      message: `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명 - 로그 확인 필요)` : ""}`
     };
 
   } catch (error) {
