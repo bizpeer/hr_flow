@@ -188,8 +188,10 @@ export const AdminSettings: React.FC = () => {
 
       setVerifyPassword('');
     } catch (err: any) {
-      console.error("Sync Error:", err);
-      setMessage({ type: 'error', text: '동기화 중 오류: ' + (err.message || '알 수 없는 오류') });
+      console.error("Sync Error Detailed:", err);
+      // Firebase HttpsError의 경우 err.message에 서버의 메시지가 담깁니다.
+      const errorMsg = err.message || '알 수 없는 오류';
+      setMessage({ type: 'error', text: '동기화 중 오류: ' + errorMsg });
     } finally {
       setLoading(false);
     }

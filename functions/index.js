@@ -18,8 +18,7 @@ exports.checkDomainAvailability = onCall(async (request) => {
   }
 
   try {
-    const { getFirestore } = require("firebase-admin/firestore");
-    const db = getFirestore(DATABASE_ID);
+    const db = admin.firestore();
 
     // domain 필드로 검색
     const qSnap = await db.collection("companies")
@@ -139,8 +138,7 @@ exports.adminCreateMember = onCall(async (request) => {
   }
 
   try {
-    const { getFirestore } = require("firebase-admin/firestore");
-    const db = getFirestore(DATABASE_ID);
+    const db = admin.firestore();
 
     // 3. 호출자(관리자) 정보 및 권한 조회
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
@@ -223,8 +221,7 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
   }
 
   try {
-    const { getFirestore } = require("firebase-admin/firestore");
-    const db = getFirestore(DATABASE_ID);
+    const db = admin.firestore();
     console.log(`[AdminDeleteCompany] Checking permissions for user ${request.auth.uid} (${request.auth.token.email})`);
 
     // 1. 권한 확인 (Auth Token Claims + Email Fallback + Firestore Profile)
@@ -328,7 +325,7 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
  * 회사 도메인 변경 시 모든 직원의 로그인 ID(Email)를 일괄 업데이트합니다.
  * Auth 이메일과 UserProfile 문서를 동시에 수정합니다.
  */
-exports.adminSyncCompanyDomain = onCall(async (request) => {
+exports.adminSyncCompanyDomain = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
   // 1. 인증 확인
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
@@ -342,8 +339,7 @@ exports.adminSyncCompanyDomain = onCall(async (request) => {
   const cleanDomain = newDomain.replace("@", "").toLowerCase().trim();
   console.log(`[AdminSyncDomain] Starting sync to @${cleanDomain} requested by ${request.auth.uid}`);
   
-  const { getFirestore } = require("firebase-admin/firestore");
-  const db = getFirestore(DATABASE_ID);
+  const db = admin.firestore();
 
   try {
     // 2. 호출자 권한 확인
