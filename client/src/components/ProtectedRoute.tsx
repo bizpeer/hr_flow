@@ -33,6 +33,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/dashboard" replace />;
   }
 
+  // SUPER_ADMIN은 회사별 메뉴에 접근 불필요하므로 자체 대시보드로 리디렉트
+  if (isSuperAdmin && !requireSuperAdmin) {
+    return <Navigate to="/super-admin" replace />;
+  }
+
   if (!userData) {
     if (requireAdmin || requireMasterAdmin) {
       return <Navigate to="/dashboard" replace />;
@@ -40,11 +45,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <>{children}</>;
   }
 
-  if (requireMasterAdmin && userData.role !== 'ADMIN' && !isSuperAdmin) {
+  if (requireMasterAdmin && userData.role !== 'ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  if (requireAdmin && userData.role !== 'ADMIN' && userData.role !== 'SUB_ADMIN' && !isSuperAdmin) {
+  if (requireAdmin && userData.role !== 'ADMIN' && userData.role !== 'SUB_ADMIN') {
     return <Navigate to="/dashboard" replace />;
   }
 
