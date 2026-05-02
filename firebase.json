@@ -15,13 +15,16 @@
   },
   "firestore": [
     {
-      "database": "weberp",
+      "database": "(default)",
       "rules": "firestore.rules"
     }
   ],
-  "storage": {
-    "rules": "storage.rules"
-  },
+  "storage": [
+    {
+      "bucket": "weberp-8f25f.firebasestorage.app",
+      "rules": "storage.rules"
+    }
+  ],
   "functions": [
     {
       "source": "functions",

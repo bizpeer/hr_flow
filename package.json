@@ -10,6 +10,6 @@
     "emulators": "firebase emulators:start"
   },
   "dependencies": {
-    "firebase": "^12.12.0"
+    "firebase": "^12.12.1"
   }
 }
