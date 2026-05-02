@@ -13,8 +13,8 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
   const { user, userData, companyData, logout, setLoginModalOpen } = useAuthStore();
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
-  const isDirector = userRole === 'ADMIN';
-  const isManagement = userRole === 'ADMIN' || userRole === 'SUB_ADMIN'; // 결재함은 둘 다 가능
+  const isDirector = userData?.role === 'ADMIN' || isSuperAdmin;
+  const isManagement = isDirector || userData?.role === 'SUB_ADMIN';
 
   const NavItem = ({ to, icon: Icon, label, colorClass = 'indigo' }: { to: string, icon: any, label: string, colorClass?: string }) => (
     <NavLink 
@@ -83,34 +83,37 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
             background: rgba(99, 102, 241, 0.3);
           }
         `}</style>
-        {isSuperAdmin ? (
-          /* SUPER_ADMIN 전용 메뉴 */
+        
+        {/* SUPER_ADMIN 전용 메뉴 - 항상 상단에 표시 */}
+        {isSuperAdmin && (
           <>
+            <div className="pb-3 px-4">
+              <p className="text-[10px] font-black text-violet-500 uppercase tracking-[0.2em]">Platform</p>
+            </div>
             <NavItem to="/super-admin" icon={Shield} label="플랫폼 관리" colorClass="violet" />
-          </>
-        ) : (
-          /* 일반 사용자 메뉴 */
-          <>
-            <NavItem to="/dashboard" icon={Home} label="대시보드" />
-            <NavItem to="/leave" icon={CalendarClock} label="휴가신청" />
-            <NavItem to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
-            <NavItem to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
-
-            {isManagement && (
-              <div className="pt-8 pb-3 px-4">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Management</p>
-              </div>
-            )}
-
-            {isManagement && <NavItem to="/admin/approvals" icon={CheckSquare} label="결재/승인 관리함" />}
-            {isDirector && <NavItem to="/admin/organization" icon={Network} label="조직관리" />}
-            {isDirector && <NavItem to="/admin/salary" icon={Banknote} label="급여관리" colorClass="indigo" />}
-            {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
-            {isDirector && <NavItem to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
-            {isDirector && <NavItem to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
-            {isDirector && <NavItem to="/subscription" icon={CreditCard} label="결제/구독 관리" colorClass="amber" />}
+            <div className="my-4 border-t border-slate-800/50" />
           </>
         )}
+
+        {/* 일반 메뉴 */}
+        <NavItem to="/dashboard" icon={Home} label="대시보드" />
+        <NavItem to="/leave" icon={CalendarClock} label="휴가신청" />
+        <NavItem to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
+        <NavItem to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
+
+        {isManagement && (
+          <div className="pt-8 pb-3 px-4">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Management</p>
+          </div>
+        )}
+
+        {isManagement && <NavItem to="/admin/approvals" icon={CheckSquare} label="결재/승인 관리함" />}
+        {isDirector && <NavItem to="/admin/organization" icon={Network} label="조직관리" />}
+        {isDirector && <NavItem to="/admin/salary" icon={Banknote} label="급여관리" colorClass="indigo" />}
+        {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
+        {isDirector && <NavItem to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
+        {isDirector && <NavItem to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
+        {isDirector && <NavItem to="/subscription" icon={CreditCard} label="결제/구독 관리" colorClass="amber" />}
       </nav>
 
       <div className="mt-auto pt-6 border-t border-slate-800 relative z-10 shrink-0">
