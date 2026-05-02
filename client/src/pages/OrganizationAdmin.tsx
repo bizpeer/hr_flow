@@ -205,7 +205,12 @@ export const OrganizationAdmin: React.FC = () => {
     try {
       setIsSubmittingEmployee(true);
       const loginInput = newEmp.email.trim().toLowerCase();
-      const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${systemDomain}`;
+      
+      // 도메인 배정 로직:
+      // 1. 입력값에 @가 포함된 경우 그대로 사용
+      // 2. @가 없는 경우: 회사 커스텀 도메인 -> 회사 영문명.com -> 시스템 기본 도메인 순서로 적용
+      const companyDomain = companyData?.domain || (companyData?.nameEn ? `${companyData.nameEn.toLowerCase().replace(/\s+/g, '')}.com` : systemDomain);
+      const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${companyDomain}`;
 
       // 1. 중복 아이디 체크 (UX 차원)
       const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail), where('companyId', '==', userData?.companyId || ''));
