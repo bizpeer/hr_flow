@@ -170,12 +170,14 @@ export const AdminSettings: React.FC = () => {
         newDomain: companyData.domain 
       });
 
-      const { success, message: syncMsg, successCount } = result.data as { 
+      const { success, message: syncMsg, successCount, failCount } = result.data as { 
         success: boolean; 
         message: string;
         successCount: number;
+        failCount: number;
       };
 
+      if (success) {
         setMessage({ 
           type: 'success', 
           text: syncMsg || `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명)` : ""}` 
