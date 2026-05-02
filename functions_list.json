@@ -1,0 +1,204 @@
+{
+  "status": "success",
+  "result": [
+    {
+      "platform": "gcfv2",
+      "id": "adminCreateMember",
+      "project": "weberp-8f25f",
+      "region": "us-central1",
+      "callableTrigger": {},
+      "entryPoint": "adminCreateMember",
+      "runtime": "nodejs24",
+      "source": {
+        "storageSource": {
+          "bucket": "gcf-v2-sources-9187485192-us-central1",
+          "object": "adminCreateMember/function-source.zip",
+          "generation": "1777693436748799"
+        }
+      },
+      "ingressSettings": "ALLOW_ALL",
+      "environmentVariables": {
+        "FIREBASE_CONFIG": "{\"projectId\":\"weberp-8f25f\",\"storageBucket\":\"weberp-8f25f.firebasestorage.app\"}",
+        "GCLOUD_PROJECT": "weberp-8f25f",
+        "EVENTARC_CLOUD_EVENT_SOURCE": "projects/weberp-8f25f/locations/us-central1/services/adminCreateMember",
+        "FUNCTION_TARGET": "adminCreateMember",
+        "LOG_EXECUTION_ID": "true",
+        "FUNCTION_SIGNATURE_TYPE": "http"
+      },
+      "timeoutSeconds": 60,
+      "uri": "https://us-central1-weberp-8f25f.cloudfunctions.net/adminCreateMember",
+      "serviceAccount": "9187485192-compute@developer.gserviceaccount.com",
+      "availableMemoryMb": 256,
+      "cpu": 1,
+      "concurrency": 80,
+      "labels": {
+        "deployment-tool": "cli-firebase",
+        "deployment-callable": "true",
+        "firebase-functions-hash": "f7acee944767fabd4aa907bd0aa0759c803e0410"
+      },
+      "runServiceId": "admincreatemember",
+      "codebase": "default",
+      "hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+      "state": "ACTIVE"
+    },
+    {
+      "platform": "gcfv2",
+      "id": "adminDeleteCompanyData",
+      "project": "weberp-8f25f",
+      "region": "us-central1",
+      "callableTrigger": {},
+      "entryPoint": "adminDeleteCompanyData",
+      "runtime": "nodejs24",
+      "source": {
+        "storageSource": {
+          "bucket": "gcf-v2-sources-9187485192-us-central1",
+          "object": "adminDeleteCompanyData/function-source.zip",
+          "generation": "1777693436829859"
+        }
+      },
+      "ingressSettings": "ALLOW_ALL",
+      "environmentVariables": {
+        "FIREBASE_CONFIG": "{\"projectId\":\"weberp-8f25f\",\"storageBucket\":\"weberp-8f25f.firebasestorage.app\"}",
+        "GCLOUD_PROJECT": "weberp-8f25f",
+        "EVENTARC_CLOUD_EVENT_SOURCE": "projects/weberp-8f25f/locations/us-central1/services/adminDeleteCompanyData",
+        "FUNCTION_TARGET": "adminDeleteCompanyData",
+        "LOG_EXECUTION_ID": "true",
+        "FUNCTION_SIGNATURE_TYPE": "http"
+      },
+      "timeoutSeconds": 60,
+      "uri": "https://us-central1-weberp-8f25f.cloudfunctions.net/adminDeleteCompanyData",
+      "serviceAccount": "9187485192-compute@developer.gserviceaccount.com",
+      "availableMemoryMb": 256,
+      "cpu": 1,
+      "concurrency": 80,
+      "labels": {
+        "deployment-tool": "cli-firebase",
+        "deployment-callable": "true",
+        "firebase-functions-hash": "f7acee944767fabd4aa907bd0aa0759c803e0410"
+      },
+      "runServiceId": "admindeletecompanydata",
+      "codebase": "default",
+      "hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+      "state": "ACTIVE"
+    },
+    {
+      "platform": "gcfv2",
+      "id": "adminResetPassword",
+      "project": "weberp-8f25f",
+      "region": "us-central1",
+      "callableTrigger": {},
+      "entryPoint": "adminResetPassword",
+      "runtime": "nodejs24",
+      "source": {
+        "storageSource": {
+          "bucket": "gcf-v2-sources-9187485192-us-central1",
+          "object": "adminResetPassword/function-source.zip",
+          "generation": "1777693436697985"
+        }
+      },
+      "ingressSettings": "ALLOW_ALL",
+      "environmentVariables": {
+        "FIREBASE_CONFIG": "{\"projectId\":\"weberp-8f25f\",\"storageBucket\":\"weberp-8f25f.firebasestorage.app\"}",
+        "GCLOUD_PROJECT": "weberp-8f25f",
+        "EVENTARC_CLOUD_EVENT_SOURCE": "projects/weberp-8f25f/locations/us-central1/services/adminResetPassword",
+        "FUNCTION_TARGET": "adminResetPassword",
+        "LOG_EXECUTION_ID": "true",
+        "FUNCTION_SIGNATURE_TYPE": "http"
+      },
+      "timeoutSeconds": 60,
+      "uri": "https://us-central1-weberp-8f25f.cloudfunctions.net/adminResetPassword",
+      "serviceAccount": "9187485192-compute@developer.gserviceaccount.com",
+      "availableMemoryMb": 256,
+      "cpu": 1,
+      "concurrency": 80,
+      "labels": {
+        "firebase-functions-hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+        "deployment-tool": "cli-firebase",
+        "deployment-callable": "true"
+      },
+      "runServiceId": "adminresetpassword",
+      "codebase": "default",
+      "hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+      "state": "ACTIVE"
+    },
+    {
+      "platform": "gcfv2",
+      "id": "checkDeploymentStatus",
+      "project": "weberp-8f25f",
+      "region": "us-central1",
+      "callableTrigger": {},
+      "entryPoint": "checkDeploymentStatus",
+      "runtime": "nodejs24",
+      "source": {
+        "storageSource": {
+          "bucket": "gcf-v2-sources-9187485192-us-central1",
+          "object": "checkDeploymentStatus/function-source.zip",
+          "generation": "1777693436809012"
+        }
+      },
+      "ingressSettings": "ALLOW_ALL",
+      "environmentVariables": {
+        "FIREBASE_CONFIG": "{\"projectId\":\"weberp-8f25f\",\"storageBucket\":\"weberp-8f25f.firebasestorage.app\"}",
+        "GCLOUD_PROJECT": "weberp-8f25f",
+        "EVENTARC_CLOUD_EVENT_SOURCE": "projects/weberp-8f25f/locations/us-central1/services/checkDeploymentStatus",
+        "FUNCTION_TARGET": "checkDeploymentStatus",
+        "LOG_EXECUTION_ID": "true",
+        "FUNCTION_SIGNATURE_TYPE": "http"
+      },
+      "timeoutSeconds": 60,
+      "uri": "https://us-central1-weberp-8f25f.cloudfunctions.net/checkDeploymentStatus",
+      "serviceAccount": "9187485192-compute@developer.gserviceaccount.com",
+      "availableMemoryMb": 256,
+      "cpu": 1,
+      "concurrency": 80,
+      "labels": {
+        "deployment-callable": "true",
+        "firebase-functions-hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+        "deployment-tool": "cli-firebase"
+      },
+      "runServiceId": "checkdeploymentstatus",
+      "codebase": "default",
+      "hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+      "state": "ACTIVE"
+    },
+    {
+      "platform": "gcfv2",
+      "id": "checkDomainAvailability",
+      "project": "weberp-8f25f",
+      "region": "us-central1",
+      "callableTrigger": {},
+      "entryPoint": "checkDomainAvailability",
+      "runtime": "nodejs24",
+      "source": {
+        "storageSource": {
+          "bucket": "gcf-v2-sources-9187485192-us-central1",
+          "object": "checkDomainAvailability/function-source.zip",
+          "generation": "1777693356765294"
+        }
+      },
+      "ingressSettings": "ALLOW_ALL",
+      "environmentVariables": {
+        "FIREBASE_CONFIG": "{\"projectId\":\"weberp-8f25f\",\"storageBucket\":\"weberp-8f25f.firebasestorage.app\"}",
+        "GCLOUD_PROJECT": "weberp-8f25f",
+        "EVENTARC_CLOUD_EVENT_SOURCE": "projects/weberp-8f25f/locations/us-central1/services/checkDomainAvailability",
+        "FUNCTION_TARGET": "checkDomainAvailability",
+        "LOG_EXECUTION_ID": "true"
+      },
+      "timeoutSeconds": 60,
+      "uri": "https://us-central1-weberp-8f25f.cloudfunctions.net/checkDomainAvailability",
+      "serviceAccount": "9187485192-compute@developer.gserviceaccount.com",
+      "availableMemoryMb": 256,
+      "cpu": 1,
+      "concurrency": 80,
+      "labels": {
+        "deployment-tool": "cli-firebase",
+        "deployment-callable": "true",
+        "firebase-functions-hash": "f7acee944767fabd4aa907bd0aa0759c803e0410"
+      },
+      "runServiceId": "checkdomainavailability",
+      "codebase": "default",
+      "hash": "f7acee944767fabd4aa907bd0aa0759c803e0410",
+      "state": "ACTIVE"
+    }
+  ]
+}
