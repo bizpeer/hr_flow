@@ -70,7 +70,7 @@ jobs:
       # 2. Firebase 통합 배포 (Functions, Hosting, Rules)
       - name: Deploy to Firebase (All)
         if: env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only functions,hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
+        run: npx firebase-tools deploy --only functions,hosting,firestore:rules,storage --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
