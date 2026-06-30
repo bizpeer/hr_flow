@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
   PieChart, DollarSign, Calendar, Filter, Printer, ChevronRight, 
-  TrendingUp, Download, Search, FileText, Loader2, CheckCircle
+  TrendingUp, Download, Search, FileText, Loader2, CheckCircle, FolderArchive
 } from 'lucide-react';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
+import JSZip from 'jszip';
 
 interface Expense {
   id: string;
@@ -16,13 +17,16 @@ interface Expense {
   category: string;
   status: 'APPROVED' | 'PENDING' | 'REJECTED';
   applicant: string;
-  userName?: string; // AdminApprovals와 일관성을 위해 추가
+  userName?: string;
+  attachmentUrl?: string;
+  attachmentName?: string;
 }
 
 export const ExpenseAdminDashboard: React.FC = () => {
   const { userData, loading: authLoading } = useAuthStore();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [zipLoading, setZipLoading] = useState(false);
   
   // 초기 날짜 설정: 이번 달 1일 ~ 다음 달 1일 (자동 1개월 범위)
   const initialStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -85,6 +89,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
     if (filteredExpenses.length === 0) {
       alert("다운로드할 데이터가 없습니다.");
       return;
+      return;
     }
 
     // CSV 헤더 및 데이터 구성
@@ -109,6 +114,64 @@ export const ExpenseAdminDashboard: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  // 영수증 이미지 일괄 ZIP 다운로드 기능
+  const handleDownloadReceiptsZip = async () => {
+    const itemsWithReceipt = filteredExpenses.filter(e => e.attachmentUrl);
+    
+    if (itemsWithReceipt.length === 0) {
+      alert("선택한 날짜 범위 내에 첨부된 영수증이 없습니다.");
+      return;
+    }
+
+    if (!window.confirm(`총 ${itemsWithReceipt.length}개의 영수증 파일을 날짜별로 압축하여 다운로드하시겠습니까?`)) {
+      return;
+    }
+
+    setZipLoading(true);
+    const zip = new JSZip();
+
+    try {
+      for (const item of itemsWithReceipt) {
+        if (!item.attachmentUrl) continue;
+        try {
+          // Firebase Storage의 CORS 허용 정책에 따라 fetch가 가능해야 함
+          const response = await fetch(item.attachmentUrl);
+          if (!response.ok) throw new Error("네트워크 응답 오류");
+          
+          const blob = await response.blob();
+          
+          // 폴더 구조: 연-월 (예: 2026-06)
+          const folderName = item.date.substring(0, 7);
+          
+          // 파일명 다듬기: 2026-06-30_지출명_원본파일명
+          const sanitizedTitle = item.title.replace(/[\/\\?%*:|"<>]/g, '_');
+          const ext = item.attachmentName ? item.attachmentName.substring(item.attachmentName.lastIndexOf('.')) : '.jpg';
+          const cleanExt = ext.length > 5 ? '.jpg' : ext; // 비정상 확장자 예방
+          const fileName = `${item.date}_${sanitizedTitle}${cleanExt}`;
+          
+          zip.folder(folderName)?.file(fileName, blob);
+        } catch (err) {
+          console.error(`영수증 다운로드 실패 [${item.title}]:`, err);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `영수증백업_${startDate.replace(/-/g, '')}_to_${endDate.replace(/-/g, '')}.zip`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error("ZIP Generation Error:", error);
+      alert("압축 파일 생성 중 오류가 발생했습니다: " + error.message);
+    } finally {
+      setZipLoading(false);
+    }
   };
 
   if (authLoading || loading) {
@@ -138,17 +201,29 @@ export const ExpenseAdminDashboard: React.FC = () => {
             <p className="text-slate-500 font-medium tracking-tight">전사 지출 데이터를 시각화하고 통합 리포트를 생성합니다.</p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+             <button 
+               onClick={handleDownloadReceiptsZip}
+               disabled={zipLoading}
+               className="flex items-center gap-2.5 px-6 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 shrink-0 disabled:opacity-50"
+             >
+                {zipLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <FolderArchive className="w-5 h-5" />
+                )}
+                <span>영수증 ZIP 다운로드</span>
+             </button>
              <button 
               onClick={() => window.print()}
               className="flex items-center gap-2.5 px-6 py-4 bg-white border border-slate-200 text-slate-700 font-black rounded-2xl shadow-xl shadow-slate-100 hover:bg-slate-50 transition-all active:scale-95 shrink-0"
              >
-                <Printer className="w-5 h-5 text-indigo-500" />
+                <Printer className="w-5 h-5 text-slate-500" />
                 <span>PDF 리포트 출력</span>
              </button>
              <button 
-               onClick={handleExportExcel}
-               className="flex items-center gap-2.5 px-6 py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 shrink-0"
+                onClick={handleExportExcel}
+                className="flex items-center gap-2.5 px-6 py-4 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 shrink-0"
              >
                 <Download className="w-5 h-5" />
                 <span className="hidden sm:inline">Excel 다운로드</span>

@@ -151,6 +151,7 @@ export const ExpenseForm: React.FC = () => {
         setEditingId(null);
         setEditingRequest(null);
         setSelectedRequest(null);
+      } else {
         // 신규 등록
         if (!userData?.companyId) throw new Error("회사 정보(companyId)가 없습니다. 다시 로그인해 주세요.");
         
