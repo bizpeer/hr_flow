@@ -310,14 +310,13 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
     };
 
   } catch (error) {
-    console.error(`[AdminDeleteCompanyError]`, error);
-    // 상세 에러 정보(메시지 및 스택 일부)를 반환하여 정확한 원인 파악 유도
-    const detailedMessage = error instanceof Error
-      ? `${error.message}\n${error.stack?.split('\n').slice(0, 2).join('\n')}`
-      : JSON.stringify(error);
-
+    console.error(`[AdminDeleteCompanyError] Detailed error:`, error);
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", detailedMessage || "데이터 삭제 중 치명적인 오류가 발생했습니다.");
+    // [보안 패치] 클라이언트 측 상세 에러 스택 및 경로 정보 노출 차단
+    throw new HttpsError(
+      "internal", 
+      "조직 데이터를 삭제하는 중 오류가 발생했습니다. 자세한 내용은 시스템 로그를 검토해주십시오."
+    );
   }
 });
 
@@ -421,10 +420,13 @@ exports.adminSyncCompanyDomain = onCall({ timeoutSeconds: 300, memory: "512MiB" 
     };
 
   } catch (error) {
-    console.error(`[AdminSyncDomainError] Global Catch:`, error);
+    console.error(`[AdminSyncDomainError] Global Catch Detailed:`, error);
     if (error instanceof HttpsError) throw error;
-    // 상세 에러 메시지 반환 (클라이언트에서 'internal'로 뭉뚱그려지는 것을 방지)
-    throw new HttpsError("internal", error.message || "도메인 일괄 업데이트 중 알 수 없는 오류가 발생했습니다.");
+    // [보안 패치] 내부 인프라나 API 예외 세부 메시지가 노출되는 것을 방지
+    throw new HttpsError(
+      "internal", 
+      "도메인 일괄 동기화 작업 중 오류가 발생했습니다. 시스템 로그를 검토해주십시오."
+    );
   }
 });
 
