@@ -67,15 +67,10 @@ jobs:
           npx firebase-tools projects:list --non-interactive --token "$FIREBASE_TOKEN"
           npx firebase-tools --version
 
-      # 2. Firebase Cloud Functions 배포
-      - name: Deploy to Firebase (Functions Only)
+      # 2. Firebase 통합 배포 (Functions, Hosting, Rules)
+      - name: Deploy to Firebase (All)
         if: env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only functions --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token "$FIREBASE_TOKEN"
-
-      # 3. Firebase Hosting 및 규칙 배포
-      - name: Deploy to Firebase (Hosting & Rules)
-        if: env.FIREBASE_TOKEN != ''
-        run: npx firebase-tools deploy --only hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --debug --token "$FIREBASE_TOKEN"
+        run: npx firebase-tools deploy --only functions,hosting,firestore:rules,storage:rules --project ${{ secrets.VITE_FIREBASE_PROJECT_ID }} --non-interactive --token "$FIREBASE_TOKEN"
 
       # GitHub Pages 배포 전 아티팩트 업로드
       - name: Upload artifact for GitHub Pages
