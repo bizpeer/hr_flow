@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Search, Building, Filter, Trash2, UserX, UserCheck, Key, 
   Loader2, ShieldAlert,
-  Calendar, X, MoreVertical
+  Calendar, X, MoreVertical, Mail, Copy, Check
 } from 'lucide-react';
 import { 
   collection, query, where, onSnapshot, doc, updateDoc, 
@@ -43,6 +43,7 @@ export const EmployeeManagement: React.FC = () => {
   const [divisions, setDivisions] = useState<any[]>([]);
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   
   // Filters
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
@@ -60,6 +61,13 @@ export const EmployeeManagement: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const isAdmin = userData?.role === 'ADMIN';
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+
+  const handleCopyEmail = (email: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    navigator.clipboard.writeText(email);
+    setCopiedEmail(email);
+    setTimeout(() => setCopiedEmail(null), 2000);
+  };
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -313,7 +321,7 @@ export const EmployeeManagement: React.FC = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
             <input 
               type="text" 
-              placeholder="이름 또는 이메일로 검색..."
+              placeholder="이름 또는 로그인 ID(이메일)로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-12 pr-6 py-4 bg-white rounded-2xl shadow-sm border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-bold text-slate-800"
@@ -382,11 +390,24 @@ export const EmployeeManagement: React.FC = () => {
                       <tr key={emp.uid} className={`group hover:bg-indigo-50/30 transition-all ${isResigned ? 'opacity-60' : ''}`}>
                         <td className="px-8 py-6">
                           <div className="flex items-center gap-4 cursor-pointer" onClick={() => handleOpenDetail(emp)}>
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:rotate-6 transition-all ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-indigo-100'}`}>
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:rotate-6 transition-all shrink-0 ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-indigo-100'}`}>
                               {emp.name[0]}
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <div className="text-md font-black tracking-tight text-slate-800">{emp.name}</div>
+                              <div 
+                                onClick={(e) => handleCopyEmail(emp.email, e)}
+                                className="inline-flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 font-bold hover:text-indigo-600 transition-colors group/copy cursor-pointer py-0.5"
+                                title="클릭하여 로그인 ID 복사"
+                              >
+                                <Mail className="w-3.5 h-3.5 text-slate-400 group-hover/copy:text-indigo-500 shrink-0" />
+                                <span className="font-mono text-slate-600 group-hover/copy:text-indigo-600">{emp.email}</span>
+                                {copiedEmail === emp.email ? (
+                                  <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5"><Check className="w-3 h-3" /> 복사됨</span>
+                                ) : (
+                                  <Copy className="w-3 h-3 text-slate-300 opacity-0 group-hover/copy:opacity-100 transition-opacity" />
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 mt-1">
                                 <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100 whitespace-nowrap">{div}</span>
                                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">{team}</span>
@@ -463,12 +484,21 @@ export const EmployeeManagement: React.FC = () => {
                   
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'}`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'}`}>
                         {emp.name[0]}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h3 className="text-lg font-black text-slate-800">{emp.name}</h3>
-                        <p className="text-xs font-bold text-slate-400">{emp.role}</p>
+                        <div 
+                          onClick={(e) => handleCopyEmail(emp.email, e)}
+                          className="flex items-center gap-1.5 text-xs text-slate-600 font-bold hover:text-indigo-600 transition-colors mt-0.5 cursor-pointer"
+                          title="클릭하여 로그인 ID 복사"
+                        >
+                          <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="font-mono truncate">{emp.email}</span>
+                          {copiedEmail === emp.email && <Check className="w-3 h-3 text-emerald-500 shrink-0" />}
+                        </div>
+                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">{emp.role}</p>
                       </div>
                     </div>
                     <button 
@@ -524,12 +554,26 @@ export const EmployeeManagement: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col max-h-[90vh]">
             <div className="p-10 border-b border-slate-50 flex justify-between items-start shrink-0">
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-black text-indigo-600 uppercase tracking-widest">Management Console</div>
                    {selectedEmpRecords.emp.status === 'RESIGNED' && <span className="px-3 py-1 bg-rose-50 text-rose-500 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">Resigned</span>}
                 </div>
                 <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{selectedEmpRecords.emp.name}님의 상세 정보</h2>
+                <div 
+                  onClick={() => handleCopyEmail(selectedEmpRecords.emp.email)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl text-xs font-bold text-slate-700 transition-colors cursor-pointer border border-slate-200 w-fit"
+                  title="클릭하여 로그인 ID 복사"
+                >
+                  <Mail className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-slate-400 font-medium">로그인 ID:</span>
+                  <span className="font-mono font-black">{selectedEmpRecords.emp.email}</span>
+                  {copiedEmail === selectedEmpRecords.emp.email ? (
+                    <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 ml-1"><Check className="w-3 h-3" /> 복사됨</span>
+                  ) : (
+                    <Copy className="w-3 h-3 text-slate-400 ml-1" />
+                  )}
+                </div>
               </div>
               
               {/* Leave Dashboard Widget */}

@@ -1,9 +1,64 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Production & Build outputs
+dist/
+dist-ssr/
+build/
+out/
+server/*.js
+server/*.js.map
+server/*.d.ts
+server/*.d.ts.map
+server/build_log.txt
+
+# Environment variables & Secrets (CRITICAL)
 .env
+.env.*
+!.env.example
+*.local
+*.pem
+*.key
+*.cert
+serviceAccount*.json
+*credentials*.json
+server/serviceAccount*.json
+
+# Firebase & Cloud tools
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS Files & Office Temp files
 .DS_Store
-build
-.firebase
-serviceAccount.json
-*.json.json
-server/serviceAccount.json
+Thumbs.db
+Desktop.ini
+~$*
+
+# IDE & Editor files
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Scratch & Temporary data
+scratch/
+tmp/
+temp/
