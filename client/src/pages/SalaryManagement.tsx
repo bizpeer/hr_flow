@@ -452,10 +452,16 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', false)}
+                                              title={data.salaryType === 'MONTHLY'
+                                                ? '퇴직급여 별도: 입력한 월급을 12배하여 연 환산액을 계산합니다.'
+                                                : '퇴직급여 별도: 입력한 연봉을 12개월로 나누어 월 지급액을 계산합니다.'}
                                               className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${!data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                                             >별도</button>
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', true)}
+                                              title={data.salaryType === 'MONTHLY'
+                                                ? '퇴직급여 포함: 입력한 월급을 13배하여 연 환산액을 계산합니다.'
+                                                : '퇴직급여 포함: 입력한 연봉을 13등분하여 월 지급액을 계산합니다.'}
                                               className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.isSeveranceIncluded ? 'bg-slate-800 text-white shadow-lg shadow-slate-200' : 'text-slate-400 hover:text-slate-600'}`}
                                             >포함</button>
                                          </div>
