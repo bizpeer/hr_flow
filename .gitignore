@@ -25,6 +25,7 @@ server/build_log.txt
 serviceAccount*.json
 *credentials*.json
 server/serviceAccount*.json
+users.json
 
 # Firebase & Cloud tools
 .firebase/
