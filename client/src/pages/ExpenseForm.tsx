@@ -121,7 +121,7 @@ export const ExpenseForm: React.FC = () => {
         const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
         finalUrl = await getDownloadURL(uploadResult.ref);
         finalName = selectedFile.name;
-        console.log("✅ Upload Success:", finalUrl);
+        console.log("✅ Upload Success");
       }
 
       // 2. 페이로드 구성 (모든 필드에 대해 undefined 방지 처리)

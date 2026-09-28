@@ -47,8 +47,8 @@ export const AdminSettings: React.FC = () => {
       setMessage({ type: 'error', text: '입력하신 두 비밀번호가 일치하지 않습니다.' });
       return;
     }
-    if (newPassword.length < 4) {
-      setMessage({ type: 'error', text: '보안을 위해 비밀번호는 최소 4자 이상이어야 합니다.' });
+    if (newPassword.length < 12) {
+      setMessage({ type: 'error', text: '보안을 위해 비밀번호는 최소 12자 이상이어야 합니다.' });
       return;
     }
 

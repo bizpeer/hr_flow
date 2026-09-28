@@ -1,187 +1,213 @@
 rules_version = '2';
-// Update cache: 2026-04-19
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // 유틸리티 함수: 사용자가 인증되었는지 확인
-    function isAuthenticated() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function profilePath(uid) { return /databases/$(database)/documents/UserProfile/$(uid); }
+    function companyPath(id) { return /databases/$(database)/documents/companies/$(id); }
+    function profile() { return get(profilePath(request.auth.uid)).data; }
+    function role() { return profile().role; }
+    function companyId() { return profile().companyId; }
+    function superAdmin() { return signedIn() && role() == 'SUPER_ADMIN'; }
+    function admin() { return signedIn() && role() == 'ADMIN'; }
+    function manager() { return signedIn() && role() in ['ADMIN', 'SUB_ADMIN']; }
+    function sameCompany(id) {
+      return signedIn() && id is string && id != '' && companyId() == id;
     }
-    
-    // Firestore 문서의 role 필드를 조회하여 권한을 확인합니다.
-    function getUserData() { 
-      // (default) 데이터베이스 경로를 명시적으로 사용합니다.
-      return get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data;
+    function companyAdmin(id) { return admin() && sameCompany(id); }
+    function companyManager(id) { return manager() && sameCompany(id); }
+    function divisionManager(id, divisionId) {
+      return sameCompany(id) && role() == 'SUB_ADMIN' &&
+        divisionId is string && divisionId != '' &&
+        profile().divisionId == divisionId;
     }
-    
-    function getRole() { 
-      let data = getUserData();
-      return data != null ? data.role : 'GUEST';
+    function owner(id, uid) {
+      return exists(companyPath(id)) && get(companyPath(id)).data.adminUid == uid;
     }
-    
-    function getCompanyId() {
-      let data = getUserData();
-      return data != null ? data.companyId : '';
+    function unchanged(keys) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
     }
-    
-    // SUPER_ADMIN 확인 (플랫폼 최고 관리자)
-    function isSuperAdmin() {
-      return isAuthenticated() && getRole() == 'SUPER_ADMIN';
+    function onlyChanged(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
-    
-    function isAdmin() { return isAuthenticated() && getRole() == 'ADMIN'; }
-    function isSubAdmin() { return isAuthenticated() && getRole() == 'SUB_ADMIN'; }
-    function isManagement() { return isAdmin() || isSubAdmin(); }
-    
-    // 같은 회사 소속인지 확인 (문서의 companyId와 사용자의 companyId 비교)
-    function isSameCompany(docCompanyId) {
-      return getCompanyId() == docCompanyId;
-    }
-
-    // 최초 회사 생성자(Owner) 여부 확인
-    function isDocCompanyOwner(docCompanyId, targetUid) {
-      return exists(/databases/(default)/documents/companies/$(docCompanyId)) && 
-             get(/databases/(default)/documents/companies/$(docCompanyId)).data.adminUid == targetUid;
+    function validApproval() {
+      return onlyChanged(['status', 'updatedAt', 'updatedBy']) &&
+        request.resource.data.status in ['PENDING', 'SUB_APPROVED', 'APPROVED', 'REJECTED'] &&
+        (companyAdmin(resource.data.companyId) ||
+          (divisionManager(resource.data.companyId, resource.data.divisionId) &&
+            resource.data.status == 'PENDING' &&
+            request.resource.data.status in ['SUB_APPROVED', 'REJECTED']));
     }
 
-    // 회사 관리 (companies)
-    match /companies/{companyId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(companyId));
-      allow create: if isAuthenticated(); // 회원가입 시 생성
-      allow update: if isSuperAdmin() || (isAdmin() && isSameCompany(companyId));
-      allow delete: if isSuperAdmin();
+    match /companies/{id} {
+      allow read: if superAdmin() || sameCompany(id);
+      // Signup creates a company, then its owner's ADMIN profile.
+      allow create: if signedIn() && id != 'PLATFORM' &&
+        !exists(profilePath(request.auth.uid)) &&
+        request.resource.data.adminUid == request.auth.uid &&
+        request.resource.data.status == 'ACTIVE' &&
+        request.resource.data.plan == 'FREE' &&
+        request.resource.data.keys().hasOnly([
+          'nameKo', 'nameEn', 'domain', 'adminUid', 'createdAt', 'status', 'plan'
+        ]);
+      // Subscription, ownership and account status are platform controlled.
+      allow update: if superAdmin() ||
+        (companyAdmin(id) && onlyChanged(['domain', 'updatedAt', 'updatedBy', 'lastBackupAt'])) ||
+        (signedIn() && !exists(profilePath(request.auth.uid)) &&
+          resource.data.adminUid == request.auth.uid &&
+          onlyChanged(['nameKo', 'nameEn', 'domain']));
+      allow delete: if superAdmin();
     }
 
-    // 본부 관리 (divisions) - 같은 회사만 접근
-    match /divisions/{divisionId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated() && (isAdmin() || isSuperAdmin());
-      allow update, delete: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
+    match /divisions/{id} {
+      allow read: if superAdmin() || sameCompany(resource.data.companyId);
+      allow create: if superAdmin() || companyAdmin(request.resource.data.companyId);
+      allow update: if superAdmin() ||
+        (companyAdmin(resource.data.companyId) && unchanged(['companyId']));
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 팀 관리 (teams) - 같은 회사만 접근
-    match /teams/{teamId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated() && (isAdmin() || isSuperAdmin());
-      allow update, delete: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
+    match /teams/{id} {
+      allow read: if superAdmin() || sameCompany(resource.data.companyId);
+      allow create: if superAdmin() || companyAdmin(request.resource.data.companyId);
+      allow update: if superAdmin() ||
+        (companyAdmin(resource.data.companyId) && unchanged(['companyId']));
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 유저/직원 프로필 관리 (UserProfile)
-    match /UserProfile/{userId} {
-      allow read: if isAuthenticated() && (request.auth.uid == userId || isSuperAdmin() || isSameCompany(resource.data.companyId));
-      
-      allow create: if isAuthenticated();
-
-      allow update: if isAuthenticated() && (
-        (request.auth.uid == userId && (
-          // 1. 본인 정보 수정 (resource.data 직접 참조로 재귀 방지)
-          (resource.data.role == 'ADMIN' && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'companyId', 'status'])) ||
-          (resource.data.role != 'ADMIN' && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['annualSalary', 'salaryType', 'isSeveranceIncluded', 'dependents', 'childrenUnder20', 'nonTaxable', 'rrn', 'role', 'companyId', 'status']))
-        )) ||
-        (request.auth.uid != userId && (
-          isSuperAdmin() || 
-          (isAdmin() && isSameCompany(resource.data.companyId) && (
-            // 대상자가 Owner인 경우 role 및 status 수정 불가
-            !isDocCompanyOwner(resource.data.companyId, userId) || 
-            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status'])
-          ))
-        ))
+    match /UserProfile/{uid} {
+      allow read: if signedIn() &&
+        (request.auth.uid == uid || superAdmin() || companyAdmin(resource.data.companyId) ||
+          divisionManager(resource.data.companyId, resource.data.divisionId));
+      // Employees are created by the Admin SDK. The browser may create only its
+      // own initial ADMIN profile for a company it registered.
+      allow create: if signedIn() && request.auth.uid == uid &&
+        request.resource.data.uid == uid &&
+        request.resource.data.email == request.auth.token.email &&
+        request.resource.data.role == 'ADMIN' &&
+        request.resource.data.companyId != 'PLATFORM' &&
+        owner(request.resource.data.companyId, uid);
+      allow update: if signedIn() && (
+        superAdmin() ||
+        (request.auth.uid == uid &&
+          unchanged(['uid', 'email', 'role', 'companyId', 'status']) &&
+          (resource.data.role == 'ADMIN' || onlyChanged([
+            'name', 'mustChangePassword', 'lastPasswordChange'
+          ]))) ||
+        (request.auth.uid != uid && companyAdmin(resource.data.companyId) &&
+          resource.data.role != 'SUPER_ADMIN' &&
+          request.resource.data.role in ['ADMIN', 'SUB_ADMIN', 'MEMBER'] &&
+          unchanged(['uid', 'email', 'companyId']) &&
+          (!owner(resource.data.companyId, uid) || unchanged(['role', 'status'])))
       );
-
-      allow delete: if isAuthenticated() && (isSuperAdmin() || isAdmin());
+      allow delete: if superAdmin() ||
+        (companyAdmin(resource.data.companyId) && request.auth.uid != uid &&
+          resource.data.role != 'SUPER_ADMIN' && !owner(resource.data.companyId, uid));
     }
 
-    // 결재 승인 관련 유틸리티 함수
-    function isSubAdminOfDivision(divId) {
-      let path = /databases/(default)/documents/UserProfile/$(request.auth.uid);
-      return isSubAdmin() && exists(path) && get(path).data.divisionId == divId;
+    match /expenses/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId) ||
+        divisionManager(resource.data.companyId, resource.data.divisionId) ||
+        (sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid);
+      allow create: if sameCompany(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update: if (
+        sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid &&
+        resource.data.status == 'PENDING' &&
+        unchanged(['companyId', 'userId', 'status', 'createdAt', 'divisionId', 'teamId'])
+      ) || validApproval();
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId) ||
+        (sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid &&
+          resource.data.status == 'PENDING');
     }
 
-    function isValidApproval(currentStatus, nextStatus, targetDivId) {
-      return isAdmin() || (
-        isSubAdminOfDivision(targetDivId) && 
-        currentStatus == 'PENDING' && 
-        (nextStatus == 'SUB_APPROVED' || nextStatus == 'REJECTED')
-      );
+    match /leaves/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId) ||
+        divisionManager(resource.data.companyId, resource.data.divisionId) ||
+        (sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid);
+      allow create: if sameCompany(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'PENDING';
+      allow update: if validApproval();
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId) ||
+        (sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid &&
+          resource.data.status == 'PENDING');
     }
 
-    // 경비 신청 (expenses) - 같은 회사만
-    match /expenses/{expenseId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      // create: 인증된 사용자 + 본인 companyId 소속으로만 생성 (멀티테넌트 보호)
-      allow create: if isAuthenticated() && isSameCompany(request.resource.data.companyId);
-      allow update: if isAuthenticated() && (
-        (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
-        isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
-      );
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
+    match /attendance/{id} {
+      allow read: if superAdmin() || companyManager(resource.data.companyId) ||
+        (sameCompany(resource.data.companyId) && resource.data.userId == request.auth.uid);
+      allow create: if sameCompany(request.resource.data.companyId) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.type in ['IN', 'OUT'];
+      allow update, delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 휴가 신청 (leaves) - 같은 회사만
-    match /leaves/{leaveId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      // create: 인증된 사용자 + 본인 companyId 소속으로만 생성 (멀티테넌트 보호)
-      allow create: if isAuthenticated() && isSameCompany(request.resource.data.companyId);
-      allow update: if isAuthenticated() && (
-        (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING') || 
-        isValidApproval(resource.data.status, request.resource.data.status, resource.data.divisionId)
-      );
-      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid && resource.data.status == 'PENDING' || isAdmin());
+    match /notices/{id} {
+      allow read: if superAdmin() || sameCompany(resource.data.companyId);
+      allow create: if companyManager(request.resource.data.companyId) &&
+        request.resource.data.authorId == request.auth.uid;
+      allow update: if companyManager(resource.data.companyId) &&
+        unchanged(['companyId', 'authorId']);
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 근태 기록 (attendance) - 같은 회사만
-    match /attendance/{atId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid);
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-    
-    // 공지사항 (notices) - 같은 회사만
-    match /notices/{noticeId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow write: if isManagement();
-      allow delete: if isAdmin();
+    match /AuditLogs/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId);
+      allow create: if sameCompany(request.resource.data.companyId) &&
+        (manager() || (request.resource.data.actionType == 'UPDATE_PASSWORD' &&
+          request.resource.data.targetId == request.auth.uid));
+      allow update: if false;
+      allow delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 감사 로그 (AuditLogs) - 같은 회사만
-    match /AuditLogs/{logId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated();
-      allow delete: if isAdmin() || isSuperAdmin();
+    match /config/{id} {
+      allow read: if superAdmin() || sameCompany(id);
+      allow create, update: if superAdmin() || companyAdmin(id);
+      allow delete: if superAdmin();
     }
 
-    // 시스템 설정 (config) - 회사별 설정
-    match /config/{configId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isSuperAdmin();
+    match /system_config/{id} {
+      allow read: if signedIn();
+      allow write: if superAdmin();
     }
 
-    // 전역 시스템 설정 (system_config) - 세액표 등
-    match /system_config/{configId} {
-      allow read: if isAuthenticated(); // 미인증 사용자 차단
-      allow write: if isSuperAdmin();
+    match /backup_tasks/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId);
+      allow create: if companyAdmin(request.resource.data.companyId) &&
+        request.resource.data.requestedBy == request.auth.uid;
+      allow delete: if superAdmin();
     }
 
-    // 데이터 백업 작업 (backup_tasks)
-    match /backup_tasks/{taskId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
-      allow create: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(request.resource.data.companyId)));
-      allow delete: if isSuperAdmin();
+    match /payroll_records/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId);
+      allow create: if companyAdmin(request.resource.data.companyId) &&
+        request.resource.data.approvedBy == request.auth.uid;
+      allow update, delete: if superAdmin() || companyAdmin(resource.data.companyId);
     }
 
-    // 급여 지출 승인 기록 (payroll_records)
-    match /payroll_records/{recordId} {
-      allow read: if isAuthenticated() && (isSuperAdmin() || isSameCompany(resource.data.companyId));
-      allow create: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(request.resource.data.companyId)));
-      allow update: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
-      allow delete: if isAuthenticated() && (isSuperAdmin() || (isAdmin() && isSameCompany(resource.data.companyId)));
+    // A PayPal callback is only a claim. A platform administrator must verify
+    // the transaction with PayPal before extending the subscription.
+    match /payment_claims/{id} {
+      allow read: if superAdmin() || companyAdmin(resource.data.companyId);
+      allow create: if companyAdmin(request.resource.data.companyId) &&
+        request.resource.data.adminUid == request.auth.uid &&
+        request.resource.data.status == 'PENDING' &&
+        request.resource.data.orderId is string &&
+        request.resource.data.orderId.matches('^[A-Za-z0-9_-]{6,80}$') &&
+        id == request.resource.data.orderId &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.keys().hasOnly([
+          'companyId', 'companyName', 'adminUid', 'adminName',
+          'orderId', 'status', 'createdAt'
+        ]);
+      allow update, delete: if superAdmin();
     }
 
-    // 기본 규칙: 그 외 명시되지 않은 모든 컬렉션은 SUPER_ADMIN만 접근 가능
+    // Payment records and all unspecified collections are platform only.
     match /{document=**} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if superAdmin();
     }
   }
 }

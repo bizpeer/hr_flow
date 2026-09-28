@@ -57,8 +57,8 @@ export const LoginModal: React.FC = () => {
       setError('새 비밀번호가 일치하지 않습니다.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+    if (newPassword.length < 12) {
+      setError('비밀번호는 최소 12자 이상이어야 합니다.');
       return;
     }
 
@@ -193,7 +193,7 @@ export const LoginModal: React.FC = () => {
                       type="password"
                       required
                       className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                      placeholder="최소 6자 이상"
+                      placeholder="최소 12자 이상"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                     />

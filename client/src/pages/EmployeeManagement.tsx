@@ -262,12 +262,15 @@ export const EmployeeManagement: React.FC = () => {
   };
 
   const handleInitializePassword = async (emp: Employee) => {
-    if (!window.confirm(`${emp.name}님의 비밀번호를 '123456'으로 초기화하시겠습니까?\n(실제 로그인 비밀번호가 강제 변경됩니다.)`)) return;
+    if (!window.confirm(`${emp.name}님의 임시 비밀번호를 새로 발급하시겠습니까?\n(실제 로그인 비밀번호가 강제 변경됩니다.)`)) return;
     
     try {
+      const randomBytes = crypto.getRandomValues(new Uint8Array(18));
+      const temporaryPassword = btoa(String.fromCharCode(...randomBytes))
+        .replace(/\+/g, '-').replace(/\//g, '_');
       // 1. Firebase Cloud Function을 통해 실제 Auth 비밀번호 변경 시도
       const adminResetPassword = httpsCallable(functions, 'adminResetPassword');
-      const result: any = await adminResetPassword({ uid: emp.uid, password: '123456' });
+      const result: any = await adminResetPassword({ uid: emp.uid, password: temporaryPassword });
 
       if (!result.data.success) {
         throw new Error(result.data.message || '비밀번호 초기화 중 오류가 발생했습니다.');
@@ -278,7 +281,7 @@ export const EmployeeManagement: React.FC = () => {
         mustChangePassword: true 
       });
 
-      alert(`비밀번호 초기화 : 재설정 비밀번호는 '123456'입니다.\n이제 해당 정보로 로그인이 가능합니다.`);
+      alert(`임시 비밀번호: ${temporaryPassword}\n직원에게 안전한 수단으로 전달하세요. 최초 로그인 시 변경해야 합니다.`);
     } catch (e: any) {
       console.error('Password reset failed:', e);
       let errorMsg = e.message;
@@ -532,7 +535,7 @@ export const EmployeeManagement: React.FC = () => {
                     <div className="absolute inset-x-0 bottom-0 top-0 bg-white/95 backdrop-blur-md z-20 p-6 flex flex-col justify-center gap-2 animate-in slide-in-from-bottom-5 duration-300">
                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">{emp.name} 관리</h4>
                        <button onClick={() => handleInitializePassword(emp)} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl text-xs font-black text-slate-700 active:bg-indigo-50">
-                          <Key className="w-5 h-5 text-indigo-500" /> 비밀번호 초기화 (123456)
+                          <Key className="w-5 h-5 text-indigo-500" /> 임시 비밀번호 발급
                        </button>
                        <button onClick={() => handleToggleStatus(emp, isResigned ? 'ACTIVE' : 'RESIGNED')} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl text-xs font-black text-slate-700 active:bg-amber-50">
                           {isResigned ? <UserCheck className="w-5 h-5 text-emerald-500" /> : <UserX className="w-5 h-5 text-amber-500" />} {isResigned ? '정지 해제' : '퇴사(정지) 처리'}

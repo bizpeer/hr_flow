@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, setDoc, query, collection, where, limit, getDocs, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
 export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'SUB_ADMIN' | 'MEMBER';
@@ -161,8 +161,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               console.warn(`[Auth] No UserProfile found for UID: ${user.uid} in ${dbId}`);
               // 프로필이 없는 경우 즉시 loading을 해제하여 UI에서 대응할 수 있게 함
               set({ loading: false, userData: null });
-            } else {
-              console.log(`[Auth] UserProfile found:`, profileSnap.data());
             }
             
             const data = profileSnap.data();
@@ -173,38 +171,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               return; 
             }
 
-            if (!currentData) {
-              console.log(`[Auth] Attempting fallback query for email: ${user.email}`);
-              if (user.email) {
-                try {
-                  const q = query(collection(db, 'UserProfile'), where('email', '==', user.email.toLowerCase().trim()), limit(1));
-                  const fallbackSnap = await getDocs(q);
-                  if (!fallbackSnap.empty) {
-                    const tempDoc = fallbackSnap.docs[0];
-                    console.log("[Auth] Found fallback profile by email:", tempDoc.id);
-                    const tempData = tempDoc.data() as UserData;
-                    currentData = { ...tempData, uid: user.uid, mustChangePassword: true };
-                    await setDoc(doc(db, 'UserProfile', user.uid), currentData);
-                    if (tempDoc.id.startsWith('temp_')) {
-                      try { await deleteDoc(tempDoc.ref); } catch (e) {}
-                    }
-                    return; 
-                  } else {
-                    console.warn("[Auth] No fallback profile found by email.");
-                  }
-                } catch (err) {
-                  console.error("[Auth] Fallback query error:", err);
-                }
-              }
-              
-              return; 
-            }
+            if (!currentData) return;
 
-
-            // 4. 역할 정규화 (변경 있을 때만 setDoc)
+            // Unknown roles need administrator repair; the browser must never
+            // rewrite the role field on its own.
             if (currentData && currentData.role && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
-              currentData = { ...currentData, role: 'MEMBER' };
-              await setDoc(doc(db, 'UserProfile', user.uid), currentData);
+              console.error('[Auth] Invalid profile role. Contact an administrator.');
+              set({ userData: null, loading: false });
+              return;
             }
 
             // 5. 상태 확인

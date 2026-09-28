@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CreditCard, CheckCircle, AlertTriangle, Loader2, ShieldCheck, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { doc, updateDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 declare global {
@@ -38,39 +38,24 @@ export const SubscriptionManagement: React.FC = () => {
         onApprove: async (data: any, _actions: any) => {
           setLoading(true);
           try {
-            // 결제 정보 저장 및 회사 정보 업데이트
-            const companyRef = doc(db, 'companies', companyData.id);
-            
-            // 기존 만료일 확인 및 연장 로직 개선
-            const currentEndDate = companyData.subscriptionEndDate ? new Date(companyData.subscriptionEndDate) : new Date();
-            const now = new Date();
-            
-            // 이미 만료되었다면 오늘부터 30일, 아니면 기존 날짜에 30일 추가
-            const baseDate = currentEndDate.getTime() < now.getTime() ? now : currentEndDate;
-            const newEndDate = new Date(baseDate);
-            newEndDate.setDate(newEndDate.getDate() + 30);
+            if (!userData || userData.role !== 'ADMIN' || userData.companyId !== companyData.id ||
+                typeof data.orderID !== 'string' || !/^[A-Za-z0-9_-]{6,80}$/.test(data.orderID)) {
+              throw new Error('결제 접수 정보가 유효하지 않습니다.');
+            }
 
-            await updateDoc(companyRef, {
-              subscriptionStatus: 'ACTIVE',
-              subscriptionEndDate: newEndDate.toISOString(),
-              lastPaymentDate: new Date().toISOString()
-            });
-
-            // 결제 기록 생성
-            await addDoc(collection(db, 'payments'), {
+            // 브라우저 콜백만으로 결제 완료를 신뢰할 수 없습니다.
+            // 플랫폼 관리자가 PayPal 거래를 대조한 뒤 구독 기간을 연장합니다.
+            await setDoc(doc(db, 'payment_claims', data.orderID), {
               companyId: companyData.id,
               companyName: companyData.nameKo,
-              adminUid: userData?.uid,
-              adminName: userData?.name,
-              amount: 15.00, // 월 $15 기준 (연간 구독일 경우 데이터 확인 필요)
-              currency: 'USD',
-              transactionId: data.orderID,
+              adminUid: userData.uid,
+              adminName: userData.name,
+              orderId: data.orderID,
               createdAt: serverTimestamp(),
-              status: 'COMPLETED'
+              status: 'PENDING'
             });
 
-            alert('결제가 완료되었습니다. 서비스 구독이 갱신되었습니다.');
-            window.location.reload(); // 상태 반영을 위해 새로고침
+            alert('결제 확인 요청이 접수되었습니다. 거래 확인 후 구독 기간이 반영됩니다.');
           } catch (err) {
             console.error('Payment Update Error:', err);
             alert('결제 정보 업데이트 중 오류가 발생했습니다. 관리자에게 문의하세요.');
@@ -196,7 +181,7 @@ export const SubscriptionManagement: React.FC = () => {
                 </div>
 
                 <p className="text-[10px] text-slate-400 text-center mt-6 font-medium leading-relaxed">
-                  결제 즉시 서비스 이용 기간이 연장됩니다.<br />
+                  결제 후 거래 확인을 거쳐 서비스 이용 기간이 연장됩니다.<br />
                   연간 구독 시 더욱 저렴하게 이용하실 수 있습니다.
                 </p>
               </div>

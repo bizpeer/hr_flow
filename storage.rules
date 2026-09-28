@@ -1,53 +1,42 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    
-    function isAuthenticated() {
-      return request.auth != null;
+    function signedIn() { return request.auth != null; }
+    function profile() {
+      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data;
+    }
+    function superAdmin() { return signedIn() && profile().role == 'SUPER_ADMIN'; }
+    function sameCompany(id) { return signedIn() && profile().companyId == id; }
+    function manager(id) {
+      return sameCompany(id) && profile().role in ['ADMIN', 'SUB_ADMIN'];
+    }
+    function validAttachment() {
+      return request.resource.size <= 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/(jpeg|png|webp|gif)|application/pdf');
     }
 
-    function getUserProfile() {
-      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid));
+    match /companies/{companyId}/expenses/{userId}/{fileName} {
+      allow read: if superAdmin() || manager(companyId) ||
+        (sameCompany(companyId) && request.auth.uid == userId);
+      allow create, update: if sameCompany(companyId) && request.auth.uid == userId && validAttachment();
+      allow delete: if sameCompany(companyId) && request.auth.uid == userId;
     }
 
-    function getUserData() {
-      let profile = getUserProfile();
-      return profile != null ? profile.data : null;
+    match /companies/{companyId}/leaves/{userId}/{fileName} {
+      allow read: if superAdmin() || manager(companyId) ||
+        (sameCompany(companyId) && request.auth.uid == userId);
+      allow create, update: if sameCompany(companyId) && request.auth.uid == userId && validAttachment();
+      allow delete: if sameCompany(companyId) && request.auth.uid == userId;
     }
 
-    function isSuperAdmin() {
-      let data = getUserData();
-      return isAuthenticated() && data != null && data.role == 'SUPER_ADMIN';
+    match /companies/{companyId}/notices/{fileName} {
+      allow read: if superAdmin() || sameCompany(companyId);
+      allow create, update: if manager(companyId) && validAttachment();
+      allow delete: if manager(companyId);
     }
 
-    // 특정 회사의 관리자인지 확인
-    function isCompanyAdmin(companyId) {
-      let data = getUserData();
-      return isAuthenticated() && data != null && 
-             data.companyId == companyId && 
-             (data.role == 'ADMIN' || data.role == 'SUB_ADMIN');
-    }
-
-    // 지출결의 전용 경로: /companies/{companyId}/expenses/{userId}/...
-    match /companies/{companyId}/expenses/{userId}/{allPaths=**} {
-      // 본인이거나, 해당 회사의 관리자/슈퍼어드민이면 허용
-      allow read, write: if isAuthenticated() && (
-        request.auth.uid == userId || 
-        isCompanyAdmin(companyId) ||
-        isSuperAdmin()
-      );
-    }
-
-    // 일반 회사 경로
-    match /companies/{companyId}/{allPaths=**} {
-      allow read, write: if isAuthenticated() && (
-        isSuperAdmin() || 
-        (getUserData() != null && getUserData().companyId == companyId)
-      );
-    }
-    
     match /{allPaths=**} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if superAdmin();
     }
   }
 }

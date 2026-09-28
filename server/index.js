@@ -50,8 +50,8 @@ app.post('/api/reset-password', authenticate, async (req, res) => {
     if (!uid || !password) {
         return res.status(400).json({ error: '사용자 UID와 새 비밀번호가 필요합니다.' });
     }
-    if (password.length < 6) {
-        return res.status(400).json({ error: '비밀번호는 최소 6자 이상이어야 합니다.' });
+    if (typeof uid !== 'string' || typeof password !== 'string' || password.length < 12 || password.length > 128) {
+        return res.status(400).json({ error: '유효한 UID와 12~128자 비밀번호가 필요합니다.' });
     }
     try {
         const db = adminDb;
@@ -75,6 +75,11 @@ app.post('/api/reset-password', authenticate, async (req, res) => {
             // 소속 회사(companyId) 일치 확인
             if (callerData.companyId !== targetData?.companyId) {
                 return res.status(403).json({ error: '소속 조직이 다른 사용자의 비밀번호는 관리할 수 없습니다.' });
+            }
+            const companySnap = await db.collection('companies').doc(callerData.companyId).get();
+            if (uid === callerUid || targetData?.role === 'ADMIN' ||
+                companySnap.data()?.adminUid === uid) {
+                return res.status(403).json({ error: '관리자 계정의 비밀번호는 재설정할 수 없습니다.' });
             }
             console.log(`[Admin API] ADMIN ${callerUid} (Company: ${callerData.companyId}) is resetting password for target user ${uid}`);
         }

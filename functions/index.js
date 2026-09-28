@@ -1,8 +1,10 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const admin = require("firebase-admin");
+const { initializeApp } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getFirestore } = require("firebase-admin/firestore");
 
 // 전역 초기화 (Functions v2 환경에서는 전역 범위 호출이 권장되며, 타임아웃을 유발하지 않습니다)
-admin.initializeApp();
+initializeApp();
 
 // (default) 데이터베이스 사용
 const DATABASE_ID = '(default)';
@@ -13,12 +15,13 @@ const DATABASE_ID = '(default)';
 exports.checkDomainAvailability = onCall(async (request) => {
   const { domain, currentCompanyId } = request.data;
 
-  if (!domain) {
+  if (typeof domain !== "string" || domain.length > 253 ||
+      !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain.trim())) {
     throw new HttpsError("invalid-argument", "확인할 도메인이 누락되었습니다.");
   }
 
   try {
-    const db = admin.firestore();
+    const db = getFirestore(DATABASE_ID);
 
     // domain 필드로 검색
     const qSnap = await db.collection("companies")
@@ -31,9 +34,14 @@ exports.checkDomainAvailability = onCall(async (request) => {
     }
 
     const doc = qSnap.docs[0];
-    // 현재 우리 회사라면 허용
-    if (currentCompanyId && doc.id === currentCompanyId) {
-      return { available: true };
+    // Only the authenticated owner of the existing company may treat it as
+    // available. The caller-supplied company ID alone is not proof of ownership.
+    if (request.auth && currentCompanyId && doc.id === currentCompanyId) {
+      const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
+      if (callerSnap.exists && callerSnap.data().companyId === currentCompanyId &&
+          callerSnap.data().role === "ADMIN") {
+        return { available: true };
+      }
     }
 
     return { 
@@ -57,13 +65,13 @@ exports.adminResetPassword = onCall(async (request) => {
   }
 
   const { uid, password } = request.data;
-  const { getFirestore } = require("firebase-admin/firestore");
 
   // 2. 입력 데이터 검증
-  if (!uid || !password) {
+  if (typeof uid !== "string" || !uid || typeof password !== "string" ||
+      password.length < 12 || password.length > 128) {
     throw new HttpsError(
       "invalid-argument",
-      "UID와 비밀번호가 누락되었습니다."
+      "유효한 UID와 12~128자 비밀번호가 필요합니다."
     );
   }
 
@@ -97,6 +105,11 @@ exports.adminResetPassword = onCall(async (request) => {
           "타사 직원의 정보는 관리할 수 없습니다."
         );
       }
+      const companySnap = await db.collection("companies").doc(callerData.companyId).get();
+      if (uid === request.auth.uid || targetData.role === "ADMIN" ||
+          companySnap.data()?.adminUid === uid) {
+        throw new HttpsError("permission-denied", "관리자 계정의 비밀번호는 재설정할 수 없습니다.");
+      }
     } else {
       throw new HttpsError(
         "permission-denied",
@@ -105,7 +118,7 @@ exports.adminResetPassword = onCall(async (request) => {
     }
 
     // 4. 비밀번호 강제 업데이트
-    await admin.auth().updateUser(uid, { password });
+    await getAuth().updateUser(uid, { password });
 
     console.log(`[AdminReset] Password for user ${uid} reset by ${request.auth.uid} (Company: ${callerData.companyId})`);
 
@@ -116,7 +129,7 @@ exports.adminResetPassword = onCall(async (request) => {
   } catch (error) {
     console.error(`[AdminResetError]`, error);
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "비밀번호 초기화 중 오류가 발생했습니다.");
+    throw new HttpsError("internal", "비밀번호 초기화 중 오류가 발생했습니다.");
   }
 });
 
@@ -133,12 +146,15 @@ exports.adminCreateMember = onCall(async (request) => {
   const { name, email, password, teamId, joinDate } = request.data;
 
   // 2. 필수 데이터 검증
-  if (!name || !email || !password) {
-    throw new HttpsError("invalid-argument", "이름, 아이디, 비밀번호는 필수 입력 항목입니다.");
+  if (typeof name !== "string" || !name.trim() ||
+      typeof email !== "string" || !email.includes("@") ||
+      typeof password !== "string" || password.length < 12 || password.length > 128 ||
+      (teamId && typeof teamId !== "string")) {
+    throw new HttpsError("invalid-argument", "이름, 이메일, 12~128자 비밀번호를 확인해 주세요.");
   }
 
   try {
-    const db = admin.firestore();
+    const db = getFirestore(DATABASE_ID);
 
     // 3. 호출자(관리자) 정보 및 권한 조회
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
@@ -151,24 +167,24 @@ exports.adminCreateMember = onCall(async (request) => {
       throw new HttpsError("permission-denied", "직원을 등록할 권한이 없습니다.");
     }
 
-    // 4. Firebase Auth 계정 생성
-    const userRecord = await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: name,
-    });
-
-    // 5. Firestore UserProfile 생성
     const companyId = callerData.role === "SUPER_ADMIN" ? "PLATFORM" : callerData.companyId;
 
     // 팀 소속 정보가 있다면 divisionId 조회
     let divisionId = "";
     if (teamId) {
       const teamSnap = await db.collection("teams").doc(teamId).get();
-      if (teamSnap.exists) {
-        divisionId = teamSnap.data().divisionId || "";
+      if (!teamSnap.exists || teamSnap.data().companyId !== companyId) {
+        throw new HttpsError("invalid-argument", "소속 회사의 팀을 선택해 주세요.");
       }
+      divisionId = teamSnap.data().divisionId || "";
     }
+
+    // Validate organization data before creating an Auth account.
+    const userRecord = await getAuth().createUser({
+      email: email.toLowerCase().trim(),
+      password,
+      displayName: name.trim(),
+    });
 
     const userData = {
       uid: userRecord.uid,
@@ -185,7 +201,12 @@ exports.adminCreateMember = onCall(async (request) => {
       createdAt: new Date().toISOString()
     };
 
-    await db.collection("UserProfile").doc(userRecord.uid).set(userData);
+    try {
+      await db.collection("UserProfile").doc(userRecord.uid).set(userData);
+    } catch (writeError) {
+      await getAuth().deleteUser(userRecord.uid);
+      throw writeError;
+    }
 
     console.log(`[AdminCreateMember] New member ${userRecord.uid} created by ${request.auth.uid} (Company: ${companyId})`);
 
@@ -201,7 +222,7 @@ exports.adminCreateMember = onCall(async (request) => {
       throw new HttpsError("already-exists", "이미 등록된 이메일 주소입니다.");
     }
     if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", error.message || "직원 등록 중 오류가 발생했습니다.");
+    throw new HttpsError("internal", "직원 등록 중 오류가 발생했습니다.");
   }
 });
 
@@ -214,6 +235,10 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
   }
+  if (!request.auth.token.auth_time ||
+      Date.now() / 1000 - request.auth.token.auth_time > 300) {
+    throw new HttpsError("failed-precondition", "조직 삭제 전에 다시 로그인해 주세요.");
+  }
 
   const { companyId } = request.data;
   if (!companyId) {
@@ -221,17 +246,14 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
   }
 
   try {
-    const db = admin.firestore();
+    const db = getFirestore(DATABASE_ID);
     console.log(`[AdminDeleteCompany] Checking permissions for user ${request.auth.uid} (${request.auth.token.email})`);
 
-    // 1. 권한 확인 (Auth Token Claims + Email Fallback + Firestore Profile)
-    const isSuperAdminByToken = request.auth.token.role === "SUPER_ADMIN";
-    
-    // Firestore Profile 보호 레이어
+    // 서버에서 조회한 현재 프로필을 권한의 단일 기준으로 사용합니다.
     const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
     const isSuperAdminByProfile = callerSnap.exists && callerSnap.data().role === "SUPER_ADMIN";
 
-    if (!isSuperAdminByToken && !isSuperAdminByProfile) {
+    if (!isSuperAdminByProfile) {
       console.warn(`[AdminDeleteCompany] Unauthorized access attempt: ${request.auth.token.email}`);
       throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
     }
@@ -274,7 +296,7 @@ exports.adminDeleteCompanyData = onCall(async (request) => {
           const uidsToDelete = qSnap.docs.map(d => d.id);
           // deleteUsers는 한 번에 1000명까지 처리 가능
           try {
-            await admin.auth().deleteUsers(uidsToDelete);
+            await getAuth().deleteUsers(uidsToDelete);
             console.log(`[AdminDeleteCompany] Deleted ${uidsToDelete.length} Auth users`);
           } catch (authErr) {
             console.error(`[AdminDeleteCompany] Auth deletion partially failed:`, authErr);
@@ -338,7 +360,7 @@ exports.adminSyncCompanyDomain = onCall({ timeoutSeconds: 300, memory: "512MiB" 
   const cleanDomain = newDomain.replace("@", "").toLowerCase().trim();
   console.log(`[AdminSyncDomain] Starting sync to @${cleanDomain} requested by ${request.auth.uid}`);
   
-  const db = admin.firestore();
+  const db = getFirestore(DATABASE_ID);
 
   try {
     // 2. 호출자 권한 확인
@@ -390,7 +412,7 @@ exports.adminSyncCompanyDomain = onCall({ timeoutSeconds: 300, memory: "512MiB" 
             console.log(`[AdminSyncDomain] Updating user ${uid}: ${userData.email} -> ${newEmail}`);
             
             // A. Firebase Auth 이메일 업데이트
-            await admin.auth().updateUser(uid, { email: newEmail });
+            await getAuth().updateUser(uid, { email: newEmail });
             
             // B. Firestore UserProfile 이메일 업데이트
             await userDoc.ref.update({ email: newEmail });

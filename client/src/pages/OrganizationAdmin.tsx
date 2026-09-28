@@ -197,8 +197,8 @@ export const OrganizationAdmin: React.FC = () => {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newEmp.password.length < 6) {
-      alert("임시 비밀번호는 최소 6자 이상이어야 합니다.");
+    if (newEmp.password.length < 12) {
+      alert("임시 비밀번호는 최소 12자 이상이어야 합니다.");
       return;
     }
 

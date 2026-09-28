@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import * as XLSX from 'xlsx';
+import readExcelFile from 'read-excel-file/browser';
 import { setDoc } from 'firebase/firestore';
 import { functions, auth } from '../firebase';
 
@@ -37,6 +37,7 @@ export const SuperAdminDashboard: React.FC = () => {
   const [isUploadingTaxTable, setIsUploadingTaxTable] = useState(false);
   const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number; fileName?: string } | null>(null);
   const [payments, setPayments] = useState<any[]>([]);
+  const [paymentClaims, setPaymentClaims] = useState<any[]>([]);
 
   // 구독 기간 연장 모달 상태
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -97,7 +98,13 @@ export const SuperAdminDashboard: React.FC = () => {
       setPayments(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     });
 
-    return () => { unsubCompanies(); unsubUsers(); unsubTax(); unsubPayments(); };
+    const unsubClaims = onSnapshot(collection(db, 'payment_claims'), (snap) => {
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setPaymentClaims(data.sort((a: any, b: any) =>
+        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+    });
+
+    return () => { unsubCompanies(); unsubUsers(); unsubTax(); unsubPayments(); unsubClaims(); };
   }, [userData]);
 
   const handleToggleStatus = async (companyId: string, currentStatus: string) => {
@@ -127,8 +134,8 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const handleResetPassword = async () => {
     if (!resetTarget || !newPassword) return;
-    if (newPassword.length < 6) {
-      alert('비밀번호는 최소 6자 이상이어야 합니다.');
+    if (newPassword.length < 12) {
+      alert('비밀번호는 최소 12자 이상이어야 합니다.');
       return;
     }
 
@@ -192,6 +199,7 @@ export const SuperAdminDashboard: React.FC = () => {
       // 1. SUPER_ADMIN 비밀번호 재확인 (보안)
       const credential = EmailAuthProvider.credential(auth.currentUser.email, adminPassword);
       await reauthenticateWithCredential(auth.currentUser, credential);
+      await auth.currentUser.getIdToken(true);
 
       // 2. 백엔드 삭제 함수 호출
       const deleteFn = httpsCallable(functions, 'adminDeleteCompanyData');
@@ -217,6 +225,11 @@ export const SuperAdminDashboard: React.FC = () => {
   const handleTaxTableUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert('세액표 파일은 5MB 이하여야 합니다.');
+      e.target.value = '';
+      return;
+    }
 
     if (!window.confirm(`'${file.name}' 파일로 세액표를 업데이트하시겠습니까?\n이 작업은 즉시 모든 직원의 급여산출에 반영됩니다.`)) {
       e.target.value = '';
@@ -236,15 +249,12 @@ export const SuperAdminDashboard: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
-          const data = new Uint8Array(event.target?.result as ArrayBuffer);
-          const workbook = XLSX.read(data, { type: 'array' });
+          const workbook = await readExcelFile(event.target?.result as ArrayBuffer);
           const allBrackets: any[] = [];
 
           // 처음 2개 시트 처리 (요청 사항: 엑셀 파일 내 sheet 2개 분석)
-          for (let i = 0; i < Math.min(2, workbook.SheetNames.length); i++) {
-            const sheetName = workbook.SheetNames[i];
-            const sheet = workbook.Sheets[sheetName];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+          for (let i = 0; i < Math.min(2, workbook.length); i++) {
+            const rows = workbook[i].data;
             
             for (const row of rows) {
               const min = parseValue(row[0]);
@@ -767,7 +777,7 @@ export const SuperAdminDashboard: React.FC = () => {
                   type="text" 
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="최소 6자 이상"
+                  placeholder="최소 12자 이상"
                   className="w-full mt-1 p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-violet-500 focus:ring-4 focus:ring-violet-50/50 transition-all font-bold"
                 />
               </div>
@@ -852,8 +862,29 @@ export const SuperAdminDashboard: React.FC = () => {
 
       {activeTab === 'PAYMENTS' && (
         <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden p-8">
+           <h2 className="text-xl font-black text-slate-800 mb-3">결제 확인 요청</h2>
+           <p className="text-slate-500 text-sm mb-5">
+             아래 거래 ID는 고객 브라우저에서 접수된 신고입니다. PayPal 관리 화면에서 거래와 금액을 확인한 뒤 조직별 구독 기간을 연장하세요.
+           </p>
+           <div className="overflow-x-auto mb-10">
+             <table className="w-full text-left text-sm">
+               <thead><tr className="border-b border-slate-100 text-slate-500">
+                 <th className="p-3">조직 / 관리자</th><th className="p-3">PayPal 거래 ID</th><th className="p-3">접수 시각</th>
+               </tr></thead>
+               <tbody>
+                 {paymentClaims.map(claim => (
+                   <tr key={claim.id} className="border-b border-slate-50">
+                     <td className="p-3">{claim.companyName} ({claim.adminName})</td>
+                     <td className="p-3 font-mono break-all">{claim.orderId}</td>
+                     <td className="p-3">{claim.createdAt?.seconds ? new Date(claim.createdAt.seconds * 1000).toLocaleString() : '-'}</td>
+                   </tr>
+                 ))}
+                 {paymentClaims.length === 0 && <tr><td colSpan={3} className="p-6 text-center text-slate-400">접수된 요청이 없습니다.</td></tr>}
+               </tbody>
+             </table>
+           </div>
            <h2 className="text-xl font-black text-slate-800 mb-6 flex items-center gap-3">
-             <CreditCard className="w-6 h-6 text-indigo-600" /> 전체 결제 승인 내역
+             <CreditCard className="w-6 h-6 text-indigo-600" /> 기존 결제 기록
            </h2>
            <p className="text-slate-400 text-sm font-medium mb-8">
              각 조직의 ADMIN이 PayPal을 통해 결제한 내역입니다. 실제 입금 여부를 대조하여 구독 상태를 관리하세요.

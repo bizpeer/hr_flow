@@ -69,8 +69,8 @@ export const Login: React.FC = () => {
       setError('비밀번호가 일치하지 않습니다.');
       return;
     }
-    if (regPassword.length < 6) {
-      setError('비밀번호는 최소 6자 이상이어야 합니다.');
+    if (regPassword.length < 12) {
+      setError('비밀번호는 최소 12자 이상이어야 합니다.');
       return;
     }
     if (!regOrgKo.trim() || !regOrgEn.trim()) {
@@ -325,7 +325,7 @@ export const Login: React.FC = () => {
                         required
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
-                        placeholder="6자 이상"
+                        placeholder="12자 이상"
                         className="w-full pl-11 pr-3 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium text-sm"
                       />
                     </div>

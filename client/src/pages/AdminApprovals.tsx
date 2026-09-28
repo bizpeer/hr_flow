@@ -63,15 +63,18 @@ export const AdminApprovals: React.FC = () => {
   useEffect(() => {
     if (authLoading || !userData?.companyId) return;
     const companyId = userData.companyId;
+    const divisionFilter = userData.role === 'SUB_ADMIN'
+      ? [where('divisionId', '==', userData.divisionId || '__unassigned__')]
+      : [];
 
     // 1. 신청 내역 구독 (companyId 기반 격리)
-    const qLeave = query(collection(db, 'leaves'), where('companyId', '==', companyId));
+    const qLeave = query(collection(db, 'leaves'), where('companyId', '==', companyId), ...divisionFilter);
     const unsubLeave = onSnapshot(qLeave, (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
       setLeaveRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
 
-    const qExpense = query(collection(db, 'expenses'), where('companyId', '==', companyId));
+    const qExpense = query(collection(db, 'expenses'), where('companyId', '==', companyId), ...divisionFilter);
     const unsubExpense = onSnapshot(qExpense, (snap) => {
       const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest));
       setExpenseRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
@@ -84,7 +87,7 @@ export const AdminApprovals: React.FC = () => {
     const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
       setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'UserProfile'), where('companyId', '==', companyId)), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, 'UserProfile'), where('companyId', '==', companyId), ...divisionFilter), (snap) => {
       setEmployees(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
     });
 

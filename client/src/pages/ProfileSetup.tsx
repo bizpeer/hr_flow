@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { db } from '../firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { AlertCircle, Building2, User, Globe, ArrowRight, Loader2, LogOut } from 'lucide-react';
@@ -36,15 +36,23 @@ export const ProfileSetup: React.FC = () => {
       const companyId = domain.replace(/\./g, '_');
 
       // 1. 회사 문서 생성
-      await setDoc(doc(db, 'companies', companyId), {
-        nameKo: orgKo.trim(),
-        nameEn: orgEn.trim(),
-        domain: domain,
-        adminUid: user.uid,
-        createdAt: new Date().toISOString(),
-        status: 'ACTIVE',
-        plan: 'FREE'
-      });
+      try {
+        await setDoc(doc(db, 'companies', companyId), {
+          nameKo: orgKo.trim(),
+          nameEn: orgEn.trim(),
+          domain,
+          adminUid: user.uid,
+          createdAt: new Date().toISOString(),
+          status: 'ACTIVE',
+          plan: 'FREE'
+        });
+      } catch {
+        // If signup created the company but stopped before profile creation,
+        // only its original owner may finish setup.
+        await updateDoc(doc(db, 'companies', companyId), {
+          nameKo: orgKo.trim(), nameEn: orgEn.trim(), domain
+        });
+      }
 
       // 2. UserProfile 생성 (ADMIN 권한 부여)
       await setDoc(doc(db, 'UserProfile', user.uid), {
