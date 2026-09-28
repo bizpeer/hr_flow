@@ -1,12 +1,24 @@
-# Easy Works ERP 개발 및 배포 가이드 (gemini.md)
+# Easy Works ERP 개발 및 배포 가이드
 
 이 문서는 프로젝트의 빌드 환경 및 핵심 개발 정책을 명시하여 개발 시 항상 반영되도록 합니다.
+
+## 현재 개발 단계 및 배포 원칙
+
+- **개발 단계**: 1차 개발이 완료되었으며, 현재는 추가 개발 단계입니다.
+- **웹 배포 대상**: Cloudflare. 구체적인 프로젝트명과 배포 연결 방식은 확인 후 설정합니다.
+- **백엔드 서비스**: Firebase Authentication, Firestore, Storage, Cloud Functions를 사용합니다.
+- **기존 배포 명령**: `npm run deploy`는 Firebase Hosting을 포함하는 레거시 명령이며 Cloudflare 배포 명령이 아닙니다. Firebase Hosting 및 GitHub Pages용 GitHub Actions 워크플로는 수동 실행으로 제한되어 있습니다.
+- **GitHub 인증**: 로컬 `.env.local`에 GitHub 접근 토큰이 저장되어 있습니다. 향후 `git push`에 필요할 때만 안전하게 사용하며, 토큰 값은 출력하거나 Git에 포함하지 않습니다. Git은 `.env.local`을 자동으로 읽지 않습니다.
+
+후속 개발 작업의 지속 지침은 [AGENTS.md](AGENTS.md)를 참고하세요.
+
+급여관리의 소득세는 [2026년 3월 1일 시행 근로소득 간이세액표](https://www.law.go.kr/LSW/flDownload.do?bylClsCd=110201&flSeq=161861245&gubun=)를 사용합니다. 관리자 등록 세액표를 읽지 못하면 저장소에 포함된 공식 기본표를 적용합니다. `childrenUnder20` 저장 필드는 기존 데이터 호환을 위해 유지하지만, 화면에서는 **공제대상인 8~20세 자녀 수**로 입력해야 합니다. 기존 값에 8세 미만 자녀가 포함되어 있다면 관리자가 확인해야 합니다. 계산 검증은 `npm --prefix client run test:payroll`로 실행합니다.
 
 ## 1. 빌드 및 배포 환경
 - **Node.js**: `v24` 이상 권장 (Node.js 24 런타임 네이티브 지원 및 GitHub Actions 최신 규격 준수)
 - **PackageManager**: `npm`
-- **Frontend Framework**: `React v18` + `Vite`
-- **CI/CD**: GitHub Actions (Node.js 24 최적화 배포)
+- **Frontend Framework**: `React v19` + `Vite`
+- **CI/CD**: 기존 GitHub Actions의 Firebase Hosting 및 GitHub Pages 배포는 수동 실행 전용입니다. Cloudflare 자동 배포 방식은 별도 설정이 필요합니다.
 
 ## 2. 데이터베이스 및 보안 (SaaS 아키텍처)
 - **Firebase Database**: Firestore (**ID: `(default)`** 사용)

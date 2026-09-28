@@ -2,11 +2,17 @@
 
 이 문서는 프로젝트의 빌드 환경 및 핵심 개발 정책을 명시하여 개발 시 항상 반영되도록 합니다.
 
+## 현재 작업 기준
+- 1차 개발 완료. 이후 작업은 추가 개발 단계입니다.
+- 웹 배포 대상은 Cloudflare입니다. Firebase Authentication, Firestore, Storage, Cloud Functions는 백엔드 서비스로 사용합니다.
+- `npm run deploy`는 Firebase Hosting을 포함하는 레거시 명령입니다. Cloudflare 배포 명령으로 사용하지 않습니다.
+- GitHub 접근 토큰은 로컬 `.env.local`에 있습니다. 향후 `git push`에 필요할 때만 안전하게 사용하고, 값을 출력하거나 커밋하지 않습니다. Git은 이 파일을 자동으로 읽지 않습니다.
+
 ## 1. 빌드 및 배포 환경
 - **Node.js**: `v24` 이상 권장 (Node.js 24 런타임 네이티브 지원 및 GitHub Actions 최신 규격 준수)
 - **PackageManager**: `npm`
-- **Frontend Framework**: `React v18` + `Vite`
-- **CI/CD**: GitHub Actions (Node.js 24 최적화 배포)
+- **Frontend Framework**: `React v19` + `Vite`
+- **CI/CD**: 기존 Firebase Hosting 및 GitHub Pages 배포 워크플로는 수동 실행 전용이며, Cloudflare 자동 배포 설정은 별도 확인이 필요합니다.
 
 ## 2. 데이터베이스 및 보안 (SaaS 아키텍처)
 - **Firebase Database**: Firestore (**ID: `(default)`** 사용)

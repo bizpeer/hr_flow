@@ -46,7 +46,7 @@ export interface UserData {
   salaryType?: 'ANNUAL' | 'MONTHLY'; // 연봉 혹은 월급
   isSeveranceIncluded?: boolean; // 퇴직금 포함 여부
   dependents?: number; // 부양가족 수 (본인 포함)
-  childrenUnder20?: number; // 20세 이하 자녀 수
+  childrenUnder20?: number; // 기존 필드명 유지: 간이세액표 자녀 공제 대상인 8~20세 자녀 수
   nonTaxable?: number; // 비과세액 (기본 200,000원)
   additionalLeave?: number; // 관리자가 부여한 추가 연차
 }

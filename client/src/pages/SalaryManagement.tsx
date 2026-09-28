@@ -8,117 +8,7 @@ import {
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
 import type { UserData } from '../store/authStore';
-
-const MEAL_ALLOWANCE_DEFAULT = 200000;
-
-const calculateNetPay = (emp: Partial<UserData> & { currentVal?: number }, taxTable: any) => {
-  const salary = emp.currentVal || emp.annualSalary || 0;
-  if (salary <= 0) return null;
-
-  // 산출 정보 메타데이터 (디버깅 및 사용자 안내용)
-  const resMetadata = {
-    tableApplied: false,
-    fallbackUsed: false
-  };
-
-  const type = emp.salaryType || 'ANNUAL';
-  const isSeveranceIncluded = emp.isSeveranceIncluded || false;
-  const dependents = emp.dependents || 1;
-  const children = emp.childrenUnder20 || 0;
-  const nonTaxable = emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT;
-
-  const monthlyGross = isSeveranceIncluded ? Math.floor(salary / 13) : Math.floor(salary / 12);
-
-  const taxableIncome = Math.max(0, monthlyGross - nonTaxable);
-
-  // 1. 국민연금 (4.75%, 상한액 302,570원, 하한액 19,000원 - 2026 기준)
-  let pension = Math.floor(taxableIncome * 0.0475);
-  pension = Math.floor(pension / 10) * 10; // 원 단위 절사
-  if (pension > 302570) pension = 302570;
-  if (taxableIncome > 0 && pension < 19000) pension = 19000;
-
-  // 2. 건강보험 (3.595%)
-  let health = Math.floor(taxableIncome * 0.03595);
-  health = Math.floor(health / 10) * 10; // 원 단위 절사
-
-  // 3. 장기요양보험 (건강보험의 13.14%)
-  let longTerm = Math.floor(health * 0.1314);
-  longTerm = Math.floor(longTerm / 10) * 10; // 원 단위 절사
-
-  // 4. 고용보험 (0.9%)
-  let employment = Math.floor(taxableIncome * 0.009);
-  employment = Math.floor(employment / 10) * 10; // 원 단위 절사
-
-  const totalInsurance = pension + health + longTerm + employment;
-
-  // 5. 소득세 (간이세액표 기반 조회)
-  let incomeTax = 0;
-  
-  if (taxTable && taxTable.brackets && taxableIncome > 0) {
-    const monthlyIncome = Math.floor(taxableIncome / 1000); // 세액표는 천원 단위 기준
-    const bracket = taxTable.brackets.find((b: any) => 
-      monthlyIncome >= Number(b.min) && (b.max === null || monthlyIncome < Number(b.max))
-    );
-    
-    if (bracket) {
-      const colIdx = Math.min(Math.max(0, dependents - 1), 10);
-      incomeTax = bracket.taxes[colIdx] || 0;
-      
-      // 디버깅을 위한 내부 표기용 플래그 (세액표 적용 성공)
-      resMetadata.tableApplied = true;
-      
-      // 자녀 세액공제 반영 (2026.03.01 기준 반영)
-      if (children > 0) {
-        let childCredit = 0;
-        if (children === 1) childCredit = 20830;
-        else if (children === 2) childCredit = 45830;
-        else if (children >= 3) childCredit = 45830 + (children - 2) * 33330;
-        
-        incomeTax = Math.max(0, incomeTax - childCredit);
-      }
-    } else {
-      // 테이블에 해당 구간이 없는 경우 Fallback
-      const taxBase = taxableIncome - totalInsurance;
-      if (taxBase <= 1200000) incomeTax = 0;
-      else if (taxBase <= 4600000) incomeTax = Math.floor(taxBase * 0.06);
-      else if (taxBase <= 8800000) incomeTax = Math.floor(taxBase * 0.15 - 108000);
-      else incomeTax = Math.floor(taxBase * 0.24 - 522000);
-    }
-  } else if (taxableIncome > 0) {
-    // 세액표 데이터 자체가 없는 경우 Fallback
-    const taxBase = taxableIncome - totalInsurance;
-    if (taxBase <= 1200000) incomeTax = 0;
-    else if (taxBase <= 4600000) incomeTax = Math.floor(taxBase * 0.06);
-    else if (taxBase <= 8800000) incomeTax = Math.floor(taxBase * 0.15 - 108000);
-    else incomeTax = Math.floor(taxBase * 0.24 - 522000);
-    resMetadata.fallbackUsed = true;
-  }
-
-  // 6. 지방소득세 (소득세의 10%)
-  const localTax = Math.floor(incomeTax * 0.1);
-
-  const totalDeductions = totalInsurance + incomeTax + localTax;
-  const netPay = monthlyGross - totalDeductions;
-
-  return {
-    monthlyGross,
-    pension,
-    health,
-    longTerm,
-    employment,
-    totalInsurance,
-    incomeTax,
-    localTax,
-    totalDeductions,
-    netPay,
-    nonTaxable,
-    dependents,
-    children,
-    isSeveranceIncluded,
-    salaryBasis: type,
-    metadata: resMetadata
-  };
-};
+import { calculateNetPay, getDeductionCounts, MEAL_ALLOWANCE_DEFAULT } from '../utils/payroll';
 
 export const SalaryManagement: React.FC = () => {
   const { userData } = useAuthStore();
@@ -184,7 +74,7 @@ export const SalaryManagement: React.FC = () => {
                annualSalary: emp.annualSalary || 0,
                salaryType: emp.salaryType || 'ANNUAL',
                isSeveranceIncluded: emp.isSeveranceIncluded || false,
-               dependents: emp.dependents || 1,
+               dependents: getDeductionCounts(emp).dependents,
                childrenUnder20: emp.childrenUnder20 || 0,
                nonTaxable: emp.nonTaxable !== undefined ? emp.nonTaxable : MEAL_ALLOWANCE_DEFAULT
             };
@@ -201,10 +91,8 @@ export const SalaryManagement: React.FC = () => {
   // 전역 시스템 설정(세액표)은 회사 정보와 무관하게 로드
   useEffect(() => {
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
-      if (doc.exists()) {
-        setTaxTable(doc.data());
-      }
-    });
+      setTaxTable(doc.exists() ? doc.data() : null);
+    }, () => setTaxTable(null));
 
     return () => unsubTax();
   }, []);
@@ -214,7 +102,12 @@ export const SalaryManagement: React.FC = () => {
       ...prev,
       [uid]: {
         ...prev[uid],
-        [field]: value
+        [field]: field === 'dependents'
+          ? Math.max(value, (prev[uid]?.childrenUnder20 || 0) + 1)
+          : value,
+        ...(field === 'childrenUnder20' ? {
+          dependents: Math.max(prev[uid]?.dependents || 1, value + 1)
+        } : {})
       }
     }));
   };
@@ -371,12 +264,6 @@ export const SalaryManagement: React.FC = () => {
 
   return (
     <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans print:p-0 print:bg-white overflow-hidden">
-      {!taxTable && (
-        <div className="max-w-7xl mx-auto mb-4 p-3 bg-rose-50 border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-in slide-in-from-top duration-500">
-           <AlertCircle className="w-5 h-5 flex-shrink-0" />
-           <div className="text-[11px] font-black">세액표 데이터를 불러올 수 없습니다. 시스템 관리자에게 문의하세요. (현재 예비 산출 모드 작동 중)</div>
-        </div>
-      )}
       <div className="max-w-7xl mx-auto space-y-6 print:hidden">
         
         {/* Header */}
@@ -389,7 +276,7 @@ export const SalaryManagement: React.FC = () => {
               <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">급여 체계 관리</h1>
               <p className="text-slate-400 text-xs font-semibold flex items-center gap-2">
                 <AlertCircle className="w-3.5 h-3.5 text-indigo-400" />
-                2026년 대한민국 소득세법 및 4대 보험 표준 로직 적용됨
+                2026년 근로소득 간이세액표 적용 · 자녀 공제는 공제대상인 8~20세 자녀만 입력하세요. 기존 저장값도 확인이 필요합니다.
               </p>
             </div>
           </div>
@@ -615,15 +502,15 @@ export const SalaryManagement: React.FC = () => {
                                    <div className="space-y-4">
                                       <div className="flex items-center gap-6">
                                          <div className="flex-1 space-y-2">
-                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">부양 가족 <Info className="w-3 h-3 text-slate-200" /></div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1" title="본인과 공제 요건을 충족하는 가족을 포함합니다.">공제대상 가족 (본인 포함) <Info className="w-3 h-3 text-slate-200" /></div>
                                             <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
-                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max(1, (data.dependents || 1) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
+                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max((data.childrenUnder20 || 0) + 1, (data.dependents || 1) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
                                                <span className="flex-1 text-center text-xs font-black text-slate-700">{data.dependents || 1}</span>
                                                <button onClick={() => handleUpdateField(emp.uid, 'dependents', (data.dependents || 1) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
                                             </div>
                                          </div>
                                          <div className="flex-1 space-y-2">
-                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">자녀 수</div>
+                                            <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest" title="공제대상 가족에 포함된 8세 이상 20세 이하 자녀만 입력합니다.">8~20세 자녀 수</div>
                                             <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
                                                <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', Math.max(0, (data.childrenUnder20 || 0) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
                                                <span className="flex-1 text-center text-xs font-black text-slate-700">{data.childrenUnder20 || 0}</span>
@@ -651,18 +538,10 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Monthly Net Pay</div>
                                          <div className="text-3xl font-black text-slate-900 tracking-tighter flex items-center gap-2">
                                             {res.netPay.toLocaleString()}
-                                            {res.metadata.fallbackUsed && (
-                                              <div className="group/warn relative">
-                                                <AlertCircle className="w-4 h-4 text-rose-500 animate-pulse cursor-help" />
-                                                <div className="absolute left-0 top-6 w-48 p-2 bg-rose-500 text-white text-[9px] font-bold rounded-lg shadow-xl opacity-0 group-hover/warn:opacity-100 transition-opacity z-50 pointer-events-none">
-                                                   실시간 세액표를 찾을 수 없어 예비 수식으로 산출되었습니다. 부양가족이 반영되지 않았을 수 있습니다.
-                                                </div>
-                                              </div>
-                                            )}
                                             <span className="text-sm font-bold text-slate-400">원</span>
                                          </div>
                                          <div className="text-[10px] font-bold text-slate-400 mt-2 flex items-center gap-1.5">
-                                            <div className={`w-1.5 h-1.5 ${res.metadata.fallbackUsed ? 'bg-rose-400' : 'bg-emerald-400'} rounded-full`}></div>
+                                            <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
                                             지급액: {res.monthlyGross.toLocaleString()}원
                                          </div>
                                       </div>
@@ -810,10 +689,7 @@ export const SalaryManagement: React.FC = () => {
                     <div>
                         <h2 className="text-xl font-black tracking-tight">{selectedDetails.name}님 급여 산출 명세서</h2>
                         <p className="text-[10px] font-bold text-slate-400 mt-1 print:text-black print:text-[8pt] italic">
-                            2026년 대한민국 소득세법 기준 산출 내역 (본인 포함 {draft.dependents || 1}인 부양, 자식 {draft.childrenUnder20 || 0}인)
-                            {res.metadata.fallbackUsed && (
-                              <span className="text-rose-500 ml-2 font-black">! 세액표 로드 실패로 정규 수식이 적용되었습니다.</span>
-                            )}
+                            2026년 근로소득 간이세액표 기준 (공제대상 가족 {res.dependents}명, 8~20세 자녀 {res.children}명, {res.metadata.tableSource === 'uploaded' ? '관리자 등록 세액표' : '공식 기본 세액표'})
                         </p>
                     </div>
                   </div>
@@ -856,7 +732,7 @@ export const SalaryManagement: React.FC = () => {
                               <div className="text-sm font-black text-slate-700">{res.dependents}명</div>
                            </div>
                            <div className="p-3 bg-slate-50/50 rounded-xl">
-                              <div className="text-9px] font-bold text-slate-400 mb-1">20세이하 자녀</div>
+                              <div className="text-9px] font-bold text-slate-400 mb-1">8~20세 자녀</div>
                               <div className="text-sm font-black text-slate-700">{res.children}명</div>
                            </div>
                         </div>
