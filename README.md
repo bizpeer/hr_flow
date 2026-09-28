@@ -5,7 +5,7 @@
 ## 현재 개발 단계 및 배포 원칙
 
 - **개발 단계**: 1차 개발이 완료되었으며, 현재는 추가 개발 단계입니다.
-- **웹 배포 대상**: Cloudflare. 구체적인 프로젝트명과 배포 연결 방식은 확인 후 설정합니다.
+- **웹 배포 대상**: Cloudflare Pages 프로젝트 `hr-flow` ([공개 주소](https://hr-flow.pages.dev/)). GitHub `main` 푸시로 자동 배포되며, Cloudflare Pages 체크 완료 후 공개 사이트를 확인합니다.
 - **백엔드 서비스**: Firebase Authentication, Firestore, Storage, Cloud Functions를 사용합니다.
 - **기존 배포 명령**: `npm run deploy`는 Firebase Hosting을 포함하는 레거시 명령이며 Cloudflare 배포 명령이 아닙니다. Firebase Hosting 및 GitHub Pages용 GitHub Actions 워크플로는 수동 실행으로 제한되어 있습니다.
 - **GitHub 인증**: 로컬 `.env.local`에 GitHub 접근 토큰이 저장되어 있습니다. 향후 `git push`에 필요할 때만 안전하게 사용하며, 토큰 값은 출력하거나 Git에 포함하지 않습니다. Git은 `.env.local`을 자동으로 읽지 않습니다.
@@ -18,7 +18,7 @@
 - **Node.js**: `v24` 이상 권장 (Node.js 24 런타임 네이티브 지원 및 GitHub Actions 최신 규격 준수)
 - **PackageManager**: `npm`
 - **Frontend Framework**: `React v19` + `Vite`
-- **CI/CD**: 기존 GitHub Actions의 Firebase Hosting 및 GitHub Pages 배포는 수동 실행 전용입니다. Cloudflare 자동 배포 방식은 별도 설정이 필요합니다.
+- **CI/CD**: Cloudflare Pages가 GitHub `main` 푸시를 자동 배포합니다. 기존 GitHub Actions의 Firebase Hosting 및 GitHub Pages 배포는 수동 실행 전용입니다.
 
 ## 2. 데이터베이스 및 보안 (SaaS 아키텍처)
 - **Firebase Database**: Firestore (**ID: `(default)`** 사용)
