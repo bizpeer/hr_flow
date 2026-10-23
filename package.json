@@ -7,7 +7,9 @@
     "client:build": "npm --prefix client run build",
     "server:dev": "npm --prefix server run dev",
     "deploy": "npm run client:build && firebase deploy",
-    "emulators": "firebase emulators:start"
+    "emulators": "firebase emulators:start",
+    "test:official-letters": "node --test --experimental-test-coverage --test-coverage-include=functions/official-letter-*.js functions/tests/official-letters.test.js",
+    "test:rules": "node scripts/security-rules.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.12.1"

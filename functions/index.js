@@ -6,6 +6,24 @@ const { getFirestore } = require("firebase-admin/firestore");
 // 전역 초기화 (Functions v2 환경에서는 전역 범위 호출이 권장되며, 타임아웃을 유발하지 않습니다)
 initializeApp();
 
+// 공문은 회사 ADMIN 최종 승인과 현재 개정본 권한을 서버에서 검사합니다.
+const { getStorage } = require('firebase-admin/storage');
+const { createOfficialLetterService } = require('./official-letter-service');
+const { renderOfficialLetterPdf } = require('./official-letter-pdf');
+exports.manageOfficialLetters = onCall({ memory: '512MiB', timeoutSeconds: 60, maxInstances: 10 }, async request => {
+  try {
+    return await createOfficialLetterService({
+      db: getFirestore('(default)'),
+      bucket: getStorage().bucket('weberp-8f25f.firebasestorage.app'),
+      renderPdf: renderOfficialLetterPdf,
+    })(request);
+  } catch (error) {
+    if (error instanceof HttpsError) throw error;
+    console.error('[OfficialLetters]', error.code || 'internal');
+    throw new HttpsError('internal', '공문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+  }
+});
+
 // (default) 데이터베이스 사용
 const DATABASE_ID = '(default)';
 

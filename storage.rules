@@ -35,8 +35,12 @@ service firebase.storage {
       allow delete: if manager(companyId);
     }
 
-    match /{allPaths=**} {
-      allow read, write: if superAdmin();
+    match /companies/{companyId}/{category}/{allPaths=**} {
+      allow read, write: if superAdmin() && category != 'official-assets';
+    }
+
+    match /{root}/{allPaths=**} {
+      allow read, write: if superAdmin() && root != 'companies';
     }
   }
 }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
-import { ref, uploadBytes } from 'firebase/storage';
+import { ref, uploadBytes, getBytes } from 'firebase/storage';
 
 const testEnv = await initializeTestEnvironment({
   projectId: 'demo-hr-flow',
@@ -67,6 +67,12 @@ try {
       userId: 'carol', companyId: 'a', divisionId: 'div2', status: 'PENDING', amount: 100
     });
     await setDoc(doc(seed, 'payroll_records', 'payroll-a'), { companyId: 'a', totalGross: 100 });
+    await setDoc(doc(seed, 'officialLetters', 'letter-a'), {
+      companyId: 'a', creatorId: 'bob', participantIds: ['bob', 'manager'], status: 'ISSUED', revision: 1
+    });
+    await setDoc(doc(seed, 'officialLetters', 'letter-a', 'history', '000001'), { companyId: 'a', content: 'archived' });
+    await setDoc(doc(seed, 'officialLetterSettings', 'a'), { companyId: 'a', lastFront: 1, lastSerial: 1 });
+    await setDoc(doc(seed, 'officialLetterNumbers', 'a_001-261023-001'), { companyId: 'a' });
   });
 
   await assertFails(updateDoc(profile(bob, 'bob'), { role: 'SUPER_ADMIN' }));
@@ -123,6 +129,18 @@ try {
     { contentType: 'image/png' }));
   await assertSucceeds(uploadBytes(ref(aliceStorage, 'companies/a/notices/notice.png'), png,
     { contentType: 'image/png' }));
+
+  // Official-letter access is callable-only, including company and platform admins.
+  for (const context of [bob, manager, alice, outsider, root]) {
+    await assertFails(getDoc(doc(db(context), 'officialLetters', 'letter-a')));
+    await assertFails(updateDoc(doc(db(context), 'officialLetters', 'letter-a'), { status: 'ISSUED', approvedRevision: 2 }));
+    await assertFails(getDoc(doc(db(context), 'officialLetters', 'letter-a', 'history', '000001')));
+    await assertFails(setDoc(doc(db(context), 'officialLetterSettings', 'a'), { companyId: 'a', lastSerial: 999 }));
+    await assertFails(setDoc(doc(db(context), 'officialLetterNumbers', 'forged'), { companyId: 'a' }));
+    const privateStorage = context.storage('test.appspot.com');
+    await assertFails(uploadBytes(ref(privateStorage, 'companies/a/official-assets/seal.png'), png, { contentType: 'image/png' }));
+    await assertFails(getBytes(ref(privateStorage, 'companies/a/official-assets/seal.png')));
+  }
 
   assert.equal((await getDoc(profile(alice, 'bob'))).data().role, 'MEMBER');
   console.log('Security rules: authorization and upload checks passed.');

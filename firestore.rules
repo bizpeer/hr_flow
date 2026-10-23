@@ -206,8 +206,10 @@ service cloud.firestore {
     }
 
     // Payment records and all unspecified collections are platform only.
-    match /{document=**} {
-      allow read, write: if superAdmin();
+    match /{collection}/{document=**} {
+      // 공문·인감·번호·보관본은 플랫폼 역할도 브라우저로 우회할 수 없습니다.
+      allow read, write: if superAdmin() &&
+        !(collection in ['officialLetters', 'officialLetterSettings', 'officialLetterNumbers']);
     }
   }
 }

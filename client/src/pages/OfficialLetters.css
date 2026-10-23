@@ -1,0 +1,16 @@
+.official-letters-screen .ol-card { background: white; border: 1px solid #e2e8f0; border-radius: 20px; padding: 24px; }
+.official-letters-screen .ol-button, .official-letters-screen .ol-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 16px; border-radius: 10px; font-size: 14px; font-weight: 700; border: 1px solid #cbd5e1; background: white; cursor: pointer; }
+.official-letters-screen .ol-primary { background: #4f46e5; border-color: #4f46e5; color: white; }
+.official-letters-screen button:disabled { opacity: .45; cursor: not-allowed; }
+.official-letters-screen .ol-label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600; }
+.official-letters-screen .ol-input { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: white; font-size: 14px; font-weight: 400; }
+.official-letters-screen .ol-input:focus { outline: 2px solid #818cf8; outline-offset: 1px; }
+.official-letters-screen .ol-input:disabled { background: #f8fafc; color: #64748b; }
+.official-letters-screen .ol-status { display: inline-block; border-radius: 20px; padding: 4px 10px; font-size: 12px; font-weight: 700; background: #f1f5f9; color: #475569; }
+.official-letters-screen .ol-status-PENDING { background: #eef2ff; color: #4338ca; }
+.official-letters-screen .ol-status-ISSUED { background: #ecfdf5; color: #047857; }
+.official-letters-screen .ol-status-REJECTED { background: #fff7ed; color: #c2410c; }
+.official-letters-screen .ol-preview { max-width: 790px; padding: 40px; margin-inline: auto; border: 1px solid #e2e8f0; background: white; overflow-wrap: anywhere; }
+.official-letters-screen .ol-draft { font-size: 12px; font-weight: bold; text-align: right; color: #94a3b8; padding-bottom: 16px; }
+@media (max-width: 600px) { .official-letters-screen .ol-card { padding: 16px; } .official-letters-screen .ol-preview { padding: 16px; } }
+@media print { .official-letters-screen { display: none !important; } }

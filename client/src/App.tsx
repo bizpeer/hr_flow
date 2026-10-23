@@ -22,6 +22,7 @@ import { LandingPage } from './pages/LandingPage';
 import { SubscriptionManagement } from './pages/SubscriptionManagement';
 import { SubscriptionRequired } from './pages/SubscriptionRequired';
 import { ProfileSetup } from './pages/ProfileSetup';
+import { OfficialLetters } from './pages/OfficialLetters';
 
 function App() {
   const { initAuth, userData, companyData, user, loading } = useAuthStore();
@@ -113,6 +114,7 @@ function App() {
                         <Route path="dashboard" element={<AttendanceDashboard />} />
                         <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
                         <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
+                        <Route path="official-letters" element={<ProtectedRoute><OfficialLetters /></ProtectedRoute>} />
                         <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
                         <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />

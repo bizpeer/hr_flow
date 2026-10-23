@@ -94,6 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
             <NavItem to="/dashboard" icon={Home} label="대시보드" />
             <NavItem to="/leave" icon={CalendarClock} label="휴가신청" />
             <NavItem to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
+            <NavItem to="/official-letters" icon={FileText} label="공문 관리" />
             <NavItem to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
 
             {isManagement && (
