@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes } from 'firebase/storage';
 
 const testEnv = await initializeTestEnvironment({
@@ -16,11 +16,16 @@ const manager = testEnv.authenticatedContext('manager', { email: 'manager@exampl
 const outsider = testEnv.authenticatedContext('outsider', { email: 'outsider@other.com' });
 const orphan = testEnv.authenticatedContext('orphan', { email: 'orphan@c.com' });
 const root = testEnv.authenticatedContext('root', { email: 'root@platform.com' });
+const formerAdmin = testEnv.authenticatedContext('formeradmin', { email: 'formeradmin@example.com' });
+const retired = testEnv.authenticatedContext('retired', { email: 'retired@example.com' });
+const suspended = testEnv.authenticatedContext('suspended', { email: 'suspended@example.com' });
+const anonymous = testEnv.unauthenticatedContext();
 const db = context => context.firestore();
 const profile = (context, uid) => doc(db(context), 'UserProfile', uid);
 const company = (context, id) => doc(db(context), 'companies', id);
 
 try {
+  await testEnv.clearFirestore();
   await assertSucceeds(setDoc(company(alice, 'a'), {
     nameKo: 'A', nameEn: 'A', domain: 'example.com', adminUid: 'alice',
     createdAt: '2026-09-28', status: 'ACTIVE', plan: 'FREE'
@@ -73,6 +78,27 @@ try {
     await setDoc(doc(seed, 'officialLetters', 'letter-a', 'history', '000001'), { companyId: 'a', content: 'archived' });
     await setDoc(doc(seed, 'officialLetterSettings', 'a'), { companyId: 'a', lastFront: 1, lastSerial: 1 });
     await setDoc(doc(seed, 'officialLetterNumbers', 'a_001-261023-001'), { companyId: 'a' });
+    await setDoc(doc(seed, 'UserProfile', 'formeradmin'), {
+      uid: 'formeradmin', role: 'MEMBER', companyId: 'a', status: 'ACTIVE'
+    });
+    await setDoc(doc(seed, 'UserProfile', 'retired'), {
+      uid: 'retired', role: 'MEMBER', companyId: 'a', status: 'RESIGNED'
+    });
+    await setDoc(doc(seed, 'companies', 'suspended'), { status: 'SUSPENDED' });
+    await setDoc(doc(seed, 'UserProfile', 'suspended'), {
+      uid: 'suspended', role: 'MEMBER', companyId: 'suspended', status: 'ACTIVE'
+    });
+    const notification = (recipientId, recipientRole, companyId = 'a') => ({
+      companyId, recipientId, recipientRole, letterId: 'letter-a', revision: 1,
+      event: 'SUBMITTED', title: '공문 결재 요청이 도착했습니다.', status: 'PENDING',
+      requiresAction: true, readAt: null, createdAt: '2026-10-23T00:00:00.000Z', updatedAt: '2026-10-23T00:00:00.000Z'
+    });
+    for (const [uid, role, companyId] of [
+      ['bob', 'MEMBER', 'a'], ['manager', 'SUB_ADMIN', 'a'], ['alice', 'ADMIN', 'a'],
+      ['formeradmin', 'ADMIN', 'a'], ['retired', 'MEMBER', 'a'], ['suspended', 'MEMBER', 'suspended']
+    ]) await setDoc(doc(seed, 'officialLetterNotifications', uid, 'items', 'letter-a'), notification(uid, role, companyId));
+    await setDoc(doc(seed, 'officialLetterNotifications', 'bob', 'items', 'wrong-company'), notification('bob', 'MEMBER', 'b'));
+    await setDoc(doc(seed, 'officialLetterNotifications', 'bob', 'items', 'wrong-role'), notification('bob', 'ADMIN'));
   });
 
   await assertFails(updateDoc(profile(bob, 'bob'), { role: 'SUPER_ADMIN' }));
@@ -142,8 +168,36 @@ try {
     await assertFails(getBytes(ref(privateStorage, 'companies/a/official-assets/seal.png')));
   }
 
+  const inboxItem = (context, uid, letterId = 'letter-a') => doc(db(context), 'officialLetterNotifications', uid, 'items', letterId);
+  for (const [context, uid, role] of [[bob, 'bob', 'MEMBER'], [manager, 'manager', 'SUB_ADMIN'], [alice, 'alice', 'ADMIN']]) {
+    await assertSucceeds(getDoc(inboxItem(context, uid)));
+    const inbox = query(collection(db(context), 'officialLetterNotifications', uid, 'items'),
+      where('companyId', '==', 'a'), where('recipientRole', '==', role), where('recipientId', '==', uid));
+    assert.equal((await assertSucceeds(getDocs(inbox))).size, 1);
+    await assertFails(updateDoc(inboxItem(context, uid), { readAt: '2026-10-23T01:00:00.000Z' }));
+    await assertFails(updateDoc(inboxItem(context, uid), { requiresAction: false }));
+    await assertFails(deleteDoc(inboxItem(context, uid)));
+    await assertFails(setDoc(inboxItem(context, uid, 'forged'), {
+      companyId: 'a', recipientId: uid, recipientRole: role, letterId: 'forged', requiresAction: true
+    }));
+  }
+  await assertFails(getDocs(collection(db(bob), 'officialLetterNotifications', 'bob', 'items')));
+  await assertFails(getDoc(inboxItem(bob, 'bob', 'wrong-company')));
+  await assertFails(getDoc(inboxItem(bob, 'bob', 'wrong-role')));
+  await assertFails(getDoc(inboxItem(formerAdmin, 'formeradmin')));
+  await assertFails(getDoc(inboxItem(retired, 'retired')));
+  await assertFails(getDoc(inboxItem(suspended, 'suspended')));
+  for (const context of [manager, alice, outsider, root, anonymous]) {
+    await assertFails(getDoc(inboxItem(context, 'bob')));
+    await assertFails(getDocs(query(collection(db(context), 'officialLetterNotifications', 'bob', 'items'),
+      where('companyId', '==', 'a'), where('recipientRole', '==', 'MEMBER'), where('recipientId', '==', 'bob'))));
+    await assertFails(setDoc(inboxItem(context, 'bob', 'forged'), { companyId: 'a', recipientId: 'bob', recipientRole: 'MEMBER' }));
+  }
+  await assertFails(updateDoc(inboxItem(root, 'bob'), { readAt: '2026-10-23T01:00:00.000Z' }));
+  await assertFails(deleteDoc(inboxItem(root, 'bob')));
+
   assert.equal((await getDoc(profile(alice, 'bob'))).data().role, 'MEMBER');
-  console.log('Security rules: authorization and upload checks passed.');
+  console.log('Security rules: authorization, private notification inboxes, and upload checks passed.');
 } finally {
   await testEnv.cleanup();
 }

@@ -205,11 +205,22 @@ service cloud.firestore {
       allow update, delete: if superAdmin();
     }
 
+    match /officialLetterNotifications/{uid}/items/{id} {
+      // Only current recipients may listen; all writes, including read receipts,
+      // go through the callable so clients cannot forge tasks or old-role access.
+      allow read: if signedIn() && uid == request.auth.uid &&
+        resource.data.recipientId == uid && sameCompany(resource.data.companyId) &&
+        resource.data.recipientRole == role() &&
+        profile().get('status', 'ACTIVE') == 'ACTIVE' &&
+        get(companyPath(resource.data.companyId)).data.status == 'ACTIVE';
+      allow write: if false;
+    }
+
     // Payment records and all unspecified collections are platform only.
     match /{collection}/{document=**} {
       // 공문·인감·번호·보관본은 플랫폼 역할도 브라우저로 우회할 수 없습니다.
       allow read, write: if superAdmin() &&
-        !(collection in ['officialLetters', 'officialLetterSettings', 'officialLetterNumbers']);
+        !(collection in ['officialLetters', 'officialLetterSettings', 'officialLetterNumbers', 'officialLetterNotifications']);
     }
   }
 }

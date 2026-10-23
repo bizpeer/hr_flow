@@ -9,6 +9,13 @@ export interface LetterContent {
   attachments: string;
 }
 export interface ApprovalStep { uid: string; name: string; approvedAt: string | null }
+export interface ApproverCandidate {
+  uid: string;
+  name: string;
+  role: 'MEMBER' | 'SUB_ADMIN';
+  teamId: string | null;
+  divisionId: string | null;
+}
 export interface LetterSettings {
   companyName: string;
   address: string;
@@ -20,7 +27,7 @@ export interface LetterSettings {
   logoPath?: string;
   sealPath?: string;
   lastFront: number;
-  lastSerial: number;
+  lastSerial?: number;
   version: number;
 }
 export interface OfficialLetter {
@@ -39,6 +46,7 @@ export interface OfficialLetter {
   approvedByName?: string;
   approvedAt?: string;
   rejectionReason?: string;
+  reassignment?: { reason: string; by: string; at: string; previousApproverIds: string[] };
   updatedAt: string;
   branding?: Pick<LetterSettings, 'companyName' | 'address' | 'representative' | 'phone' | 'email'> & { logoData?: string; sealData?: string };
 }
@@ -68,8 +76,11 @@ export const officialLetters = {
     content, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),
   submit: (letter: OfficialLetter) => call('submit', { id: letter.id, revision: letter.revision }),
-  review: (letter: OfficialLetter, decision: 'approve' | 'reject', options: { reason?: string; front?: number; serial?: number; issueDate?: string } = {}) =>
+  review: (letter: OfficialLetter, decision: 'approve' | 'reject', options: { reason?: string; front?: number } = {}) =>
     call('review', { id: letter.id, revision: letter.revision, decision, ...options }),
+  approverCandidates: (letter: OfficialLetter) => call<{ candidates: ApproverCandidate[] }>('approverCandidates', { id: letter.id }),
+  reassign: (letter: OfficialLetter, approverIds: string[], reason: string) =>
+    call<{ success: true }>('reassign', { id: letter.id, revision: letter.revision, approverIds, reason }),
   pdf: (letter: OfficialLetter) => call<{ base64: string; filename: string }>('pdf', { id: letter.id, revision: letter.revision }),
   history: (letter: OfficialLetter) => call<{ history: LetterHistory[] }>('history', { id: letter.id }),
   deleteHistory: (letter: OfficialLetter, historyId: string) => call('deleteHistory', { id: letter.id, revision: letter.revision, historyId }),
@@ -82,8 +93,8 @@ export function koreanDate(date: string): string {
   const [year, month, day] = date.split('-').map(Number);
   return `${year}년 ${month}월 ${day}일`;
 }
-export function previewNumber(front: number, date: string, serial: number): string {
-  return `${String(front).padStart(3, '0')}-${date.replaceAll('-', '').slice(2)}-${String(serial).padStart(3, '0')}`;
+export function previewNumber(front: number, date: string): string {
+  return `${String(front).padStart(3, '0')}-${date.replaceAll('-', '').slice(2)}`;
 }
 export async function readLetterImage(file: File): Promise<string> {
   if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 300 * 1024) {

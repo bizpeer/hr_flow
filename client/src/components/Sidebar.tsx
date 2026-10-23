@@ -45,16 +45,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
       {/* Decorative Gradient Background */}
       <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-indigo-600/5 to-transparent opacity-50 pointer-events-none"></div>
 
-      <NavLink 
-        to="/"
-        className="flex items-center justify-between mb-6 relative z-10 shrink-0 group cursor-pointer"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between mb-6 relative z-10 shrink-0">
+        <NavLink to="/" className="flex min-w-0 items-center gap-3 group cursor-pointer">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white italic shadow-lg shadow-indigo-900/20 group-hover:scale-110 transition-transform">HF</div>
           <div className="text-2xl font-black tracking-tighter text-white group-hover:text-indigo-400 transition-colors">HR <span className="text-indigo-400">FLOW</span></div>
-        </div>
-        {!isSuperAdmin && <NotificationBell currentUserId={user?.uid || ''} />}
-      </NavLink>
+        </NavLink>
+        {!isSuperAdmin && <NotificationBell currentUserId={user?.uid || ''} onNavigate={onItemClick} />}
+      </div>
 
       {/* 회사 정보 표시 */}
       {companyData && !isSuperAdmin && (
