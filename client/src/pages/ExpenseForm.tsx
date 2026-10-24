@@ -3,8 +3,9 @@ import {
   UploadCloud, CheckCircle, FileText, History, AlertCircle, Send, Loader2, DollarSign, X, Trash2, Edit, Clock, Calendar 
 } from 'lucide-react';
 import { addDoc, collection, query, where, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
+import { uploadCompanyAttachment } from '../services/attachmentService';
+import { SecureAttachment } from '../components/SecureAttachment';
 import { useAuthStore } from '../store/authStore';
 import { format } from 'date-fns';
 
@@ -21,6 +22,7 @@ interface ExpenseRequest {
   createdAt: string;
   attachmentName?: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
 }
 
 export const ExpenseForm: React.FC = () => {
@@ -72,7 +74,7 @@ export const ExpenseForm: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, userData?.companyId, authLoading]);
 
   // 필터링된 내역 계산
   const filteredRequests = filterMonth === 'all' 
@@ -96,32 +98,13 @@ export const ExpenseForm: React.FC = () => {
 
     try {
       // 0. 초기화: undefined 방지를 위해 기본값 보장
-      let finalUrl = editingRequest?.attachmentUrl || '';
+      let finalPath = editingRequest?.attachmentPath || '';
       let finalName = fileName || editingRequest?.attachmentName || '';
       
       // 1. 파일 업로드 로직 (새 파일이 선택된 경우에만)
       if (selectedFile) {
-        console.log("📤 Uploading file to Storage...", selectedFile.name);
-        
-        // Storage 설정이 올바른지 체크 (Buckets이 없으면 무한 대기 가능성 상존)
-        if (!storage.app.options.storageBucket) {
-          throw new Error("Firebase Storage Bucket 설정(VITE_FIREBASE_STORAGE_BUCKET)이 누락되었습니다. 관리자에게 문의해 주세요.");
-        }
-
-        const folderPath = `companies/${userData?.companyId || 'public'}/expenses/${user?.uid || 'anonymous'}`;
-        const fileNameToSave = `${Date.now()}_${selectedFile.name}`;
-        const fileRef = ref(storage, `${folderPath}/${fileNameToSave}`);
-        
-        // 무한 로딩 방지: 20초 타임아웃 적용
-        const uploadPromise = uploadBytes(fileRef, selectedFile);
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error("업로드 시간 초과: 네트워크 상태를 확인하거나 스토리지 설정을 점검해 주세요.")), 20000)
-        );
-
-        const uploadResult = await Promise.race([uploadPromise, timeoutPromise]);
-        finalUrl = await getDownloadURL(uploadResult.ref);
-        finalName = selectedFile.name;
-        console.log("✅ Upload Success");
+        const uploaded = await uploadCompanyAttachment('expenses', selectedFile);
+        finalPath = uploaded.path; finalName = uploaded.name;
       }
 
       // 2. 페이로드 구성 (모든 필드에 대해 undefined 방지 처리)
@@ -136,7 +119,8 @@ export const ExpenseForm: React.FC = () => {
         category: category || '기타',
         description: description || '',
         attachmentName: finalName || '',
-        attachmentUrl: finalUrl || '',
+        attachmentPath: finalPath,
+        ...(selectedFile ? { attachmentUrl: '' } : {}),
         status: isEditing ? (editingRequest?.status || 'PENDING') : 'PENDING',
         updatedAt: new Date().toISOString()
       };
@@ -580,37 +564,8 @@ export const ExpenseForm: React.FC = () => {
                  <div className="space-y-3 pt-4 border-t border-slate-100">
                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block ml-1">첨부 증빙 자료</span>
                     
-                    {selectedRequest.attachmentUrl ? (
-                       <>
-                          {(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].some(ext => selectedRequest.attachmentUrl?.toLowerCase().includes(ext)) || 
-                            selectedRequest.attachmentUrl?.includes('image%2F')) && (
-                             <div className="mb-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                                <img 
-                                   src={selectedRequest.attachmentUrl} 
-                                   alt="Preview" 
-                                   className="w-full h-auto max-h-[200px] object-contain cursor-pointer"
-                                   onClick={() => window.open(selectedRequest.attachmentUrl, '_blank')}
-                                />
-                             </div>
-                          )}
-
-                          <div className="flex items-center justify-between p-3 bg-white border border-emerald-50 rounded-xl shadow-sm hover:border-emerald-200 transition-all group/file">
-                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-500 group-hover/file:bg-emerald-600 group-hover/file:text-white transition-all">
-                                   <FileText className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                   <p className="text-[10px] font-black text-slate-800 truncate">{selectedRequest.attachmentName || '첨부 파일'}</p>
-                                </div>
-                             </div>
-                             <button 
-                                onClick={() => window.open(selectedRequest.attachmentUrl, '_blank')}
-                                className="px-3 py-1.5 bg-emerald-600 text-white text-[9px] font-black uppercase rounded-lg hover:bg-emerald-700 transition-all shrink-0 ml-3"
-                             >
-                                View
-                             </button>
-                          </div>
-                       </>
+                    {(selectedRequest.attachmentPath || selectedRequest.attachmentUrl) ? (
+                       <SecureAttachment category="expenses" documentId={selectedRequest.id} name={selectedRequest.attachmentName} version={selectedRequest.attachmentPath} preview />
                     ) : (
                        <div className="p-6 border-2 border-slate-100 border-dashed rounded-xl flex flex-col items-center gap-2 text-slate-300 bg-slate-50/30">
                           <AlertCircle className="w-5 h-5 opacity-20" />

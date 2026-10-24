@@ -8,6 +8,9 @@ import {
 import { format } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import { DocumentApprovalInbox } from '../components/DocumentApprovalInbox';
+import { SecureAttachment } from '../components/SecureAttachment';
+import { accountSecurity } from '../services/accountSecurityService';
+import type { DirectoryUser } from '../services/accountSecurityService';
 
 interface LeaveRequest {
   id: string;
@@ -24,6 +27,7 @@ interface LeaveRequest {
   divisionId?: string;
   attachmentName?: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
 }
 
 interface ExpenseRequest {
@@ -41,10 +45,13 @@ interface ExpenseRequest {
   divisionId?: string;
   attachmentName?: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
 }
+type ApprovalRequest = Pick<LeaveRequest, 'id' | 'userId' | 'userName' | 'status' | 'createdAt'> & Partial<LeaveRequest & ExpenseRequest>;
+interface OrganizationUnit { id: string; name: string; divisionId?: string }
 
 export const AdminApprovals: React.FC = () => {
-  const { userData, loading: authLoading } = useAuthStore();
+  const { userData, loading: authLoading, sessionReady } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE' | 'DOCUMENT'>('LEAVE');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
@@ -56,13 +63,15 @@ export const AdminApprovals: React.FC = () => {
   const [selectedTeam, setSelectedTeam] = useState<string>('ALL');
   
   // 조직 데이터 상태
-  const [divisions, setDivisions] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [divisions, setDivisions] = useState<OrganizationUnit[]>([]);
+  const [teams, setTeams] = useState<OrganizationUnit[]>([]);
+  const [employees, setEmployees] = useState<DirectoryUser[]>([]);
+  const [directoryError, setDirectoryError] = useState('');
+  const [directoryRetry, setDirectoryRetry] = useState(0);
+  const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
 
   useEffect(() => {
-    if (authLoading || !userData?.companyId) return;
+    if (authLoading || !sessionReady || !userData?.companyId) return;
     const companyId = userData.companyId;
     const divisionFilter = userData.role === 'SUB_ADMIN'
       ? [where('divisionId', '==', userData.divisionId || '__unassigned__')]
@@ -83,23 +92,29 @@ export const AdminApprovals: React.FC = () => {
 
     // 2. 조직/사용자 데이터 구독 (조인을 위함)
     const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
-      setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDivisions(snap.docs.map(d => ({ ...d.data(), id: d.id } as OrganizationUnit)));
     });
     const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
-      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTeams(snap.docs.map(d => ({ ...d.data(), id: d.id } as OrganizationUnit)));
     });
-    const unsubUsers = onSnapshot(query(collection(db, 'UserProfile'), where('companyId', '==', companyId), ...divisionFilter), (snap) => {
-      setEmployees(snap.docs.map(d => ({ uid: d.id, ...d.data() })));
-    });
-
     return () => { 
       unsubLeave(); unsubExpense();
-      unsubDivs(); unsubTeams(); unsubUsers();
+      unsubDivs(); unsubTeams();
     };
-  }, [authLoading, userData]);
+  }, [authLoading, sessionReady, userData]);
+  useEffect(() => {
+    if (authLoading || !sessionReady || !userData?.companyId) return;
+    let active = true;
+    accountSecurity.directory().then(result => {
+      if (active) { setEmployees(result.users); setDirectoryError(''); }
+    }).catch(failure => {
+      if (active) { setEmployees([]); setDirectoryError(failure instanceof Error ? failure.message : '직원 목록을 불러오지 못했습니다.'); }
+    });
+    return () => { active = false; };
+  }, [authLoading, sessionReady, userData?.uid, userData?.companyId, userData?.role, userData?.divisionId, directoryRetry]);
   const handleUpdateStatus = async (collectionName: string, id: string, newStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'SUB_APPROVED') => {
     try {
-      const userRole = employees.find(e => e.uid === userData?.uid)?.role || userData?.role;
+      const userRole = userData?.role;
       const targetStatus = newStatus || (userRole === 'SUB_ADMIN' ? 'SUB_APPROVED' : 'APPROVED');
       
       const actionText = targetStatus === 'SUB_APPROVED' ? '1차 승인' : 
@@ -114,16 +129,15 @@ export const AdminApprovals: React.FC = () => {
         updatedBy: userData?.name || '시스템'
       });
       alert(`${actionText} 처리가 완료되었습니다.`);
-    } catch (err: any) {
-      alert('상태 업데이트 실패: ' + err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : '상태 업데이트에 실패했습니다.');
     }
   };
 
   // 필터 로직 함수
-  const applyFilters = (requests: any[]) => {
+  const applyFilters = <T extends ApprovalRequest,>(requests: T[]) => {
     // 0. 현재 로그인한 사용자의 실시간 최신 권한 확인 (새롭게 임명된 관리자 대응)
-    const currentProfile = employees.find(e => e.uid === userData?.uid);
-    const currentUserRole = currentProfile?.role || userData?.role;
+    const currentUserRole = userData?.role;
 
     return requests.filter(req => {
       // 1. 상태 필터 (대기/승인/반려/전체)
@@ -145,7 +159,7 @@ export const AdminApprovals: React.FC = () => {
 
       // 4. 부관리자(SUB_ADMIN) 보안 필터링: 본인 본부 내역만 노출
       if (currentUserRole === 'SUB_ADMIN') {
-        const subAdminDivId = currentProfile?.divisionId || userData?.divisionId;
+        const subAdminDivId = userData?.divisionId;
         
         // 본인 본부와 일치하지 않으면 제외
         if (userDivId !== subAdminDivId) return false;
@@ -157,6 +171,7 @@ export const AdminApprovals: React.FC = () => {
 
   const filteredLeaves = applyFilters(leaveRequests);
   const filteredExpenses = applyFilters(expenseRequests);
+  const filteredRequests: ApprovalRequest[] = activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses;
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -181,6 +196,7 @@ export const AdminApprovals: React.FC = () => {
   return (
     <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
       <div className="max-w-7xl mx-auto space-y-10">
+        {directoryError && <div role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900 text-sm">{directoryError}<button type="button" className="ml-3 underline font-semibold" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
         
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
@@ -310,7 +326,7 @@ export const AdminApprovals: React.FC = () => {
                     </tr>
                  </thead>
                  <tbody className="divide-y divide-slate-100">
-                    {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).map((req: any) => {
+                    {filteredRequests.map(req => {
                        const userProf = employees.find(e => e.uid === req.userId);
                        const userTeam = teams.find(t => t.id === (req.teamId || userProf?.teamId));
                        const userDiv = divisions.find(d => d.id === (req.divisionId || userTeam?.divisionId));
@@ -454,7 +470,7 @@ export const AdminApprovals: React.FC = () => {
 
         {/* Mobile Card View */}
         <div className="md:hidden space-y-4 pb-10">
-           {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).map((req: any) => (
+           {filteredRequests.map(req => (
               <div 
                 key={req.id} 
                 onClick={() => setSelectedRequest(req)}
@@ -686,39 +702,8 @@ export const AdminApprovals: React.FC = () => {
                  <div className="space-y-4 pt-6 border-t border-slate-100">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">첨부 증빙 자료 (Attachments)</span>
                     
-                    {selectedRequest.attachmentUrl ? (
-                       <>
-                          {/* 이미지 미리보기 (URL이 있고 이미지 형식인 경우) */}
-                          {(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].some(ext => selectedRequest.attachmentUrl?.toLowerCase().includes(ext)) || 
-                            selectedRequest.attachmentUrl?.includes('image%2F')) && (
-                             <div className="mb-4 rounded-2xl overflow-hidden border border-slate-200 bg-slate-50">
-                                <img 
-                                   src={selectedRequest.attachmentUrl} 
-                                   alt="Attachment Preview" 
-                                   className="w-full h-auto max-h-[300px] object-contain cursor-pointer hover:scale-[1.02] transition-transform"
-                                   onClick={() => window.open(selectedRequest.attachmentUrl, '_blank')}
-                                />
-                             </div>
-                          )}
-
-                          <div className="flex items-center justify-between p-5 bg-white border-2 border-indigo-50 rounded-2xl shadow-sm hover:border-indigo-200 transition-all group/file">
-                             <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500 group-hover/file:bg-indigo-600 group-hover/file:text-white transition-all">
-                                   <FileText className="w-6 h-6" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                   <p className="text-sm font-black text-slate-800 truncate">{selectedRequest.attachmentName || '첨부 파일 (확인이 필요한 경우 클릭)'}</p>
-                                   <p className="text-[10px] font-bold text-slate-400">클릭 시 안전한 보안 링크로 파일을 확인합니다.</p>
-                                </div>
-                             </div>
-                             <button 
-                                onClick={() => window.open(selectedRequest.attachmentUrl, '_blank')}
-                                className="px-5 py-2.5 bg-indigo-600 text-white text-[10px] font-black uppercase rounded-xl hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 shrink-0 ml-4"
-                             >
-                                Download / View
-                             </button>
-                          </div>
-                       </>
+                    {(selectedRequest.attachmentPath || selectedRequest.attachmentUrl) ? (
+                       <SecureAttachment category={activeTab === 'EXPENSE' ? 'expenses' : 'leaves'} documentId={selectedRequest.id} name={selectedRequest.attachmentName} preview />
                     ) : selectedRequest.attachmentName ? (
                        <div className="flex items-center justify-between p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl group/file">
                           <div className="flex items-center gap-4">

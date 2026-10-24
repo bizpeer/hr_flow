@@ -1,231 +1,63 @@
-import React, { useState, useEffect } from 'react';
-import { updatePassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import { 
-  doc, updateDoc, addDoc, collection
-} from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { useState } from 'react';
+import type { FormEvent } from 'react';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../firebase';
 import { useAuthStore } from '../store/authStore';
-import { AlertCircle, X, KeyRound, CheckCircle2 } from 'lucide-react';
+import { accountSecurity } from '../services/accountSecurityService';
+import { AlertCircle, X, KeyRound, Loader2, LogOut } from 'lucide-react';
 
-export const LoginModal: React.FC = () => {
-  const { 
-    isLoginModalOpen, setLoginModalOpen, userData,
-    isManualChangeMode 
-  } = useAuthStore();
-  
-  // 비밀번호 변경 관련
+function PasswordChangeDialog({ manual, required }: { manual: boolean; required: boolean }) {
+  const { logout, setLoginModalOpen } = useAuthStore();
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [working, setWorking] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changeSuccess, setChangeSuccess] = useState(false);
-  const [isChangeMode, setIsChangeMode] = useState(false);
-
-  // 비밀번호 변경 필수 체크
-  useEffect(() => {
-    if (!userData) return;
-
-    const isSuperAdmin = userData.role === 'SUPER_ADMIN';
-
-    if (userData.mustChangePassword && !isSuperAdmin) {
-      setIsChangeMode(true);
-      setLoading(false);
-    } else {
-      setIsChangeMode(false);
-      setLoginModalOpen(false);
-    }
-  }, [userData, setLoginModalOpen]);
-
-  // 모달이 열릴 때 상태 동기화
-  useEffect(() => {
-    const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
-    if (isLoginModalOpen && (userData?.mustChangePassword && !isSuperAdmin)) {
-      setIsChangeMode(true);
-    } else if (isLoginModalOpen && isManualChangeMode) {
-      setIsChangeMode(true);
-    }
-  }, [isLoginModalOpen, userData, isManualChangeMode]);
-
-  if (!isLoginModalOpen) return null;
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    
-    if (newPassword !== confirmPassword) {
-      setError('새 비밀번호가 일치하지 않습니다.');
-      return;
-    }
-    if (newPassword.length < 12) {
-      setError('비밀번호는 최소 12자 이상이어야 합니다.');
-      return;
-    }
-
-    setLoading(true);
+  const [confirmation, setConfirmation] = useState('');
+  async function change(event: FormEvent) {
+    event.preventDefault(); setError('');
+    if (newPassword !== confirmation) { setError('새 비밀번호가 일치하지 않습니다.'); return; }
+    if (newPassword.length < 12 || newPassword.length > 128) { setError('새 비밀번호는 12~128자로 입력해 주세요.'); return; }
+    setWorking(true);
     try {
       const user = auth.currentUser;
-      if (!user) throw new Error("인증 세션이 만료되었습니다.");
-
-      // 수동 변경 모드 진행 시 보안을 위해 현재 비밀번호로 재인증 처리
-      if (isManualChangeMode) {
-        if (!currentPassword) {
-          setError('현재 비밀번호를 입력해 주세요.');
-          setLoading(false);
-          return;
-        }
-        try {
-          const credential = EmailAuthProvider.credential(user.email!, currentPassword);
-          await reauthenticateWithCredential(user, credential);
-        } catch (authErr: any) {
-          setError('현재 비밀번호가 일치하지 않습니다.');
-          setLoading(false);
-          return;
-        }
+      if (!user?.email) throw new Error('인증 세션이 만료되었습니다. 다시 로그인해 주세요.');
+      if (manual) {
+        if (!currentPassword) throw new Error('현재 비밀번호를 입력해 주세요.');
+        try { await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword)); }
+        catch { throw new Error('현재 비밀번호를 확인해 주세요.'); }
+        await user.getIdToken(true);
       }
-
-      await updatePassword(user, newPassword);
-
-      try {
-        await updateDoc(doc(db, 'UserProfile', user.uid), {
-          mustChangePassword: false,
-          lastPasswordChange: new Date().toISOString()
-        });
-
-        await addDoc(collection(db, 'AuditLogs'), {
-          timestamp: new Date().toISOString(),
-          actionType: 'UPDATE_PASSWORD',
-          performedBy: userData?.name || '시스템',
-          targetId: user.uid,
-          targetName: userData?.name || '',
-          details: isManualChangeMode ? '기존 비밀번호 재인증 후 비밀번호 변경 완료' : '최초 로그인 비밀번호 변경 완료 (계정 활성화)',
-          companyId: userData?.companyId || ''
-        });
-      } catch (dbErr) {
-        console.error("Non-fatal Database Error during password change:", dbErr);
-      }
-
-      setLoading(false);
-      setChangeSuccess(true);
-      alert("비밀번호가 성공적으로 변경되었습니다.");
-      setLoginModalOpen(false);
-
-      setChangeSuccess(true);
-      setTimeout(() => {
-        setLoginModalOpen(false);
-        setChangeSuccess(false);
-        setCurrentPassword('');
-      }, 2000);
-    } catch (err: any) {
-      if (err.code === 'auth/requires-recent-login') {
-        setError('보안 세션이 만료되었습니다. 로그아웃 후 다시 로그인해 주세요.');
-      } else {
-        setError('비밀번호 변경 실패: ' + err.message);
-      }
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // 비밀번호 변경 모드가 아니면 모달을 표시하지 않음 (로그인은 Login.tsx에서 처리)
-  if (!isChangeMode) {
-    return null;
+      await accountSecurity.changePassword(newPassword);
+      setCurrentPassword(''); setNewPassword(''); setConfirmation('');
+      await logout();
+      window.alert('비밀번호를 변경했습니다. 1초 후 새 비밀번호로 다시 로그인해 주세요.');
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : '비밀번호를 변경하지 못했습니다. 다시 시도해 주세요.');
+    } finally { setWorking(false); }
   }
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden relative animate-in fade-in zoom-in duration-300">
-        {/* 수동 모드이거나, 비밀번호 변경 필수 모드가 아닐 때 닫기 버튼 */}
-        {(!userData?.mustChangePassword || isManualChangeMode) && (
-          <button 
-            onClick={() => setLoginModalOpen(false)}
-            className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
-
-        <div className="p-8">
-          <div className="text-center">
-            {changeSuccess ? (
-              <div className="py-10 flex flex-col items-center gap-4 animate-in zoom-in duration-500">
-                <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
-                  <CheckCircle2 className="w-10 h-10" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">환영합니다!</h3>
-                <p className="text-gray-500">계정이 활성화되었습니다.</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-center mb-6">
-                  <div className="p-4 bg-indigo-50 rounded-2xl">
-                    <KeyRound className="w-10 h-10 text-indigo-600" />
-                  </div>
-                </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">비밀번호 변경</h2>
-                <p className="text-gray-500 text-sm mb-8">보안을 위해 초기 비밀번호를<br/>반드시 변경해 주세요.</p>
-
-                <form onSubmit={handleChangePassword} className="space-y-4">
-                  {error && (
-                    <div className="bg-red-50 text-red-700 p-3 rounded-lg flex items-center gap-2 text-xs font-medium border border-red-100">
-                      <AlertCircle className="w-4 h-4 shrink-0" />
-                      {error}
-                    </div>
-                  )}
-                  {isManualChangeMode && (
-                    <div className="text-left mb-4">
-                      <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1.5">현재 비밀번호</label>
-                      <input
-                        type="password"
-                        required
-                        className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                        placeholder="현재 비밀번호 입력"
-                        value={currentPassword}
-                        onChange={(e) => setCurrentPassword(e.target.value)}
-                      />
-                    </div>
-                  )}
-
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1.5">새 비밀번호 (1차 입력)</label>
-                    <input
-                      type="password"
-                      required
-                      className="w-full px-4 py-3 border-2 border-indigo-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
-                      placeholder="최소 12자 이상"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                    />
-                  </div>
-                  <div className="text-left">
-                    <label className="block text-xs font-bold text-gray-500 uppercase ml-1 mb-1.5">비밀번호 재확인 (2차 입력)</label>
-                    <input
-                      type="password"
-                      required
-                      className={`w-full px-4 py-3 border-2 rounded-xl focus:ring-2 outline-none transition-all ${
-                        confirmPassword && newPassword !== confirmPassword 
-                          ? 'border-red-200 focus:ring-red-500 focus:border-red-500' 
-                          : 'border-indigo-100 focus:ring-indigo-500 focus:border-indigo-500'
-                      }`}
-                      placeholder="새 비밀번호 다시 입력"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all disabled:opacity-50 mt-4"
-                  >
-                    {loading ? '변경 중...' : '비밀번호 저장 및 시작'}
-                  </button>
-                </form>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+  return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby="password-change-title">
+    <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl relative p-8">
+      {(!required || manual) && <button type="button" aria-label="비밀번호 변경 닫기" disabled={working} className="absolute top-4 right-4 p-2 text-slate-500" onClick={() => setLoginModalOpen(false)}><X size={20} /></button>}
+      <div className="flex justify-center mb-5"><KeyRound className="text-indigo-600" size={40} /></div>
+      <h2 id="password-change-title" className="text-2xl font-bold text-center">비밀번호 변경</h2>
+      <p className="text-slate-600 text-sm text-center mt-3 mb-6">{required ? '초기 비밀번호를 변경해야 업무 기능을 사용할 수 있습니다.' : '현재 비밀번호를 확인한 뒤 새 비밀번호를 설정합니다.'} 변경 후에는 새 비밀번호로 다시 로그인합니다.</p>
+      <form onSubmit={event => { void change(event); }} className="space-y-4">
+        {error && <p role="alert" className="bg-red-50 text-red-800 p-3 rounded-lg flex gap-2 text-sm"><AlertCircle className="shrink-0" size={18} />{error}</p>}
+        <fieldset disabled={working} className="space-y-4">
+          {manual && <label className="block text-sm font-semibold">현재 비밀번호<input type="password" autoComplete="current-password" required value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} className="w-full px-4 py-3 border rounded-xl mt-1" /></label>}
+          <label className="block text-sm font-semibold">새 비밀번호<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={newPassword} onChange={event => setNewPassword(event.target.value)} className="w-full px-4 py-3 border rounded-xl mt-1" /></label>
+          <label className="block text-sm font-semibold">새 비밀번호 확인<input type="password" autoComplete="new-password" required minLength={12} maxLength={128} value={confirmation} onChange={event => setConfirmation(event.target.value)} className="w-full px-4 py-3 border rounded-xl mt-1" /></label>
+          <p className="text-xs text-slate-500">12~128자를 입력해 주세요. 공통 초기 비밀번호를 새 비밀번호로 사용할 수 없습니다. 최근 로그인 시간이 오래되었다면 다시 로그인해 주세요.</p>
+          <button className="w-full py-3 rounded-xl bg-indigo-600 text-white font-bold flex gap-2 items-center justify-center">{working && <Loader2 className="animate-spin" size={18} />}비밀번호 변경 후 다시 로그인</button>
+        </fieldset>
+      </form>
+      <button type="button" disabled={working} className="mt-5 w-full flex gap-2 justify-center items-center text-sm text-slate-600" onClick={() => { void logout(); }}><LogOut size={16} />로그아웃하고 다시 로그인</button>
     </div>
-  );
-};
+  </div>;
+}
+
+export function LoginModal() {
+  const { userData, isLoginModalOpen, isManualChangeMode } = useAuthStore();
+  if (!userData || !isLoginModalOpen || (!userData.mustChangePassword && !isManualChangeMode)) return null;
+  return <PasswordChangeDialog key={`${userData.uid}:${isManualChangeMode}`} manual={isManualChangeMode} required={!!userData.mustChangePassword} />;
+}

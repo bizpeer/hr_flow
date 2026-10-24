@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Megaphone, Plus, Search, ChevronDown, Bell, Clock, User, ArrowRight, 
-  Trash2, Edit3, X, UploadCloud, Loader2, FileText, CheckCircle
+  Megaphone, Plus, Search, ChevronDown, Bell, Clock, User,
+  Trash2, Edit3, X, UploadCloud, Loader2, CheckCircle
 } from 'lucide-react';
 import { collection, onSnapshot, query, addDoc, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
+import { uploadCompanyAttachment } from '../services/attachmentService';
+import { SecureAttachment } from '../components/SecureAttachment';
 import { format } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 
@@ -18,6 +19,7 @@ interface Notice {
   createdAt: string;
   category: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
   attachmentName?: string;
   readBy: string[];
 }
@@ -87,21 +89,20 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      let attachmentUrl = editingNotice?.attachmentUrl || '';
+      let attachmentPath = editingNotice?.attachmentPath || '';
       let attachmentName = editingNotice?.attachmentName || '';
 
       if (selectedFile) {
-        const fileRef = ref(storage, `companies/${userData?.companyId || 'public'}/notices/${Date.now()}_${selectedFile.name}`);
-        const uploadResult = await uploadBytes(fileRef, selectedFile);
-        attachmentUrl = await getDownloadURL(uploadResult.ref);
-        attachmentName = selectedFile.name;
+        const uploaded = await uploadCompanyAttachment('notices', selectedFile);
+        attachmentPath = uploaded.path; attachmentName = uploaded.name;
       }
 
       const noticeData = {
         title,
         content,
         category,
-        attachmentUrl,
+        attachmentPath,
+        ...(selectedFile ? { attachmentUrl: '' } : {}),
         attachmentName,
         updatedAt: new Date().toISOString()
       };
@@ -301,19 +302,9 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
                              <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 font-medium text-slate-700 leading-relaxed whitespace-pre-wrap text-sm">
                                 {notice.content}
                                 
-                                {notice.attachmentUrl && (
+                                {(notice.attachmentPath || notice.attachmentUrl) && (
                                   <div className="mt-5 pt-4 border-t border-slate-200/50">
-                                     <a 
-                                      href={notice.attachmentUrl} 
-                                      target="_blank" 
-                                      rel="noopener noreferrer"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-xs font-black rounded-xl hover:bg-indigo-700 transition-all group shadow-lg shadow-indigo-100"
-                                     >
-                                        <FileText className="w-3.5 h-3.5" />
-                                        첨부문서: {notice.attachmentName}
-                                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                                     </a>
+                                     <SecureAttachment category="notices" documentId={notice.id} name={notice.attachmentName} version={notice.attachmentPath} />
                                   </div>
                                 )}
                              </div>

@@ -15,7 +15,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requireMasterAdmin = false,
   requireSuperAdmin = false
 }) => {
-  const { user, userData, loading } = useAuthStore();
+  const { user, userData, loading, sessionReady } = useAuthStore();
   const location = useLocation();
 
   if (loading) {
@@ -26,6 +26,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (!sessionReady && location.pathname !== '/subscription') {
+    return <Navigate to="/subscription-required" replace />;
   }
 
   // SUPER_ADMIN은 플랫폼 관리 페이지만 접근 가능

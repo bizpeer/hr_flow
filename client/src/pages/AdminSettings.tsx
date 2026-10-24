@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users, Database, Clock, CloudDownload } from 'lucide-react';
 import { auth, db, functions } from '../firebase';
 import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { updatePassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential, verifyBeforeUpdateEmail } from 'firebase/auth';
+import { accountSecurity } from '../services/accountSecurityService';
 import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 import { query, where } from 'firebase/firestore';
@@ -20,19 +21,6 @@ export const AdminSettings: React.FC = () => {
   const { userData } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
-
-  useEffect(() => {
-    const fetchConfig = async () => {
-      if (userData?.companyId) {
-        try {
-          await fetchCompanyDomain(userData.companyId);
-        } catch (err) {
-          console.error("Error fetching config:", err);
-        }
-      }
-    };
-    fetchConfig();
-  }, [fetchCompanyDomain, userData?.companyId]);
 
   // 시스템 도메인이 로드되면 입력창의 임시 상태 초기화
   useEffect(() => {
@@ -59,8 +47,8 @@ export const AdminSettings: React.FC = () => {
         // 보안 정책 준수를 위한 관리자 재인증 (verifyAdmin 내부에서 세션 갱신)
         await verifyAdmin();
         
-        await updatePassword(auth.currentUser, newPassword);
-        setMessage({ type: 'success', text: '관리자 비밀번호가 성공적으로 변경되었습니다.' });
+        await accountSecurity.changePassword(newPassword);
+        await useAuthStore.getState().logout();
         setNewPassword('');
         setConfirmPassword('');
         setVerifyPassword(''); // 사용한 검증 비밀번호 초기화
@@ -84,9 +72,11 @@ export const AdminSettings: React.FC = () => {
       throw new Error("관리자 비밀번호를 입력해주세요.");
     }
     try {
-      if (!auth.currentUser?.email) throw new Error("인증 정보가 없습니다.");
+      const administrator = auth.currentUser;
+      if (!administrator?.email) throw new Error("인증 정보가 없습니다.");
       // 보안 재인증 수행
-      await signInWithEmailAndPassword(auth, auth.currentUser.email, verifyPassword);
+      await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, verifyPassword));
+      await administrator.getIdToken(true);
       return true;
     } catch (err: any) {
       if (err.code === 'auth/too-many-requests') {
@@ -130,20 +120,27 @@ export const AdminSettings: React.FC = () => {
         return;
       }
 
-      // 2. 도메인 설정 저장 (회사 문서 업데이트)
+      const administrator = auth.currentUser;
+      if (!administrator?.email) throw new Error('관리자 인증 상태를 확인해 주세요.');
+      await administrator.reload();
+      await administrator.getIdToken(true);
+      if (!administrator.emailVerified || administrator.email.toLowerCase().split('@')[1] !== cleanDomain.toLowerCase()) {
+        const verificationEmail = `${administrator.email.split('@')[0]}@${cleanDomain.toLowerCase()}`;
+        await verifyBeforeUpdateEmail(administrator, verificationEmail);
+        setMessage({ type: 'success', text: `${verificationEmail}로 인증 메일을 보냈습니다. 메일의 링크를 완료한 뒤 새 이메일로 다시 로그인하고 도메인 저장을 눌러 주세요.` });
+        return;
+      }
+
+      // Domain ownership and reservation are changed atomically by the server.
       if (!userData?.companyId) throw new Error("회사 정보가 없습니다.");
       
-      console.log(`[AdminSettings] Saving domain: ${cleanDomain} for company: ${userData.companyId}`);
-      await setDoc(doc(db, 'companies', userData.companyId), {
-        domain: cleanDomain,
-        updatedAt: new Date().toISOString(),
-        updatedBy: auth.currentUser?.uid || 'unknown'
-      }, { merge: true });
+      const syncDomain = httpsCallable(functions, 'adminSyncCompanyDomain');
+      await syncDomain({ newDomain: cleanDomain });
 
       // 3. 스토어 갱신 (저장된 최신 값 반영)
       await fetchCompanyDomain(userData.companyId);
       
-      setMessage({ type: 'success', text: `회사 도메인이 @${cleanDomain}으로 저장되었습니다. 이제 기존 사용자 일체화를 실행하세요.` });
+      setMessage({ type: 'success', text: `회사 도메인과 사용자 로그인 ID가 @${cleanDomain}으로 동기화되었습니다.` });
       setVerifyPassword('');
     } catch (err: any) {
       console.error("[AdminSettings] Domain update error:", err);

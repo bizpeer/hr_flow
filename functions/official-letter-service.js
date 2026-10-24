@@ -1,6 +1,7 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
 const { createPrinterInspectionService, printerInspectionActions } = require('./official-letter-printers');
+const { authorizeContext } = require('./security-context');
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -93,20 +94,9 @@ function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf
   const notificationRef = (uid, letterId) => db.collection('officialLetterNotifications').doc(uid).collection('items').doc(letterId);
 
   async function actor(request, reader = db) {
-    if (!request.auth) fail('unauthenticated', '로그인이 필요합니다.');
-    const snapshot = await read(reader, db.collection('UserProfile').doc(request.auth.uid));
-    const user = snapshot.data();
-    if (!snapshot.exists || !user.companyId || user.companyId === 'PLATFORM' ||
-        !['ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(user.role) ||
-        (user.status && user.status !== 'ACTIVE')) {
-      fail('permission-denied', '소속 회사의 활성 계정이 필요합니다.');
-    }
-    const company = await read(reader, db.collection('companies').doc(user.companyId));
-    if (!company.exists || company.data().status !== 'ACTIVE') {
-      fail('permission-denied', '활성 회사에서만 공문을 사용할 수 있습니다.');
-    }
+    const user = await authorizeContext({ db, request, reader, now });
     const settings = (await read(reader, settingsRef(user.companyId))).data();
-    return { ...user, uid: request.auth.uid, companyName: company.data().nameKo,
+    return { ...user, uid: request.auth.uid, companyName: user.company.nameKo,
       documentApprovalGranted: user.role === 'SUB_ADMIN' && Boolean(user.divisionId) &&
         (settings?.documentApproverIds || []).includes(request.auth.uid) };
   }

@@ -9,6 +9,8 @@ import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 import { MyIssuedDocuments } from '../components/MyIssuedDocuments';
+import { accountSecurity } from '../services/accountSecurityService';
+import type { DirectoryUser } from '../services/accountSecurityService';
 
 interface AttendanceRecord {
   id: string;
@@ -17,10 +19,11 @@ interface AttendanceRecord {
   timestamp: string;
   location?: string;
 }
+interface LeaveSummary { status: string; type?: string; requestDays?: number }
 
 export const AttendanceDashboard: React.FC = () => {
   const { 
-    user, userData, getDisplayEmail,
+    user, userData, sessionReady,
     openPasswordChange 
   } = useAuthStore();
   const [kstTime, setKstTime] = useState<string>('');
@@ -34,7 +37,9 @@ export const AttendanceDashboard: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
   const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [monthlyRecords, setMonthlyRecords] = useState<AttendanceRecord[]>([]);
-  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [allUsers, setAllUsers] = useState<DirectoryUser[]>([]);
+  const [directoryError, setDirectoryError] = useState('');
+  const [directoryRetry, setDirectoryRetry] = useState(0);
 
 
   // 초기 selectedUserId 설정
@@ -48,25 +53,21 @@ export const AttendanceDashboard: React.FC = () => {
 
   // 관리자일 경우 전체 사용자 목록 페칭
   useEffect(() => {
-    if (isManagement && userData?.companyId) {
-      const q = query(
-        collection(db, 'UserProfile'), where('companyId', '==', userData.companyId),
-        ...(userData.role === 'SUB_ADMIN'
-          ? [where('divisionId', '==', userData.divisionId || '__unassigned__')]
-          : [])
-      );
-      const unsubscribe = onSnapshot(q, (snap) => {
-        setAllUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-      }, (err) => {
-        console.error("Management User List Error:", err);
-      });
-      return () => unsubscribe();
-    }
-  }, [userData?.role, userData?.companyId]);
+    if (!sessionReady || !isManagement || !userData?.companyId) return;
+    let active = true;
+    accountSecurity.directory().then(result => {
+      if (!active) return;
+      setAllUsers(result.users); setDirectoryError('');
+      setSelectedUserId(previous => previous === user?.uid || result.users.some(employee => employee.uid === previous) ? previous : user?.uid || '');
+    }).catch(failure => {
+      if (active) { setAllUsers([]); setDirectoryError(failure instanceof Error ? failure.message : '직원 목록을 불러오지 못했습니다.'); }
+    });
+    return () => { active = false; };
+  }, [sessionReady, isManagement, user?.uid, userData?.role, userData?.companyId, userData?.divisionId, directoryRetry]);
 
   // 선택된 사용자의 월별 근태 기록 구독
   useEffect(() => {
-    if (!selectedUserId) return;
+    if (!sessionReady || !selectedUserId) return;
 
 
     // KST 기준 월 시작/종료 계산
@@ -79,6 +80,7 @@ export const AttendanceDashboard: React.FC = () => {
       collection(db, 'attendance'),
       where('companyId', '==', userData.companyId),
       where('userId', '==', selectedUserId),
+      ...(userData.role === 'SUB_ADMIN' && selectedUserId !== user?.uid ? [where('divisionId', '==', userData.divisionId || '__unassigned__')] : []),
       where('timestamp', '>=', start),
       where('timestamp', '<=', end)
     );
@@ -91,7 +93,7 @@ export const AttendanceDashboard: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [selectedUserId, currentMonth]);
+  }, [sessionReady, selectedUserId, currentMonth, user?.uid, userData?.companyId, userData?.role, userData?.divisionId]);
 
   // KST 실시간 시계
   useEffect(() => {
@@ -105,7 +107,7 @@ export const AttendanceDashboard: React.FC = () => {
 
   // 오늘 근태 기록 실시간 구독
   useEffect(() => {
-    if (!user?.uid || !userData?.companyId) {
+    if (!sessionReady || !user?.uid || !userData?.companyId) {
       setLoading(false);
       return;
     }
@@ -128,7 +130,7 @@ export const AttendanceDashboard: React.FC = () => {
         try {
           const recordKstDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(record.timestamp));
           return recordKstDate === kstDateStr;
-        } catch (e) {
+        } catch {
           return false;
         }
       });
@@ -142,10 +144,10 @@ export const AttendanceDashboard: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [user?.uid, userData]);
+  }, [sessionReady, user?.uid, userData]);
 
   const handleAttendance = async (type: 'IN' | 'OUT') => {
-    if (!user) {
+    if (!sessionReady || !user || !userData) {
       alert("로그인이 필요합니다.");
       return;
     }
@@ -174,7 +176,8 @@ export const AttendanceDashboard: React.FC = () => {
         timestamp: timestamp,
         location: '본사',
         createdAt: timestamp,
-        companyId: userData?.companyId || ''
+        companyId: userData.companyId,
+        divisionId: userData.divisionId || '', teamId: userData.teamId || ''
       };
       
       const docRef = await addDoc(collection(db, 'attendance'), attendanceData);
@@ -209,22 +212,23 @@ export const AttendanceDashboard: React.FC = () => {
   const hasCheckedOutToday = records.some(r => r.type === 'OUT');
 
   // 연차 요약 로직
-  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveSummary[]>([]);
   useEffect(() => {
-    if (!userData?.companyId || !selectedUserId) return;
+    if (!sessionReady || !userData?.companyId || !selectedUserId) return;
 
     const q = query(
       collection(db, 'leaves'), 
       where('companyId', '==', userData.companyId),
       where('userId', '==', selectedUserId),
+      ...(userData.role === 'SUB_ADMIN' && selectedUserId !== user?.uid ? [where('divisionId', '==', userData.divisionId || '__unassigned__')] : []),
       orderBy('startDate', 'desc')
     );
     return onSnapshot(q, (snap) => {
-      setLeaveRequests(snap.docs.map(doc => doc.data()));
+      setLeaveRequests(snap.docs.map(doc => doc.data() as LeaveSummary));
     }, (err) => {
       console.error("Leave Snapshot Error:", err);
     });
-  }, [user?.uid, selectedUserId, userData?.companyId]);
+  }, [sessionReady, user?.uid, selectedUserId, userData?.companyId, userData?.role, userData?.divisionId]);
 
   const joinDate = userData?.joinDate ? new Date(userData.joinDate) : new Date();
   const totalLeave = calculateLeaveEntitlement(joinDate);
@@ -266,7 +270,7 @@ export const AttendanceDashboard: React.FC = () => {
             <div className="h-10 w-px bg-slate-200 hidden md:block mx-2"></div>
             <div className="flex -space-x-3">
               {allUsers.slice(0, 5).map((u, i) => (
-                <div key={u.id} className="w-10 h-10 rounded-full border-4 border-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shadow-sm" style={{ zIndex: 10 - i }}>
+                <div key={u.uid} className="w-10 h-10 rounded-full border-4 border-white bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 shadow-sm" style={{ zIndex: 10 - i }}>
                   {u.name?.slice(0, 1)}
                 </div>
               ))}
@@ -280,6 +284,7 @@ export const AttendanceDashboard: React.FC = () => {
         </div>
 
         <MyIssuedDocuments />
+        {directoryError && <div role="alert" className="rounded-xl bg-amber-50 text-amber-900 p-4 text-sm">{directoryError}<button type="button" className="ml-3 underline font-semibold" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
 
         {/* Bento Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
@@ -432,7 +437,7 @@ export const AttendanceDashboard: React.FC = () => {
                         className="w-full sm:w-auto px-6 py-3 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-xs font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer"
                       >
                         {allUsers.map((u) => (
-                          <option key={u.id} value={u.id}>{u.name} ({getDisplayEmail(u.email)})</option>
+                           <option key={u.uid} value={u.uid}>{u.name}</option>
                         ))}
                       </select>
                     )}

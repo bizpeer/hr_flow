@@ -1,407 +1,47 @@
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const { initializeApp } = require("firebase-admin/app");
-const { getAuth } = require("firebase-admin/auth");
-const { getFirestore } = require("firebase-admin/firestore");
-
-// 전역 초기화 (Functions v2 환경에서는 전역 범위 호출이 권장되며, 타임아웃을 유발하지 않습니다)
-initializeApp();
-
-// 서류는 ADMIN/위임받은 본부 SUB_ADMIN 승인과 현재 개정본 권한을 서버에서 검사합니다.
+const { onCall, onRequest, HttpsError } = require('firebase-functions/v2/https');
+const { initializeApp } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const { createOfficialLetterService } = require('./official-letter-service');
 const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('./official-letter-pdf');
 const { createMemberService } = require('./member-service');
-exports.manageOfficialLetters = onCall({ memory: '512MiB', timeoutSeconds: 60, maxInstances: 10 }, async request => {
+const { createAccountSecurityService } = require('./account-security-service');
+const { createAdminSecurityService } = require('./admin-security-service');
+const { createAttachmentService } = require('./attachment-service');
+const { authorizeContext } = require('./security-context');
+
+initializeApp();
+const dependencies = () => ({ db: getFirestore('(default)'), auth: getAuth(), bucket: getStorage().bucket('weberp-8f25f.firebasestorage.app') });
+const callable = (handler, options = {}) => onCall({ maxInstances: 10, timeoutSeconds: 60, ...options }, async request => {
   try {
-    return await createOfficialLetterService({
-      db: getFirestore('(default)'),
-      bucket: getStorage().bucket('weberp-8f25f.firebasestorage.app'),
-      renderPdf: renderOfficialLetterPdf,
-      renderPrintTestPdf: renderSealPrintTestPdf,
-    })(request);
-  } catch (error) {
+    const dep = dependencies();
+    if (request.auth) {
+      const bearer = /^Bearer ([^\s]+)$/.exec(request.rawRequest.headers.authorization || '');
+      try {
+        if (!bearer) throw new Error('missing');
+        await dep.auth.verifyIdToken(bearer[1], true);
+      } catch { throw new HttpsError('unauthenticated', '로그인을 다시 확인해 주세요.'); }
+    }
+    return await handler(request, dep);
+  }
+  catch (error) {
     if (error instanceof HttpsError) throw error;
-    console.error('[OfficialLetters]', error.code || 'internal');
-    throw new HttpsError('internal', '서류 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    console.error('[ServiceError]', error.code || 'internal');
+    throw new HttpsError('internal', '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.');
   }
 });
-
-// (default) 데이터베이스 사용
-const DATABASE_ID = '(default)';
-
-/**
- * 특정 도메인이 이미 다른 회사에 등록되어 있는지 확인합니다.
- */
-exports.checkDomainAvailability = onCall(async (request) => {
-  const { domain, currentCompanyId } = request.data;
-
-  if (typeof domain !== "string" || domain.length > 253 ||
-      !/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain.trim())) {
-    throw new HttpsError("invalid-argument", "확인할 도메인이 누락되었습니다.");
-  }
-
-  try {
-    const db = getFirestore(DATABASE_ID);
-
-    // domain 필드로 검색
-    const qSnap = await db.collection("companies")
-      .where("domain", "==", domain.toLowerCase().trim())
-      .limit(1)
-      .get();
-
-    if (qSnap.empty) {
-      return { available: true };
-    }
-
-    const doc = qSnap.docs[0];
-    // Only the authenticated owner of the existing company may treat it as
-    // available. The caller-supplied company ID alone is not proof of ownership.
-    if (request.auth && currentCompanyId && doc.id === currentCompanyId) {
-      const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-      if (callerSnap.exists && callerSnap.data().companyId === currentCompanyId &&
-          callerSnap.data().role === "ADMIN") {
-        return { available: true };
-      }
-    }
-
-    return { 
-      available: false, 
-      message: "이미 다른 조직에서 사용 중인 도메인입니다." 
-    };
-  } catch (error) {
-    console.error(`[checkDomainAvailabilityError]`, error);
-    throw new HttpsError("internal", "도메인 중복 확인 중 오류가 발생했습니다.");
-  }
+exports.manageOfficialLetters = callable((request, dep) => createOfficialLetterService({ ...dep,
+  renderPdf: renderOfficialLetterPdf, renderPrintTestPdf: renderSealPrintTestPdf })(request), { memory: '512MiB' });
+exports.adminCreateMember = callable((request, dep) => createMemberService(dep)(request));
+exports.accountSecurity = callable((request, dep) => createAccountSecurityService(dep)(request));
+exports.checkDomainAvailability = callable((request, dep) => createAdminSecurityService(dep).checkDomain(request));
+exports.adminResetPassword = callable((request, dep) => createAdminSecurityService(dep).resetPassword(request));
+exports.adminSyncCompanyDomain = callable((request, dep) => createAdminSecurityService(dep).syncDomain(request), { timeoutSeconds: 300, memory: '512MiB' });
+exports.adminDeleteCompanyData = callable((request, dep) => createAdminSecurityService(dep).deleteCompany(request), { timeoutSeconds: 540, memory: '512MiB' });
+exports.checkDeploymentStatus = callable(async (request, { db }) => {
+  await authorizeContext({ db, request, roles: ['SUPER_ADMIN'] });
+  return { version: '3.0.0', deployedAt: new Date().toISOString(), environment: 'production', databaseId: '(default)', status: 'healthy' };
 });
-
-/**
- * 관리자 권한으로 사용자의 비밀번호를 초기화합니다.
- * 호출자는 반드시 'ADMIN' 권한을 가지고 있어야 합니다.
- */
-exports.adminResetPassword = onCall(async (request) => {
-  // 1. 인증 정보 확인
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
-  }
-
-  const { uid, password } = request.data;
-
-  // 2. 입력 데이터 검증
-  if (typeof uid !== "string" || !uid || typeof password !== "string" ||
-      password.length < 12 || password.length > 128) {
-    throw new HttpsError(
-      "invalid-argument",
-      "유효한 UID와 12~128자 비밀번호가 필요합니다."
-    );
-  }
-
-  try {
-    // 3. 권한 및 소속 확인 (Firestore UserProfile 조회)
-    const db = getFirestore(DATABASE_ID);
-    const callerRef = db.collection("UserProfile").doc(request.auth.uid);
-    const targetRef = db.collection("UserProfile").doc(uid);
-
-    const [callerSnap, targetSnap] = await Promise.all([callerRef.get(), targetRef.get()]);
-
-    if (!callerSnap.exists) {
-      throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
-    }
-
-    const callerData = callerSnap.data();
-
-    // SUPER_ADMIN은 모든 권한 허용
-    if (callerData.role === "SUPER_ADMIN") {
-      console.log(`[AdminReset] SUPER_ADMIN ${request.auth.uid} is resetting password for ${uid}`);
-    } else if (callerData.role === "ADMIN") {
-      // 일반 ADMIN인 경우 소속 회사 확인
-      if (!targetSnap.exists) {
-        throw new HttpsError("not-found", "대상을 찾을 수 없습니다.");
-      }
-
-      const targetData = targetSnap.data();
-      if (callerData.companyId !== targetData.companyId) {
-        throw new HttpsError(
-          "permission-denied",
-          "타사 직원의 정보는 관리할 수 없습니다."
-        );
-      }
-      const companySnap = await db.collection("companies").doc(callerData.companyId).get();
-      if (uid === request.auth.uid || targetData.role === "ADMIN" ||
-          companySnap.data()?.adminUid === uid) {
-        throw new HttpsError("permission-denied", "관리자 계정의 비밀번호는 재설정할 수 없습니다.");
-      }
-    } else {
-      throw new HttpsError(
-        "permission-denied",
-        "비밀번호를 초기화할 권한이 없습니다."
-      );
-    }
-
-    // 4. 비밀번호 강제 업데이트
-    await getAuth().updateUser(uid, { password });
-
-    console.log(`[AdminReset] Password for user ${uid} reset by ${request.auth.uid} (Company: ${callerData.companyId})`);
-
-    return {
-      success: true,
-      message: "비밀번호가 성공적으로 초기화되었습니다."
-    };
-  } catch (error) {
-    console.error(`[AdminResetError]`, error);
-    if (error instanceof HttpsError) throw error;
-    throw new HttpsError("internal", "비밀번호 초기화 중 오류가 발생했습니다.");
-  }
-});
-
-/**
- * 신규 직원의 인증 계정(Auth)과 프로필(Firestore)을 동시에 생성합니다.
- * 호출자는 반드시 'ADMIN' 또는 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
- */
-exports.adminCreateMember = onCall(async (request) => {
-  try {
-    return await createMemberService({ db: getFirestore(DATABASE_ID), auth: getAuth() })(request);
-  } catch (error) {
-    if (error instanceof HttpsError) throw error;
-    console.error('[AdminCreateMemberError]', error.code || 'internal');
-    throw new HttpsError("internal", "직원 등록 중 오류가 발생했습니다.");
-  }
-});
-
-/**
- * 특정 조직(Company) 및 해당 조직과 관련된 모든 데이터를 일괄 삭제합니다.
- * 호출자는 반드시 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
- */
-exports.adminDeleteCompanyData = onCall(async (request) => {
-  // 1. 인증 및 권한 확인
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
-  }
-  if (!request.auth.token.auth_time ||
-      Date.now() / 1000 - request.auth.token.auth_time > 300) {
-    throw new HttpsError("failed-precondition", "조직 삭제 전에 다시 로그인해 주세요.");
-  }
-
-  const { companyId } = request.data;
-  if (!companyId) {
-    throw new HttpsError("invalid-argument", "삭제할 조직 ID가 누락되었습니다.");
-  }
-
-  try {
-    const db = getFirestore(DATABASE_ID);
-    console.log(`[AdminDeleteCompany] Checking permissions for user ${request.auth.uid} (${request.auth.token.email})`);
-
-    // 서버에서 조회한 현재 프로필을 권한의 단일 기준으로 사용합니다.
-    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-    const isSuperAdminByProfile = callerSnap.exists && callerSnap.data().role === "SUPER_ADMIN";
-
-    if (!isSuperAdminByProfile) {
-      console.warn(`[AdminDeleteCompany] Unauthorized access attempt: ${request.auth.token.email}`);
-      throw new HttpsError("permission-denied", "조직을 삭제할 권한이 없습니다. (SUPER_ADMIN 전용)");
-    }
-
-    console.log(`[AdminDeleteCompany] Verified SUPER_ADMIN. Starting wipe for companyId: ${companyId}`);
-
-    // 조직 정보 확인
-    const companySnap = await db.collection("companies").doc(companyId).get();
-    if (!companySnap.exists) {
-      console.warn(`[AdminDeleteCompany] Organization not found: ${companyId}`);
-      throw new HttpsError("not-found", "해당 조직을 찾을 수 없습니다.");
-    }
-
-    // 3. 삭제할 컬렉션 목록
-    const collectionsToWipe = [
-      "attendance",
-      "divisions",
-      "teams",
-      "leaves",
-      "expenses",
-      "AuditLogs",
-      "UserProfile",
-      "config"
-    ];
-
-    // 4. 일괄 삭제 헬퍼 함수 (Batch Chunking 적용)
-    const deleteCollectionDocs = async (collectionName) => {
-      let totalDeleted = 0;
-      while (true) {
-        // 한 번에 500개씩 가져와서 삭제 (Firestore Batch 제한 보호)
-        const qSnap = await db.collection(collectionName)
-          .where("companyId", "==", companyId)
-          .limit(500)
-          .get();
-
-        if (qSnap.empty) break;
-
-        // UserProfile의 경우 Auth 계정 일괄 삭제 병행
-        if (collectionName === "UserProfile") {
-          const uidsToDelete = qSnap.docs.map(d => d.id);
-          // deleteUsers는 한 번에 1000명까지 처리 가능
-          try {
-            await getAuth().deleteUsers(uidsToDelete);
-            console.log(`[AdminDeleteCompany] Deleted ${uidsToDelete.length} Auth users`);
-          } catch (authErr) {
-            console.error(`[AdminDeleteCompany] Auth deletion partially failed:`, authErr);
-          }
-        }
-
-        const batch = db.batch();
-        qSnap.docs.forEach((doc) => batch.delete(doc.ref));
-        await batch.commit();
-
-        totalDeleted += qSnap.size;
-        console.log(`[AdminDeleteCompany] Deleted ${qSnap.size} docs from ${collectionName} (Total: ${totalDeleted})`);
-
-        // 데이터가 500개 미만이면 더 이상 루프를 돌 필요 없음
-        if (qSnap.size < 500) break;
-      }
-      return totalDeleted;
-    };
-
-    // 순차적 혹은 병렬 삭제 수행
-    for (const collectionName of collectionsToWipe) {
-      await deleteCollectionDocs(collectionName);
-    }
-
-    // 5. 최종적으로 회사 문서 삭제
-    await db.collection("companies").doc(companyId).delete();
-
-    console.log(`[AdminDeleteCompany] Successfully wiped all data for company: ${companyId}`);
-
-    return {
-      success: true,
-      message: "조직의 모든 데이터 및 구성원 계정이 영구적으로 삭제되었습니다."
-    };
-
-  } catch (error) {
-    console.error(`[AdminDeleteCompanyError] Detailed error:`, error);
-    if (error instanceof HttpsError) throw error;
-    // [보안 패치] 클라이언트 측 상세 에러 스택 및 경로 정보 노출 차단
-    throw new HttpsError(
-      "internal", 
-      "조직 데이터를 삭제하는 중 오류가 발생했습니다. 자세한 내용은 시스템 로그를 검토해주십시오."
-    );
-  }
-});
-
-/**
- * 회사 도메인 변경 시 모든 직원의 로그인 ID(Email)를 일괄 업데이트합니다.
- * Auth 이메일과 UserProfile 문서를 동시에 수정합니다.
- */
-exports.adminSyncCompanyDomain = onCall({ timeoutSeconds: 300, memory: "512MiB" }, async (request) => {
-  // 1. 인증 확인
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
-  }
-
-  const { newDomain } = request.data;
-  if (!newDomain) {
-    throw new HttpsError("invalid-argument", "변경할 도메인이 누락되었습니다.");
-  }
-
-  const cleanDomain = newDomain.replace("@", "").toLowerCase().trim();
-  console.log(`[AdminSyncDomain] Starting sync to @${cleanDomain} requested by ${request.auth.uid}`);
-  
-  const db = getFirestore(DATABASE_ID);
-
-  try {
-    // 2. 호출자 권한 확인
-    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-    if (!callerSnap.exists) {
-      console.error(`[AdminSyncDomain] Caller ${request.auth.uid} not found in UserProfile`);
-      throw new HttpsError("permission-denied", "호출자 정보를 찾을 수 없습니다.");
-    }
-    const callerData = callerSnap.data();
-    console.log(`[AdminSyncDomain] Caller role: ${callerData.role}, company: ${callerData.companyId}`);
-
-    if (callerData.role !== "ADMIN" && callerData.role !== "SUPER_ADMIN") {
-      throw new HttpsError("permission-denied", "도메인 일괄 변경 권한이 없습니다.");
-    }
-
-    const companyId = callerData.companyId;
-    if (!companyId) {
-      throw new HttpsError("failed-precondition", "소속 회사 정보가 없습니다.");
-    }
-
-    // 3. 해당 회사 모든 사용자 조회
-    console.log(`[AdminSyncDomain] Fetching users for company: ${companyId}`);
-    const qSnap = await db.collection("UserProfile")
-      .where("companyId", "==", companyId)
-      .get();
-    
-    console.log(`[AdminSyncDomain] Found ${qSnap.docs.length} users to process.`);
-
-    let successCount = 0;
-    let failCount = 0;
-
-    // 순차적으로 업데이트 (Auth API 제한 고려 및 안정성 확보)
-    for (const userDoc of qSnap.docs) {
-      const userData = userDoc.data();
-      const uid = userDoc.id;
-      
-      // SUPER_ADMIN이나 타사 계정은 건드리지 않음 (혹시 모를 안전장치)
-      if (userData.role === "SUPER_ADMIN") {
-        console.log(`[AdminSyncDomain] Skipping SUPER_ADMIN: ${uid}`);
-        continue;
-      }
-
-      if (userData.email && userData.email.includes("@")) {
-        const [id] = userData.email.split("@");
-        const newEmail = `${id.trim()}@${cleanDomain}`;
-
-        if (userData.email.toLowerCase().trim() !== newEmail.toLowerCase().trim()) {
-          try {
-            console.log(`[AdminSyncDomain] Updating user ${uid}: ${userData.email} -> ${newEmail}`);
-            
-            // A. Firebase Auth 이메일 업데이트
-            await getAuth().updateUser(uid, { email: newEmail });
-            
-            // B. Firestore UserProfile 이메일 업데이트
-            await userDoc.ref.update({ email: newEmail });
-            
-            successCount++;
-          } catch (e) {
-            console.error(`[AdminSyncDomainError] Failed to update user ${uid} (${userData.email}):`, e);
-            failCount++;
-          }
-        } else {
-          console.log(`[AdminSyncDomain] User ${uid} already has correct domain or matches: ${userData.email}`);
-          successCount++;
-        }
-      } else {
-        console.warn(`[AdminSyncDomain] User ${uid} has invalid email format: ${userData.email}`);
-        failCount++;
-      }
-    }
-
-    console.log(`[AdminSyncDomain] Company ${companyId} domain sync finished: Success ${successCount}, Fail ${failCount} by ${request.auth.uid}`);
-
-    return {
-      success: true,
-      successCount,
-      failCount,
-      message: `${successCount}명의 사용자 도메인 동기화가 완료되었습니다.${failCount > 0 ? ` (실패: ${failCount}명 - 로그 확인 필요)` : ""}`
-    };
-
-  } catch (error) {
-    console.error(`[AdminSyncDomainError] Global Catch Detailed:`, error);
-    if (error instanceof HttpsError) throw error;
-    // [보안 패치] 내부 인프라나 API 예외 세부 메시지가 노출되는 것을 방지
-    throw new HttpsError(
-      "internal", 
-      "도메인 일괄 동기화 작업 중 오류가 발생했습니다. 시스템 로그를 검토해주십시오."
-    );
-  }
-});
-
-/**
- * 백엔드 함수의 배포 상태 및 버전을 확인하기 위한 헬퍼 함수입니다.
- */
-exports.checkDeploymentStatus = onCall(async (request) => {
-  return {
-    version: "2.2.0",
-    deployedAt: new Date().toISOString(),
-    environment: "production",
-    databaseId: DATABASE_ID,
-    status: "healthy (fully lazy loaded)"
-  };
-});
+exports.uploadCompanyAttachment = onRequest({ maxInstances: 10, memory: '512MiB', timeoutSeconds: 120 }, (req, res) => createAttachmentService(dependencies()).upload(req, res));
+exports.downloadCompanyAttachment = onRequest({ maxInstances: 10, memory: '512MiB', timeoutSeconds: 120 }, (req, res) => createAttachmentService(dependencies()).download(req, res));

@@ -66,7 +66,7 @@ export const SuperAdminDashboard: React.FC = () => {
     console.log("[SuperAdmin] Requesting companies collection...");
     const unsubCompanies = onSnapshot(collection(db, 'companies'), (snap) => {
       console.log(`[SuperAdmin] Successfully fetched ${snap.docs.length} companies.`);
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as CompanyData & { id: string }));
+      const data = snap.docs.filter(d => d.data().status !== 'DELETED').map(d => ({ id: d.id, ...d.data() } as CompanyData & { id: string }));
       setCompanies(data.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
       setLoading(false);
     }, (err) => {
@@ -140,6 +140,10 @@ export const SuperAdminDashboard: React.FC = () => {
     }
 
     try {
+      const confirmationPassword = window.prompt('보안 확인을 위해 플랫폼 관리자 비밀번호를 입력해 주세요.');
+      if (!confirmationPassword || !auth.currentUser?.email) return;
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, confirmationPassword));
+      await auth.currentUser.getIdToken(true);
       const resetFn = httpsCallable(functions, 'adminResetPassword');
       await resetFn({ uid: resetTarget.uid, password: newPassword });
       alert(`[성공] ${resetTarget.name}님의 비밀번호가 '${newPassword}'로 초기화되었습니다.`);
@@ -160,19 +164,9 @@ export const SuperAdminDashboard: React.FC = () => {
       const credential = EmailAuthProvider.credential(auth.currentUser.email, subscriptionPassword);
       await reauthenticateWithCredential(auth.currentUser, credential);
 
-      // 2. DB 업데이트
-      const companyRef = doc(db, 'companies', subscriptionTarget.id);
-      
-      // 현재 종료일이 미래면 그 기준, 과거거나 없으면 오늘 기준
-      const currentEnd = subscriptionTarget.currentEndDate ? new Date(subscriptionTarget.currentEndDate) : new Date();
-      const baseDate = currentEnd > new Date() ? currentEnd : new Date();
-      const newEndDate = new Date(baseDate);
-      newEndDate.setDate(newEndDate.getDate() + subscriptionDaysToAdd);
-      
-      await updateDoc(companyRef, {
-        subscriptionStatus: 'ACTIVE',
-        subscriptionEndDate: newEndDate.toISOString()
-      });
+      await auth.currentUser.getIdToken(true);
+      const changeSubscription = httpsCallable(functions, 'accountSecurity');
+      await changeSubscription({ action: 'extendSubscription', companyId: subscriptionTarget.id, days: subscriptionDaysToAdd });
       
       alert(`[완료] 해당 조직의 구독 기간이 ${subscriptionDaysToAdd}일 연장되었습니다.`);
       setShowSubscriptionModal(false);

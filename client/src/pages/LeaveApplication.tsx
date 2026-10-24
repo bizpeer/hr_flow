@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, History, Send, Loader2, AlertCircle, UploadCloud } from 'lucide-react';
 import { collection, query, onSnapshot, addDoc, where } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db } from '../firebase';
+import { uploadCompanyAttachment } from '../services/attachmentService';
+import { SecureAttachment } from '../components/SecureAttachment';
 import { useAuthStore } from '../store/authStore';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -20,6 +21,7 @@ interface LeaveRequest {
   requestDays: number;
   attachmentName?: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
 }
 
 export const LeaveApplication: React.FC = () => {
@@ -62,6 +64,7 @@ export const LeaveApplication: React.FC = () => {
 
     const q = query(
       collection(db, 'leaves'),
+      where('companyId', '==', userData?.companyId || ''),
       where('userId', '==', user.uid)
     );
 
@@ -82,7 +85,7 @@ export const LeaveApplication: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [user?.uid, userData?.uid]);
+  }, [user?.uid, userData?.uid, userData?.companyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,11 +109,11 @@ export const LeaveApplication: React.FC = () => {
     try {
       setSubmitting(true);
       
-      let attachmentUrl = '';
+      let attachmentPath = '';
+      let attachmentName = '';
       if (formData.file) {
-        const fileRef = ref(storage, `companies/${userData?.companyId || 'public'}/leaves/${user?.uid || 'anonymous'}/${Date.now()}_${formData.file.name}`);
-        const uploadResult = await uploadBytes(fileRef, formData.file);
-        attachmentUrl = await getDownloadURL(uploadResult.ref);
+        const uploaded = await uploadCompanyAttachment('leaves', formData.file);
+        attachmentPath = uploaded.path; attachmentName = uploaded.name;
       }
 
       await addDoc(collection(db, 'leaves'), {
@@ -122,8 +125,8 @@ export const LeaveApplication: React.FC = () => {
         startDate: formData.startDate || '',
         endDate: formData.endDate || '',
         reason: formData.reason || '',
-        attachmentName: formData.fileName || '',
-        attachmentUrl: attachmentUrl,
+        attachmentName,
+        attachmentPath,
         status: 'PENDING',
         requestDays: days || 0,
         createdAt: new Date().toISOString(),
@@ -199,7 +202,7 @@ export const LeaveApplication: React.FC = () => {
                   <select 
                     className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-50 rounded-2xl focus:border-indigo-500 focus:bg-white outline-none transition-all font-semibold text-slate-700"
                     value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value as any})}
+                    onChange={(e) => setFormData({...formData, type: e.target.value as typeof formData.type})}
                   >
                     <option value="annual">연차 휴가 (1일)</option>
                     <option value="half">반차 휴가 (0.5일)</option>
@@ -318,6 +321,7 @@ export const LeaveApplication: React.FC = () => {
                             {req.startDate} {req.type !== 'half' && `~ ${req.endDate}`}
                           </div>
                           <div className="text-[10px] font-medium text-slate-400 mt-1 line-clamp-1">{req.reason}</div>
+                          {(req.attachmentPath || req.attachmentUrl) && <div className="mt-3"><SecureAttachment category="leaves" documentId={req.id} name={req.attachmentName} /></div>}
                         </td>
                         <td className="py-6 px-4 text-center md:text-left">
                           <span className="text-sm font-black text-slate-900">{req.requestDays}일</span>

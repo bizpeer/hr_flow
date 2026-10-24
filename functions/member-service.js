@@ -1,4 +1,5 @@
 const { HttpsError } = require('firebase-functions/v2/https');
+const { authorizeContext } = require('./security-context');
 
 // Deliberately restricted to newly created employee accounts. Permanent and
 // administrator-reset passwords keep their separate 12~128-character policy.
@@ -8,27 +9,18 @@ const read = (db, reader, ref) => reader === db ? ref.get() : reader.get(ref);
 
 function createMemberService({ db, auth, now = () => new Date() }) {
   async function authorize(request, reader = db) {
-    if (!request.auth) fail('unauthenticated', '인증이 필요한 요청입니다.');
-    const snapshot = await read(db, reader, db.collection('UserProfile').doc(request.auth.uid));
-    const caller = snapshot.data();
-    if (!snapshot.exists || !['ADMIN', 'SUPER_ADMIN'].includes(caller.role) ||
-        (caller.status && caller.status !== 'ACTIVE')) {
-      fail('permission-denied', '직원을 등록할 권한이 없습니다.');
-    }
-    if (caller.role === 'SUPER_ADMIN') return 'PLATFORM';
-    if (typeof caller.companyId !== 'string' || !caller.companyId || caller.companyId === 'PLATFORM') {
-      fail('permission-denied', '소속 회사의 관리자 계정이 필요합니다.');
-    }
-    const company = await read(db, reader, db.collection('companies').doc(caller.companyId));
-    if (!company.exists || company.data().status !== 'ACTIVE') fail('permission-denied', '활성 회사에서만 직원을 등록할 수 있습니다.');
-    return caller.companyId;
+    return (await authorizeContext({ db, request, reader, now, roles: ['ADMIN', 'SUPER_ADMIN'] })).companyId;
   }
 
   async function divisionForTeam(teamId, companyId, reader = db) {
     if (!teamId) return '';
     const team = await read(db, reader, db.collection('teams').doc(teamId));
     if (!team.exists || team.data().companyId !== companyId) fail('invalid-argument', '소속 회사의 팀을 선택해 주세요.');
-    return team.data().divisionId || '';
+    const divisionId = team.data().divisionId;
+    if (typeof divisionId !== 'string' || !divisionId || divisionId.includes('/')) fail('invalid-argument', '팀의 소속 본부를 확인해 주세요.');
+    const division = await read(db, reader, db.collection('divisions').doc(divisionId));
+    if (!division.exists || division.data().companyId !== companyId) fail('invalid-argument', '팀의 소속 본부를 확인해 주세요.');
+    return divisionId;
   }
 
   return async request => {

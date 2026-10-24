@@ -6,11 +6,11 @@ import {
 } from 'lucide-react';
 import { 
   collection, query, where, onSnapshot, doc, updateDoc, 
-  getDocs, writeBatch 
+  getDocs
 } from 'firebase/firestore';
 import { auth, db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 
@@ -198,7 +198,7 @@ export const EmployeeManagement: React.FC = () => {
     if (!window.confirm(confirmMsg)) return;
     
     try {
-      await updateDoc(doc(db, 'UserProfile', emp.uid), { status: newStatus });
+      await httpsCallable(functions, 'accountSecurity')({ action: 'setMemberStatus', uid: emp.uid, status: newStatus });
       alert(isActactivating ? '계정이 활성화되었습니다.' : '퇴사(업무정지) 처리가 완료되었습니다.');
     } catch (e) {
       alert('오류 발생: ' + (e as Error).message);
@@ -225,32 +225,16 @@ export const EmployeeManagement: React.FC = () => {
     try {
       // 0. Verify Admin Password (Re-auth)
       try {
-        await signInWithEmailAndPassword(auth, userData?.email || '', adminPassword);
+        const administrator = auth.currentUser;
+        if (!administrator?.email) throw new Error('관리자 인증 상태를 확인해 주세요.');
+        await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, adminPassword));
+        await administrator.getIdToken(true);
       } catch (err) {
         throw new Error('비밀번호가 일치하지 않습니다.');
       }
 
       const emp = deleteConfirmEmp;
-      const batch = writeBatch(db);
-
-      const companyId = userData?.companyId || '';
-
-      // 1. Delete Attendance
-      const attSnap = await getDocs(query(collection(db, 'attendance'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
-      attSnap.forEach(d => batch.delete(d.ref));
-
-      // 2. Delete Leaves
-      const leaveSnap = await getDocs(query(collection(db, 'leaves'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
-      leaveSnap.forEach(d => batch.delete(d.ref));
-
-      // 3. Delete Expenses
-      const expSnap = await getDocs(query(collection(db, 'expenses'), where('userId', '==', emp.uid), where('companyId', '==', companyId)));
-      expSnap.forEach(d => batch.delete(d.ref));
-
-      // 4. Delete Profile
-      batch.delete(doc(db, 'UserProfile', emp.uid));
-
-      await batch.commit();
+      await httpsCallable(functions, 'accountSecurity')({ action: 'deleteMember', uid: emp.uid, deleteRecords: true });
       alert(`[삭제 완료] ${emp.name}님의 모든 정보가 삭제되었습니다.`);
       setDeleteConfirmEmp(null);
       setAdminPassword('');
@@ -265,6 +249,10 @@ export const EmployeeManagement: React.FC = () => {
     if (!window.confirm(`${emp.name}님의 임시 비밀번호를 새로 발급하시겠습니까?\n(실제 로그인 비밀번호가 강제 변경됩니다.)`)) return;
     
     try {
+      const confirmationPassword = window.prompt('보안 확인을 위해 관리자 비밀번호를 입력해 주세요.');
+      if (!confirmationPassword || !auth.currentUser?.email) return;
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, confirmationPassword));
+      await auth.currentUser.getIdToken(true);
       const randomBytes = crypto.getRandomValues(new Uint8Array(18));
       const temporaryPassword = btoa(String.fromCharCode(...randomBytes))
         .replace(/\+/g, '-').replace(/\//g, '_');
@@ -275,11 +263,6 @@ export const EmployeeManagement: React.FC = () => {
       if (!result.data.success) {
         throw new Error(result.data.message || '비밀번호 초기화 중 오류가 발생했습니다.');
       }
-
-      // 2. Firestore 상태 업데이트 (로그인 시 비밀번호 변경 유도)
-      await updateDoc(doc(db, 'UserProfile', emp.uid), { 
-        mustChangePassword: true 
-      });
 
       alert(`임시 비밀번호: ${temporaryPassword}\n직원에게 안전한 수단으로 전달하세요. 최초 로그인 시 변경해야 합니다.`);
     } catch (e: any) {

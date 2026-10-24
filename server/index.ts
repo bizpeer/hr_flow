@@ -36,7 +36,7 @@ const authenticate = async (req: AuthenticatedRequest, res: express.Response, ne
   }
 
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const decodedToken = await adminAuth.verifyIdToken(idToken, true);
     req.user = decodedToken;
     next();
   } catch (error: any) {
@@ -66,7 +66,7 @@ app.post('/api/reset-password', authenticate, async (req: AuthenticatedRequest, 
     return res.status(400).json({ error: '사용자 UID와 새 비밀번호가 필요합니다.' });
   }
 
-  if (typeof uid !== 'string' || typeof password !== 'string' || password.length < 12 || password.length > 128) {
+  if (typeof uid !== 'string' || !uid || uid.length > 128 || uid.includes('/') || typeof password !== 'string' || password.length < 12 || password.length > 128) {
     return res.status(400).json({ error: '유효한 UID와 12~128자 비밀번호가 필요합니다.' });
   }
 
@@ -83,6 +83,24 @@ app.post('/api/reset-password', authenticate, async (req: AuthenticatedRequest, 
     }
 
     const callerData = callerSnap.data();
+
+    if ((callerData?.status || 'ACTIVE') !== 'ACTIVE' || callerData?.mustChangePassword ||
+        (callerData?.sessionValidAfter && req.user.auth_time < callerData.sessionValidAfter)) {
+      return res.status(403).json({ error: '활성 계정에서 비밀번호 변경을 완료한 후 이용해 주세요.' });
+    }
+    if (callerData?.role === 'SUPER_ADMIN' && callerData.companyId !== 'PLATFORM') {
+      return res.status(403).json({ error: '플랫폼 관리자 권한이 필요합니다.' });
+    }
+    if (callerData?.role === 'ADMIN') {
+      const tenant = await db.collection('companies').doc(callerData.companyId).get();
+      if (!tenant.exists || tenant.data()?.status !== 'ACTIVE' ||
+          !(tenant.data()?.accessUntil?.toMillis?.() > Date.now())) {
+        return res.status(403).json({ error: '활성 구독 중인 회사에서만 이용할 수 있습니다.' });
+      }
+    }
+    if (!targetSnap.exists || targetSnap.data()?.role === 'SUPER_ADMIN') {
+      return res.status(403).json({ error: '관리할 수 없는 계정입니다.' });
+    }
 
     // 권한 검증 분기
     if (callerData?.role === 'SUPER_ADMIN') {
@@ -107,7 +125,9 @@ app.post('/api/reset-password', authenticate, async (req: AuthenticatedRequest, 
     }
 
     // Firebase Admin SDK를 통해 실제 인증 시스템의 비밀번호를 업데이트합니다.
+    await targetRef.update({ mustChangePassword: true });
     await adminAuth.updateUser(uid, { password: password });
+    await adminAuth.revokeRefreshTokens(uid);
     
     // [보안 개선] 평문 비밀번호가 로깅되지 않도록 식별자만 로그에 남김
     console.log(`[Admin API] User ${uid} password reset successfully by ${callerUid}`);

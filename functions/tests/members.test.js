@@ -1,5 +1,6 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const { Timestamp } = require('firebase-admin/firestore');
 const { createMemberService, INITIAL_MEMBER_PASSWORD } = require('../member-service');
 
 function fixture(options = {}) {
@@ -8,13 +9,22 @@ function fixture(options = {}) {
     ['UserProfile/member', { role: 'MEMBER', companyId: 'a', status: 'ACTIVE' }],
     ['UserProfile/manager', { role: 'SUB_ADMIN', companyId: 'a', status: 'ACTIVE' }],
     ['UserProfile/platform', { role: 'SUPER_ADMIN', companyId: 'PLATFORM', status: 'ACTIVE' }],
-    ['companies/a', { status: 'ACTIVE' }], ['companies/b', { status: 'ACTIVE' }],
+    ['companies/a', { status: 'ACTIVE', accessUntil: Timestamp.fromDate(new Date('2027-01-01')) }],
+    ['companies/b', { status: 'ACTIVE', accessUntil: Timestamp.fromDate(new Date('2027-01-01')) }],
     ['teams/own-team', { companyId: 'a', divisionId: 'division-a' }],
     ['teams/other-team', { companyId: 'b', divisionId: 'division-b' }],
+    ['divisions/division-a', { companyId: 'a' }], ['divisions/division-b', { companyId: 'b' }],
   ]);
   const created = [];
   const deleted = [];
-  const snapshot = path => ({ exists: records.has(path), data: () => records.has(path) ? structuredClone(records.get(path)) : undefined });
+  const copy = value => {
+    if (!value) return value;
+    const { accessUntil, ...rest } = value;
+    return { ...structuredClone(rest), ...(accessUntil === undefined ? {} : {
+      accessUntil: accessUntil instanceof Timestamp ? Timestamp.fromMillis(accessUntil.toMillis()) : structuredClone(accessUntil),
+    }) };
+  };
+  const snapshot = path => ({ exists: records.has(path), data: () => copy(records.get(path)) });
   const db = {
     collection: collection => ({ doc: id => ({ path: `${collection}/${id}`, get: async () => snapshot(`${collection}/${id}`) }) }),
     runTransaction: async callback => {
@@ -41,7 +51,7 @@ function fixture(options = {}) {
     deleteUser: async uid => { deleted.push(uid); },
   };
   const manage = createMemberService({ db, auth, now: () => new Date('2026-10-23T15:10:00.000Z') });
-  const call = (uid = 'admin', data = {}) => manage({ ...(uid ? { auth: { uid, token: { role: 'SUPER_ADMIN' } } } : {}),
+  const call = (uid = 'admin', data = {}) => manage({ ...(uid ? { auth: { uid, token: { role: 'SUPER_ADMIN', ...(options.authTime === undefined ? {} : { auth_time: options.authTime }) } } } : {}),
     data: { name: ' 직원 이름 ', email: ' Employee@Example.COM ', teamId: 'own-team', joinDate: '2026-10-01', ...data } });
   return { records, created, deleted, call };
 }
@@ -98,6 +108,39 @@ test('inactive companies and foreign or missing teams fail before Auth creation'
   assert.equal(created.length, 0);
 });
 
+test('unfinished passwords, stale sessions and expired or missing server entitlement cannot create employees', async () => {
+  for (const [change, code] of [
+    [records => { records.get('UserProfile/admin').mustChangePassword = true; }, 'failed-precondition'],
+    [records => { records.get('UserProfile/admin').sessionValidAfter = 1; }, 'unauthenticated'],
+    [records => { records.get('companies/a').accessUntil = Timestamp.fromDate(new Date('2026-01-01')); }, 'permission-denied'],
+    [records => { delete records.get('companies/a').accessUntil; }, 'permission-denied'],
+    [records => { records.get('companies/a').accessUntil = '2099-01-01'; }, 'permission-denied'],
+    [records => { records.get('companies/a').status = 'DELETING'; }, 'permission-denied'],
+    [records => { records.get('companies/a').status = 'DELETED'; }, 'permission-denied'],
+    [records => { records.delete('companies/a'); }, 'permission-denied'],
+  ]) {
+    const { call, records, created } = fixture(); change(records);
+    await assert.rejects(call(), error => error.code === code);
+    assert.equal(created.length, 0);
+  }
+});
+
+test('same-company team cannot point at a foreign, missing or invalid division', async () => {
+  for (const divisionId of ['division-b', 'missing', '', 'invalid/path']) {
+    const { call, records, created } = fixture();
+    records.get('teams/own-team').divisionId = divisionId;
+    await assert.rejects(call(), error => error.code === 'invalid-argument');
+    assert.equal(created.length, 0);
+  }
+});
+
+test('a refreshed session at the password-change boundary may create employees', async () => {
+  const { call, records, created } = fixture({ authTime: 200 });
+  records.get('UserProfile/admin').sessionValidAfter = 200;
+  await call();
+  assert.equal(created.length, 1);
+});
+
 test('invalid registration fields are rejected without creating credentials', async () => {
   for (const values of [{ name: '' }, { name: 'a'.repeat(101) }, { email: 'bad@' }, { teamId: 3 }, { joinDate: '2026-02-30' }, { joinDate: {} }]) {
     const { call, created } = fixture();
@@ -118,9 +161,14 @@ test('permission, company or team changes during Auth creation roll the new acco
     records => { records.get('UserProfile/admin').role = 'MEMBER'; },
     records => { records.get('UserProfile/admin').companyId = 'b'; },
     records => { records.get('teams/own-team').companyId = 'b'; },
+    records => { records.get('divisions/division-a').companyId = 'b'; },
+    records => { records.get('UserProfile/admin').status = 'RESIGNED'; },
+    records => { records.get('UserProfile/admin').mustChangePassword = true; },
+    records => { records.get('UserProfile/admin').sessionValidAfter = 1; },
+    records => { records.get('companies/a').accessUntil = Timestamp.fromDate(new Date('2026-01-01')); },
   ]) {
     const { call, records, deleted } = fixture({ afterAuthCreate });
-    await assert.rejects(call(), error => ['permission-denied', 'aborted', 'invalid-argument'].includes(error.code));
+    await assert.rejects(call(), error => ['permission-denied', 'aborted', 'invalid-argument', 'failed-precondition', 'unauthenticated'].includes(error.code));
     assert.deepEqual(deleted, ['new-member']);
     assert.equal(records.has('UserProfile/new-member'), false);
   }

@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { auth, db, functions } from '../firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
+import { useAuthStore } from '../store/authStore';
+import { passwordChangeWait, saveCompanySignup } from '../services/accountSecurityService';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, LogIn, UserPlus, AlertCircle, Mail, Lock, User, Building2, Globe, ArrowRight } from 'lucide-react';
 
 type TabMode = 'login' | 'register';
 
 export const Login: React.FC = () => {
+  const { refreshSession, authError } = useAuthStore();
   const [mode, setMode] = useState<TabMode>('login');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -30,33 +31,26 @@ export const Login: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (passwordChangeWait() > 0) { setError('비밀번호 변경 처리를 마친 뒤 1초 후에 다시 로그인해 주세요.'); return; }
     setLoading(true);
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
-      
-      if (userCredential.user.uid) {
-        const { getDoc } = await import('firebase/firestore');
-        const profileSnap = await getDoc(doc(db, 'UserProfile', userCredential.user.uid));
-        
-        if (!profileSnap.exists()) {
-          console.log("[Login] Profile missing for existing user. Redirecting to setup.");
-          navigate('/profile-setup', { replace: true });
-          return;
-        }
-      }
-
-      navigate('/dashboard', { replace: true });
-    } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      await signInWithEmailAndPassword(auth, loginEmail.trim().toLowerCase(), loginPassword);
+      await refreshSession();
+      const session = useAuthStore.getState();
+      if (session.authError) throw new Error(session.authError);
+      navigate(!session.userData ? '/profile-setup' : session.userData.role === 'SUPER_ADMIN' ? '/super-admin' : '/dashboard', { replace: true });
+    } catch (err: unknown) {
+      const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : '';
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-credential') {
         setError('이메일 또는 비밀번호가 올바르지 않습니다.');
-      } else if (err.code === 'auth/too-many-requests') {
+      } else if (code === 'auth/too-many-requests') {
         setError('보안 정책상 잠시 후 다시 시도해주세요.');
       } else {
-        setError('로그인 중 오류가 발생했습니다: ' + err.message);
+        setError(err instanceof Error ? err.message : '로그인 중 오류가 발생했습니다.');
       }
     } finally {
-      if (!error) setLoading(false); // 오류가 세팅된 경우 UI 로딩 상태는 바로 위 코드블록에서 해제함
+      setLoading(false);
     }
   };
 
@@ -69,12 +63,12 @@ export const Login: React.FC = () => {
       setError('비밀번호가 일치하지 않습니다.');
       return;
     }
-    if (regPassword.length < 12) {
-      setError('비밀번호는 최소 12자 이상이어야 합니다.');
+    if (regPassword.length < 12 || regPassword.length > 128) {
+      setError('비밀번호는 12~128자로 입력해 주세요.');
       return;
     }
-    if (!regOrgKo.trim() || !regOrgEn.trim()) {
-      setError('조직 이름(한글, 영문)을 모두 입력해주세요.');
+    if (!regName.trim() || !regOrgKo.trim() || !regOrgEn.trim()) {
+      setError('관리자 이름과 조직 이름(한글, 영문)을 모두 입력해 주세요.');
       return;
     }
     if (!regEmail.includes('@') || !regEmail.includes('.')) {
@@ -85,75 +79,18 @@ export const Login: React.FC = () => {
     setLoading(true);
     try {
       const normalizedEmail = regEmail.trim().toLowerCase();
-      const domain = normalizedEmail.split('@')[1];
-
-      // [도메인 중복 체크 로직 추가]
-      const checkDomain = httpsCallable(functions, 'checkDomainAvailability');
-      const result = await checkDomain({ domain });
-      const { available, message: domainMsg } = result.data as { available: boolean; message?: string };
-
-      if (!available) {
-        setError(domainMsg || '이미 등록된 회사 도메인입니다. 관리자 계정 생성 시 중복된 도메인은 사용할 수 없습니다.');
-        setLoading(false);
-        return;
-      }
-      
-      // 1. Firebase Auth 계정 생성
+      saveCompanySignup(normalizedEmail, { name: regName.trim(), nameKo: regOrgKo.trim(), nameEn: regOrgEn.trim() });
       const userCredential = await createUserWithEmailAndPassword(auth, normalizedEmail, regPassword);
-      const uid = userCredential.user.uid;
-
-      // 2. 이메일에서 도메인 추출 → company_id로 사용
-      const companyId = domain.replace(/\./g, '_'); // aeterno.co.kr → aeterno_co_kr
-
-      // 3. 회사 문서 생성
-      // 회사 도메인 결정: 영문 사명이 있으면 이를 기반으로 .co.kr 도메인 생성 (사용자 요청 반영)
-      const finalCompanyDomain = regOrgEn.trim() 
-        ? `${regOrgEn.trim().toLowerCase().replace(/\s+/g, '')}.co.kr` 
-        : domain;
-
-      await setDoc(doc(db, 'companies', companyId), {
-        nameKo: regOrgKo.trim(),
-        nameEn: regOrgEn.trim(),
-        domain: finalCompanyDomain,
-        adminUid: uid,
-        createdAt: new Date().toISOString(),
-        status: 'ACTIVE',
-        plan: 'FREE'
-      });
-
-      // 4. UserProfile 생성 (ADMIN 권한)
-      await setDoc(doc(db, 'UserProfile', uid), {
-        uid,
-        email: normalizedEmail,
-        name: regName.trim(),
-        role: 'ADMIN',
-        companyId: companyId,
-        teamHistory: [],
-        mustChangePassword: false,
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString()
-      });
-
-      // 5. 회사별 config 문서 생성
-      await setDoc(doc(db, 'config', companyId), {
-        defaultDomain: finalCompanyDomain,
-        updatedAt: new Date().toISOString(),
-        updatedBy: uid
-      });
-
-      console.log("[Register] Company and Admin created:", companyId);
+      await sendEmailVerification(userCredential.user);
+      await refreshSession();
       setRegisterSuccess(true);
-      
-      // 2초 후 대시보드로 이동
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 2000);
-
-    } catch (err: any) {
-      if (err.code === 'auth/email-already-in-use') {
+      navigate('/profile-setup', { replace: true });
+    } catch (err: unknown) {
+      const code = typeof err === 'object' && err !== null && 'code' in err ? err.code : '';
+      if (code === 'auth/email-already-in-use') {
         setError('이미 등록된 이메일입니다. 로그인을 시도해주세요.');
       } else {
-        setError('회원가입 중 오류가 발생했습니다: ' + err.message);
+        setError(err instanceof Error ? err.message : '회원가입 중 오류가 발생했습니다.');
       }
     } finally {
       setLoading(false);
@@ -167,8 +104,8 @@ export const Login: React.FC = () => {
           <div className="w-24 h-24 bg-emerald-100 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-8 border-2 border-emerald-200 dark:border-emerald-500/30">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 dark:text-emerald-400" />
           </div>
-          <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3">조직 생성 완료!</h2>
-          <p className="text-slate-500 dark:text-slate-400 font-medium">대시보드로 이동합니다...</p>
+          <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-3">이메일을 확인해 주세요</h2>
+          <p className="text-slate-500 dark:text-slate-400 font-medium">인증 메일을 확인한 뒤 조직 등록을 완료할 수 있습니다.</p>
           <Loader2 className="w-6 h-6 text-indigo-500 dark:text-indigo-400 animate-spin mx-auto mt-6" />
         </div>
       </div>
@@ -223,10 +160,10 @@ export const Login: React.FC = () => {
         </div>
 
         {/* 에러 메시지 */}
-        {error && (
+        {(error || authError) && (
           <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-rose-600 dark:text-rose-300 p-4 rounded-2xl flex items-center gap-3 text-sm font-medium mb-6 backdrop-blur-sm">
             <AlertCircle className="w-5 h-5 shrink-0" />
-            {error}
+            {error || authError}
           </div>
         )}
 
@@ -243,6 +180,7 @@ export const Login: React.FC = () => {
                     <input
                       type="email"
                       required
+                      maxLength={254}
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
                       placeholder="admin@yourcompany.co.kr"
@@ -279,7 +217,7 @@ export const Login: React.FC = () => {
             /* 회원가입 폼 */
             <form onSubmit={handleRegister} className="p-8 space-y-5">
               <div className="text-center mb-2">
-                <p className="text-slate-500 dark:text-slate-400 text-xs font-medium">가입 즉시 조직 관리자(ADMIN) 권한이 부여됩니다</p>
+                <p className="text-slate-500 dark:text-slate-400 text-xs font-medium">이메일 인증 후 조직 등록을 완료하면 회사 관리자 계정이 생성됩니다.</p>
               </div>
 
               <div className="space-y-4">
@@ -291,6 +229,7 @@ export const Login: React.FC = () => {
                     <input
                       type="text"
                       required
+                      maxLength={100}
                       value={regName}
                       onChange={(e) => setRegName(e.target.value)}
                       placeholder="홍길동"
@@ -306,13 +245,14 @@ export const Login: React.FC = () => {
                     <input
                       type="email"
                       required
+                      maxLength={254}
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
                       placeholder="admin@yourcompany.co.kr"
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
                     />
                   </div>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 ml-1">이메일 도메인이 회사 ID로 자동 생성됩니다</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 ml-1">본인이 확인할 수 있는 이메일을 입력해 주세요.</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -323,6 +263,8 @@ export const Login: React.FC = () => {
                       <input
                         type="password"
                         required
+                        minLength={12}
+                        maxLength={128}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="12자 이상"
@@ -337,6 +279,8 @@ export const Login: React.FC = () => {
                       <input
                         type="password"
                         required
+                        minLength={12}
+                        maxLength={128}
                         value={regConfirmPassword}
                         onChange={(e) => setRegConfirmPassword(e.target.value)}
                         placeholder="재입력"
@@ -365,6 +309,7 @@ export const Login: React.FC = () => {
                     <input
                       type="text"
                       required
+                      maxLength={120}
                       value={regOrgKo}
                       onChange={(e) => setRegOrgKo(e.target.value)}
                       placeholder="에테르노"
@@ -380,6 +325,7 @@ export const Login: React.FC = () => {
                     <input
                       type="text"
                       required
+                      maxLength={120}
                       value={regOrgEn}
                       onChange={(e) => setRegOrgEn(e.target.value)}
                       placeholder="Aeterno"
@@ -395,7 +341,7 @@ export const Login: React.FC = () => {
                 className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-600 text-white font-bold rounded-2xl hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-200 dark:shadow-indigo-900/30 active:scale-[0.98] disabled:opacity-50 mt-2"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5" />}
-                {loading ? '등록 중...' : '조직 생성 및 가입'}
+                {loading ? '등록 중...' : '가입 및 이메일 인증'}
               </button>
             </form>
           )}

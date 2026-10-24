@@ -1,71 +1,70 @@
-import React, { useEffect, useState } from 'react';
-import { CreditCard, CheckCircle, AlertTriangle, Loader2, ShieldCheck, Zap } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 
-declare global {
-  interface Window {
-    paypal: any;
-  }
-}
+const HostedPayPalCheckout: React.FC<{ uid: string; companyId: string }> = ({ uid, companyId }) => {
+  const submitting = useRef(false);
+  const completed = useRef(new Set<string>());
+  const [orderId, setOrderId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [submittedOrder, setSubmittedOrder] = useState('');
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    const order = orderId.trim();
+    if (!/^[A-Za-z0-9_-]{6,80}$/.test(order)) {
+      setError('PayPal 영수증의 거래 또는 주문번호를 6~80자의 영문, 숫자, 밑줄, 하이픈으로 입력해 주세요.');
+      return;
+    }
+    const { userData, companyData } = useAuthStore.getState();
+    if (userData?.uid !== uid || userData.role !== 'ADMIN' || userData.mustChangePassword ||
+      (userData.status && userData.status !== 'ACTIVE') || companyData?.status !== 'ACTIVE' ||
+      userData.companyId !== companyId || companyData?.id !== companyId) {
+      setOrderId(''); setSubmittedOrder('');
+      setError('회사 관리자 계정 정보를 다시 확인한 뒤 요청해 주세요.');
+      return;
+    }
+    if (completed.current.has(order)) {
+      setSubmittedOrder(order); setError('');
+      return;
+    }
+    submitting.current = true;
+    setLoading(true); setError(''); setSubmittedOrder('');
+    try {
+      // Transaction IDs are untrusted until the platform administrator verifies PayPal.
+      await httpsCallable(functions, 'accountSecurity')({ action: 'submitPaymentClaim', orderId: order });
+      completed.current.add(order);
+      setSubmittedOrder(order);
+    } catch {
+      setError('결제 확인 요청을 보내지 못했습니다. 입력한 번호는 유지됩니다. 다시 결제하지 말고 확인 요청을 다시 보내 주세요.');
+    } finally {
+      submitting.current = false; setLoading(false);
+    }
+  };
+  return <div className="space-y-5">
+    <a href="https://www.paypal.com/ncp/payment/36DMV6NKPEZYW" target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
+      className="block rounded-xl bg-indigo-600 px-5 py-3 text-center font-bold text-white hover:bg-indigo-700">PayPal에서 구독 결제 (새 탭)</a>
+    <p className="text-xs text-slate-500 leading-relaxed">PayPal에서 월간 또는 연간 플랜을 선택해 결제한 뒤 이 화면으로 돌아와 주세요. 이미 결제했다면 다시 결제하지 마세요.</p>
+    <form onSubmit={submit} className="space-y-3" aria-label="PayPal 결제 확인 요청">
+      <label htmlFor="paypal-transaction-id" className="block text-sm font-bold text-slate-700">PayPal 거래 또는 주문번호</label>
+      <input id="paypal-transaction-id" value={orderId} onChange={event => { setOrderId(event.target.value); setError(''); setSubmittedOrder(''); }}
+        minLength={6} maxLength={80} required disabled={loading} autoComplete="off" spellCheck={false}
+        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" placeholder="PayPal 영수증의 거래/주문번호" />
+      <button type="submit" disabled={loading || submittedOrder === orderId.trim()}
+        className="w-full rounded-xl border border-indigo-300 px-4 py-2 text-sm font-bold text-indigo-700 disabled:opacity-50">
+        {loading ? '결제 확인 요청 중...' : error ? '결제 확인 요청 다시 보내기' : '결제 확인 요청 보내기'}
+      </button>
+      {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
+      {submittedOrder && <p role="status" className="text-xs text-emerald-700">결제 확인 요청이 접수되었습니다. 플랫폼 관리자의 거래 확인 후 이용 기간이 반영됩니다.</p>}
+    </form>
+  </div>;
+};
 
 export const SubscriptionManagement: React.FC = () => {
   const { userData, companyData } = useAuthStore();
-  const [loading, setLoading] = useState(false);
-  const [paypalLoaded, setPaypalLoaded] = useState(false);
-
-  useEffect(() => {
-    // PayPal SDK가 로드되었는지 확인
-    const checkPaypal = setInterval(() => {
-      if (window.paypal) {
-        setPaypalLoaded(true);
-        clearInterval(checkPaypal);
-      }
-    }, 500);
-
-    return () => clearInterval(checkPaypal);
-  }, []);
-
-  useEffect(() => {
-    if (paypalLoaded && companyData) {
-      // 이전에 렌더링된 버튼이 있다면 제거 (재렌더링 방지)
-      const container = document.getElementById('paypal-container-36DMV6NKPEZYW');
-      if (container) container.innerHTML = '';
-
-      window.paypal.HostedButtons({
-        hostedButtonId: "36DMV6NKPEZYW",
-        onApprove: async (data: any, _actions: any) => {
-          setLoading(true);
-          try {
-            if (!userData || userData.role !== 'ADMIN' || userData.companyId !== companyData.id ||
-                typeof data.orderID !== 'string' || !/^[A-Za-z0-9_-]{6,80}$/.test(data.orderID)) {
-              throw new Error('결제 접수 정보가 유효하지 않습니다.');
-            }
-
-            // 브라우저 콜백만으로 결제 완료를 신뢰할 수 없습니다.
-            // 플랫폼 관리자가 PayPal 거래를 대조한 뒤 구독 기간을 연장합니다.
-            await setDoc(doc(db, 'payment_claims', data.orderID), {
-              companyId: companyData.id,
-              companyName: companyData.nameKo,
-              adminUid: userData.uid,
-              adminName: userData.name,
-              orderId: data.orderID,
-              createdAt: serverTimestamp(),
-              status: 'PENDING'
-            });
-
-            alert('결제 확인 요청이 접수되었습니다. 거래 확인 후 구독 기간이 반영됩니다.');
-          } catch (err) {
-            console.error('Payment Update Error:', err);
-            alert('결제 정보 업데이트 중 오류가 발생했습니다. 관리자에게 문의하세요.');
-          } finally {
-            setLoading(false);
-          }
-        }
-      }).render("#paypal-container-36DMV6NKPEZYW");
-    }
-  }, [paypalLoaded, companyData, userData]);
 
   if (!companyData) return null;
 
@@ -170,15 +169,9 @@ export const SubscriptionManagement: React.FC = () => {
                   <p className="text-sm font-bold text-indigo-600 mt-1">또는 연간 $150 (특별 할인 적용)</p>
                 </div>
                 
-                {/* PayPal Container */}
-                <div id="paypal-container-36DMV6NKPEZYW" className="min-h-[150px] w-full overflow-hidden">
-                  {!paypalLoaded && (
-                    <div className="flex flex-col items-center justify-center gap-3 py-10">
-                      <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-                      <p className="text-xs font-bold text-slate-400">PayPal 결제 모듈 로딩 중...</p>
-                    </div>
-                  )}
-                </div>
+                {userData?.role === 'ADMIN' && !userData.mustChangePassword && userData.companyId === companyData.id ?
+                  <HostedPayPalCheckout key={`${userData.uid}:${companyData.id}`} uid={userData.uid} companyId={companyData.id} /> :
+                  <p className="text-sm text-slate-500">회사 관리자 계정으로 결제를 진행해 주세요.</p>}
 
                 <p className="text-[10px] text-slate-400 text-center mt-6 font-medium leading-relaxed">
                   결제 후 거래 확인을 거쳐 서비스 이용 기간이 연장됩니다.<br />
@@ -201,14 +194,6 @@ export const SubscriptionManagement: React.FC = () => {
         )}
       </div>
 
-      {loading && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="bg-white p-8 rounded-[2rem] flex flex-col items-center gap-4 shadow-2xl">
-            <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-            <p className="text-lg font-black text-slate-800">결제 처리 중...</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

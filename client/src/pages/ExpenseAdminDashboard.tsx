@@ -8,6 +8,7 @@ import { db } from '../firebase';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
 import JSZip from 'jszip';
+import { attachmentSessionKey, downloadCompanyAttachment } from '../services/attachmentService';
 
 interface Expense {
   id: string;
@@ -19,6 +20,7 @@ interface Expense {
   applicant: string;
   userName?: string;
   attachmentUrl?: string;
+  attachmentPath?: string;
   attachmentName?: string;
 }
 
@@ -61,7 +63,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
     });
 
     return () => unsubscribe();
-  }, [userData?.companyId]);
+  }, [userData?.companyId, authLoading]);
 
   // 시작 날짜 변경 시 종료 날짜 자동 1개월 뒤로 설정
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,7 +120,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
 
   // 영수증 이미지 일괄 ZIP 다운로드 기능
   const handleDownloadReceiptsZip = async () => {
-    const itemsWithReceipt = filteredExpenses.filter(e => e.attachmentUrl);
+    const itemsWithReceipt = filteredExpenses.filter(e => e.attachmentPath || e.attachmentUrl);
     
     if (itemsWithReceipt.length === 0) {
       alert("선택한 날짜 범위 내에 첨부된 영수증이 없습니다.");
@@ -131,33 +133,33 @@ export const ExpenseAdminDashboard: React.FC = () => {
 
     setZipLoading(true);
     const zip = new JSZip();
+    const scope = attachmentSessionKey();
+    let included = 0;
+    let failed = 0;
 
     try {
       for (const item of itemsWithReceipt) {
-        if (!item.attachmentUrl) continue;
         try {
-          // Firebase Storage의 CORS 허용 정책에 따라 fetch가 가능해야 함
-          const response = await fetch(item.attachmentUrl);
-          if (!response.ok) throw new Error("네트워크 응답 오류");
-          
-          const blob = await response.blob();
+          const { blob } = await downloadCompanyAttachment('expenses', item.id);
           
           // 폴더 구조: 연-월 (예: 2026-06)
           const folderName = item.date.substring(0, 7);
           
           // 파일명 다듬기: 2026-06-30_지출명_원본파일명
-          const sanitizedTitle = item.title.replace(/[\/\\?%*:|"<>]/g, '_');
-          const ext = item.attachmentName ? item.attachmentName.substring(item.attachmentName.lastIndexOf('.')) : '.jpg';
-          const cleanExt = ext.length > 5 ? '.jpg' : ext; // 비정상 확장자 예방
-          const fileName = `${item.date}_${sanitizedTitle}${cleanExt}`;
+          const sanitizedTitle = item.title.replace(/[/\\?%*:|"<>]/g, '_');
+          const ext = item.attachmentName?.match(/\.[a-z0-9]{1,5}$/i)?.[0] || (blob.type === 'application/pdf' ? '.pdf' : '.jpg');
+          const fileName = `${item.date}_${sanitizedTitle}_${item.id}${ext}`;
           
           zip.folder(folderName)?.file(fileName, blob);
-        } catch (err) {
-          console.error(`영수증 다운로드 실패 [${item.title}]:`, err);
+          included++;
+        } catch {
+          if (scope !== attachmentSessionKey()) throw new Error('로그인 또는 소속 정보가 변경되었습니다. 다시 시도해 주세요.');
+          failed++;
         }
       }
-
+      if (!included) throw new Error('영수증에 접근할 수 없습니다. 권한과 네트워크 연결을 확인해 주세요.');
       const zipBlob = await zip.generateAsync({ type: 'blob' });
+      if (scope !== attachmentSessionKey()) throw new Error('로그인 또는 소속 정보가 변경되었습니다. 다시 시도해 주세요.');
       const url = URL.createObjectURL(zipBlob);
       const link = document.createElement("a");
       link.setAttribute("href", url);
@@ -165,10 +167,10 @@ export const ExpenseAdminDashboard: React.FC = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      console.error("ZIP Generation Error:", error);
-      alert("압축 파일 생성 중 오류가 발생했습니다: " + error.message);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (failed) alert(`${included}개 영수증을 저장했습니다. ${failed}개는 접근 권한 또는 연결 문제로 제외되었습니다.`);
+    } catch (error: unknown) {
+      alert("압축 파일 생성 중 오류가 발생했습니다: " + (error instanceof Error ? error.message : '다시 시도해 주세요.'));
     } finally {
       setZipLoading(false);
     }

@@ -5,10 +5,11 @@ import {
 } from 'lucide-react';
 import { 
   collection, onSnapshot, addDoc, doc, setDoc, deleteDoc, updateDoc,
-  query, where, getDocs 
+  query, where, getDocs, writeBatch
 } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { db, functions } from '../firebase';
+import { auth, db, functions } from '../firebase';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 
@@ -246,7 +247,11 @@ export const OrganizationAdmin: React.FC = () => {
   const handleDeleteEmployee = async (uid: string, name: string) => {
     if (!window.confirm(`'${name}' 직원을 삭제하시겠습니까?`)) return;
     try {
-      await deleteDoc(doc(db, 'UserProfile', uid));
+      const confirmationPassword = window.prompt('보안 확인을 위해 관리자 비밀번호를 입력해 주세요.');
+      if (!confirmationPassword || !auth.currentUser?.email) return;
+      await reauthenticateWithCredential(auth.currentUser, EmailAuthProvider.credential(auth.currentUser.email, confirmationPassword));
+      await auth.currentUser.getIdToken(true);
+      await httpsCallable(functions, 'accountSecurity')({ action: 'deleteMember', uid });
       await logAction('DELETE_MEMBER', uid, name, '직원 삭제(영구)');
     } catch (err) {
       alert("삭제 실패: " + (err as Error).message);
@@ -352,18 +357,17 @@ export const OrganizationAdmin: React.FC = () => {
     if (!deleteLogsPassword) return;
     setIsProcessingLogs(true);
     try {
-      const { auth } = await import('../firebase');
-      const { signInWithEmailAndPassword } = await import('firebase/auth');
-      
       try {
-        await signInWithEmailAndPassword(auth, userData?.email || '', deleteLogsPassword);
+        const administrator = auth.currentUser;
+        if (!administrator?.email) throw new Error('관리자 인증 상태를 확인해 주세요.');
+        await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, deleteLogsPassword));
+        await administrator.getIdToken(true);
       } catch (err) {
         throw new Error('비밀번호가 일치하지 않습니다.');
       }
 
-      const { writeBatch, getDocs, collection } = await import('firebase/firestore');
       const batch = writeBatch(db);
-      const snap = await getDocs(collection(db, 'AuditLogs'));
+      const snap = await getDocs(query(collection(db, 'AuditLogs'), where('companyId', '==', userData?.companyId || '')));
       snap.forEach(d => batch.delete(d.ref));
       
       await batch.commit();

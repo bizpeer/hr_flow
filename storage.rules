@@ -1,46 +1,8 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    function signedIn() { return request.auth != null; }
-    function profile() {
-      return firestore.get(/databases/(default)/documents/UserProfile/$(request.auth.uid)).data;
-    }
-    function superAdmin() { return signedIn() && profile().role == 'SUPER_ADMIN'; }
-    function sameCompany(id) { return signedIn() && profile().companyId == id; }
-    function manager(id) {
-      return sameCompany(id) && profile().role in ['ADMIN', 'SUB_ADMIN'];
-    }
-    function validAttachment() {
-      return request.resource.size <= 10 * 1024 * 1024 &&
-        request.resource.contentType.matches('image/(jpeg|png|webp|gif)|application/pdf');
-    }
-
-    match /companies/{companyId}/expenses/{userId}/{fileName} {
-      allow read: if superAdmin() || manager(companyId) ||
-        (sameCompany(companyId) && request.auth.uid == userId);
-      allow create, update: if sameCompany(companyId) && request.auth.uid == userId && validAttachment();
-      allow delete: if sameCompany(companyId) && request.auth.uid == userId;
-    }
-
-    match /companies/{companyId}/leaves/{userId}/{fileName} {
-      allow read: if superAdmin() || manager(companyId) ||
-        (sameCompany(companyId) && request.auth.uid == userId);
-      allow create, update: if sameCompany(companyId) && request.auth.uid == userId && validAttachment();
-      allow delete: if sameCompany(companyId) && request.auth.uid == userId;
-    }
-
-    match /companies/{companyId}/notices/{fileName} {
-      allow read: if superAdmin() || sameCompany(companyId);
-      allow create, update: if manager(companyId) && validAttachment();
-      allow delete: if manager(companyId);
-    }
-
-    match /companies/{companyId}/{category}/{allPaths=**} {
-      allow read, write: if superAdmin() && !(category in ['official-assets', 'official-pdfs']);
-    }
-
-    match /{root}/{allPaths=**} {
-      allow read, write: if superAdmin() && root != 'companies';
-    }
+    // Private attachments and official assets use authenticated server endpoints.
+    // No browser role, including SUPER_ADMIN, can access originals directly.
+    match /{object=**} { allow read, write: if false; }
   }
 }

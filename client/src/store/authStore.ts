@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User } from 'firebase/auth';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { accountSecurity } from '../services/accountSecurityService';
 
 export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'SUB_ADMIN' | 'MEMBER';
 
@@ -26,6 +27,7 @@ export interface CompanyData {
   planType?: 'MONTHLY' | 'YEARLY';
   lastPaymentDate?: string;
   lastBackupAt?: string;
+  accessUntil?: string;
 }
 
 export interface UserData {
@@ -58,7 +60,10 @@ interface AuthState {
   loading: boolean;
   isLoginModalOpen: boolean;
   isManualChangeMode: boolean;
+  sessionReady: boolean;
+  authError: string | null;
   initAuth: () => (() => void);
+  refreshSession: () => Promise<void>;
   fetchCompanyDomain: (companyId: string) => Promise<void>;
   setUserData: (userData: UserData | null) => void;
   setLoginModalOpen: (isOpen: boolean) => void;
@@ -68,161 +73,113 @@ interface AuthState {
 }
 
 
-export const useAuthStore = create<AuthState>((set, get) => ({
-  user: null,
-  userData: null,
-  companyData: null,
-  loading: true,
-  isLoginModalOpen: false,
-  isManualChangeMode: false,
-  setUserData: (userData) => set({ userData }),
-  setLoginModalOpen: (isOpen) => set({ 
-    isLoginModalOpen: isOpen,
-    isManualChangeMode: isOpen ? get().isManualChangeMode : false 
-  }),
-  openPasswordChange: () => set({ isLoginModalOpen: true, isManualChangeMode: true }),
-  getDisplayEmail: (email?: string | null) => {
-    if (!email) return 'ID 미표기';
-    return email; // SaaS 모드에서는 이메일을 그대로 표시
-  },
+export const useAuthStore = create<AuthState>((set, get) => {
+  let generation = 0;
+  let unsubscribeAuth: (() => void) | null = null;
+  let unsubscribeProfile: (() => void) | null = null;
+  let unsubscribeCompany: (() => void) | null = null;
+  let accessTimer: ReturnType<typeof setTimeout> | null = null;
+  let pending: { uid: string; promise: Promise<void>; token: symbol } | null = null;
+  const stopData = () => {
+    unsubscribeProfile?.(); unsubscribeProfile = null;
+    unsubscribeCompany?.(); unsubscribeCompany = null;
+    if (accessTimer) clearTimeout(accessTimer); accessTimer = null;
+  };
+  const empty = { userData: null, companyData: null, sessionReady: false, isLoginModalOpen: false, isManualChangeMode: false };
+  const current = (epoch: number, uid: string) => epoch === generation && auth.currentUser?.uid === uid;
+  const binding = (profile: UserData) => JSON.stringify([profile.companyId, profile.role, profile.status || 'ACTIVE',
+    !!profile.mustChangePassword, profile.teamId || '', profile.divisionId || '']);
+  const denied = (failure: unknown) => typeof failure === 'object' && failure !== null && 'code' in failure &&
+    ['permission-denied', 'unauthenticated', 'failed-precondition', 'not-found', 'auth/user-disabled', 'auth/user-token-expired'].includes(String(failure.code).replace(/^functions\//, ''));
 
-  logout: async () => {
-    try {
-      await auth.signOut();
-      set({ user: null, userData: null, companyData: null });
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
-  },
-
-  fetchCompanyDomain: async (companyId: string) => {
-    if (!companyId || companyId === 'PLATFORM') return;
-    try {
-      const companyDoc = await getDoc(doc(db, 'companies', companyId));
-      if (companyDoc.exists()) {
-        const data = companyDoc.data() as CompanyData;
-        
-        // 구독 상태 자동 계산 (실시간 반영을 위해 클라이언트 사이드에서 체크)
-        const trialDays = 90;
-        const createdDate = new Date(data.createdAt);
-        const expiryDate = new Date(createdDate.getTime() + trialDays * 24 * 60 * 60 * 1000);
-        const isTrialActive = new Date() < expiryDate;
-        
-        let subStatus = data.subscriptionStatus || 'TRIAL';
-        
-        // 체험 기간이 끝났는데 유효한 구독 종료일이 없거나 지난 경우 EXPIRED
-        if (!isTrialActive) {
-          if (!data.subscriptionEndDate || new Date() > new Date(data.subscriptionEndDate)) {
-            subStatus = 'EXPIRED';
-          } else {
-            subStatus = 'ACTIVE';
-          }
-        } else if (!data.subscriptionEndDate) {
-          subStatus = 'TRIAL';
-        } else if (new Date() < new Date(data.subscriptionEndDate)) {
-          subStatus = 'ACTIVE';
+  function loadSession(user: User): Promise<void> {
+    if (pending?.uid === user.uid) return pending.promise;
+    const epoch = ++generation; const token = Symbol(); stopData();
+    set({ ...empty, user, loading: true, authError: null });
+    const promise = (async () => {
+      try {
+        const session = await accountSecurity.session();
+        if (!current(epoch, user.uid)) return;
+        const profile = session.profile;
+        if (profile && (profile.uid !== user.uid || !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(profile.role) ||
+          (profile.status && profile.status !== 'ACTIVE') || (session.company && session.company.status !== 'ACTIVE'))) {
+          throw Object.assign(new Error('현재 계정으로 서비스를 이용할 수 없습니다.'), { code: 'permission-denied' });
         }
+        const ready = !!profile && session.businessAllowed === true && !profile.mustChangePassword;
+        const company = session.company && !session.businessAllowed && !profile?.mustChangePassword
+          ? { ...session.company, subscriptionStatus: 'EXPIRED' as const } : session.company;
+        set({ user, userData: profile, companyData: company, loading: false, sessionReady: ready,
+          isLoginModalOpen: !!profile?.mustChangePassword, isManualChangeMode: false, authError: null });
+        if (!ready || !profile) return;
 
-        set({ 
-          companyData: { ...data, id: companyDoc.id, subscriptionStatus: subStatus as any }
-        });
-        console.log("[System] Company Domain:", data.domain, "| Sub Status:", subStatus);
-      }
-    } catch (err) {
-      console.error("[System] Failed to fetch company domain:", err);
-    }
-  },
-
-  initAuth: (() => {
-    let initialized = false;
-    let unsubscribeAuth: (() => void) | null = null;
-    let unsubscribeProfile: (() => void) | null = null;
-
-    return () => {
-      // 이미 초기화된 경우 중복 실행 방지
-      if (initialized) return () => {};
-      initialized = true;
-
-      unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-        const dbId = '(default)';
-        console.log("[Auth] State Change:", user ? `Logged in (${user.email})` : "Logged out", "| UID:", user?.uid);
-        
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = null;
+        const approvedBinding = binding(profile);
+        const recheck = () => {
+          if (!current(epoch, user.uid)) return;
+          pending = null; void loadSession(user);
+        };
+        unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), snapshot => {
+          if (!current(epoch, user.uid)) return;
+          if (!snapshot.exists()) { recheck(); return; }
+          const next = { ...snapshot.data(), uid: user.uid } as UserData;
+          if (binding(next) !== approvedBinding) { recheck(); return; }
+          set({ userData: next });
+        }, recheck);
+        if (profile.companyId !== 'PLATFORM') {
+          let first = true;
+          unsubscribeCompany = onSnapshot(doc(db, 'companies', profile.companyId), snapshot => {
+            if (!current(epoch, user.uid)) return;
+            if (!snapshot.exists() || snapshot.data().status !== 'ACTIVE') { recheck(); return; }
+            if (first) { first = false; return; }
+            recheck();
+          }, recheck);
         }
-
-        if (user) {
-          set({ user, loading: true });
-          console.log(`[Auth] Fetching UserProfile for UID: ${user.uid} in Database: ${dbId}`);
-          
-          unsubscribeProfile = onSnapshot(doc(db, 'UserProfile', user.uid), async (profileSnap) => {
-            if (!profileSnap.exists()) {
-              console.warn(`[Auth] No UserProfile found for UID: ${user.uid} in ${dbId}`);
-              // 프로필이 없는 경우 즉시 loading을 해제하여 UI에서 대응할 수 있게 함
-              set({ loading: false, userData: null });
-            }
-            
-            const data = profileSnap.data();
-            let currentData: UserData | null = profileSnap.exists() ? (data as UserData) : null;
-
-            if (currentData && !currentData.role) {
-              console.log("[Auth] Profile exists but incomplete (no role). Waiting...");
-              return; 
-            }
-
-            if (!currentData) return;
-
-            // Unknown roles need administrator repair; the browser must never
-            // rewrite the role field on its own.
-            if (currentData && currentData.role && !['SUPER_ADMIN', 'ADMIN', 'SUB_ADMIN', 'MEMBER'].includes(currentData.role)) {
-              console.error('[Auth] Invalid profile role. Contact an administrator.');
-              set({ userData: null, loading: false });
-              return;
-            }
-
-            // 5. 상태 확인
-            if (currentData?.status === 'RESIGNED') {
-              await auth.signOut();
-              set({ user: null, userData: null, loading: false });
-              alert("퇴사 처리된 계정입니다.");
-              return;
-            }
-
-            // 6. 회사 도메인 로드 (이미 로드된 상태면 건너뜀)
-            if (currentData?.companyId && currentData.companyId !== 'PLATFORM') {
-              const currentCompanyId = get().companyData?.id;
-              if (currentCompanyId !== currentData.companyId) {
-                await get().fetchCompanyDomain(currentData.companyId);
-              }
-            }
-
-            // [최종 상태 업데이트] 데이터가 실제로 다를 때만 set() 호출하여 무한 렌더링 방지
-            const prevUserData = get().userData;
-            const isDifferent = JSON.stringify(prevUserData) !== JSON.stringify(currentData);
-            
-            if (isDifferent || get().loading) {
-              set({ 
-                userData: currentData, 
-                loading: false,
-                isLoginModalOpen: (currentData?.mustChangePassword && currentData.role !== 'SUPER_ADMIN') || false 
-              });
-              console.log("[Auth] UserData Updated (Loop-Safe):", currentData?.role);
-            }
-          }, (err) => {
-            console.error("[Auth] Snapshot Error:", err);
-            set({ loading: false });
-          });
-        } else {
-          set({ user: null, userData: null, companyData: null, loading: false });
+        const expiresAt = company?.accessUntil ? new Date(company.accessUntil).getTime() : NaN;
+        if (Number.isFinite(expiresAt)) accessTimer = setTimeout(recheck, Math.min(2147483647, Math.max(1000, expiresAt - Date.now() + 50)));
+      } catch (failure) {
+        if (!current(epoch, user.uid)) return;
+        stopData();
+        const authError = failure instanceof Error ? failure.message : '계정 상태를 확인하지 못했습니다. 다시 시도해 주세요.';
+        set({ ...empty, loading: false, authError });
+        if (denied(failure)) {
+          try { await auth.signOut(); } catch { /* Cached access remains cleared even if sign-out fails. */ }
+          if (epoch === generation) set({ user: null });
         }
+      } finally { if (pending?.token === token) pending = null; }
+    })();
+    pending = { uid: user.uid, promise, token };
+    return promise;
+  }
+
+  return {
+    user: null, ...empty, loading: true, authError: null,
+    setUserData: userData => set({ userData }),
+    setLoginModalOpen: isOpen => {
+      if (!isOpen && get().userData?.mustChangePassword && !get().isManualChangeMode) return;
+      set({ isLoginModalOpen: isOpen, isManualChangeMode: isOpen ? get().isManualChangeMode : false });
+    },
+    openPasswordChange: () => set({ isLoginModalOpen: true, isManualChangeMode: true }),
+    getDisplayEmail: email => email || 'ID 미표기',
+    logout: async () => {
+      generation++; pending = null; stopData();
+      set({ ...empty, user: null, loading: false, authError: null });
+      try { await auth.signOut(); } catch { set({ authError: '로그아웃을 완료하지 못했습니다. 페이지를 닫고 다시 로그인해 주세요.' }); }
+    },
+    refreshSession: async () => {
+      const user = auth.currentUser;
+      if (user) await loadSession(user);
+      else { generation++; stopData(); set({ ...empty, user: null, loading: false }); }
+    },
+    fetchCompanyDomain: async companyId => {
+      if (companyId === get().userData?.companyId) await get().refreshSession();
+    },
+    initAuth: () => {
+      if (unsubscribeAuth) return () => {};
+      unsubscribeAuth = onAuthStateChanged(auth, user => {
+        if (user) { void loadSession(user); return; }
+        generation++; pending = null; stopData();
+        set({ ...empty, user: null, loading: false });
       });
-
-      return () => {
-        if (unsubscribeAuth) unsubscribeAuth();
-        if (unsubscribeProfile) unsubscribeProfile();
-        initialized = false; // 클린업 시 플래그 초기화
-      };
-    };
-  })() as () => (() => void),
-}));
+      return () => { generation++; pending = null; unsubscribeAuth?.(); unsubscribeAuth = null; stopData(); };
+    },
+  };
+});

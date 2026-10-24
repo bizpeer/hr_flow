@@ -25,7 +25,7 @@ import { ProfileSetup } from './pages/ProfileSetup';
 import { OfficialLetters } from './pages/OfficialLetters';
 
 function App() {
-  const { initAuth, userData, companyData, user, loading } = useAuthStore();
+  const { initAuth, userData, companyData, user, loading, sessionReady, authError, refreshSession, logout } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -41,6 +41,17 @@ function App() {
 
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
   const isExpired = !isSuperAdmin && companyData?.subscriptionStatus === 'EXPIRED';
+
+  if (user && authError) {
+    return <div className="min-h-screen grid place-items-center bg-slate-50 p-6"><div className="max-w-md space-y-4 bg-white p-8 rounded-2xl shadow">
+      <p role="alert">{authError}</p><button onClick={() => void refreshSession()} className="bg-indigo-600 text-white px-4 py-2 rounded-lg">다시 확인</button>
+      <button onClick={() => void logout()} className="ml-3 px-4 py-2">로그아웃</button>
+    </div></div>;
+  }
+
+  if (user && userData && (userData.mustChangePassword || (!sessionReady && !isExpired))) {
+    return <HashRouter><div className="min-h-screen grid place-items-center bg-slate-50 p-6"><p>비밀번호 변경을 완료한 후 업무를 시작할 수 있습니다.</p></div><LoginModal /></HashRouter>;
+  }
 
   if (user && !loading && !userData) {
     return <ProfileSetup />;
@@ -63,7 +74,7 @@ function App() {
         
         <Route path="/*" element={
           !user ? <Navigate to="/login" replace /> : !userData ? <Navigate to="/profile-setup" replace /> : (
-            <div className="flex h-screen bg-slate-50 overflow-hidden relative font-sans">
+            <div key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} className="flex h-screen bg-slate-50 overflow-hidden relative font-sans">
               {/* Mobile Header */}
               <div className="md:hidden print:hidden flex items-center justify-between bg-slate-900 text-white p-4 fixed top-0 left-0 w-full z-50 shadow-lg border-b border-indigo-500/20">
                 <div className="flex items-center gap-2">

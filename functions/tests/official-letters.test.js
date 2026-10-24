@@ -1,7 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { initializeApp, deleteApp } = require('firebase-admin/app');
-const { getFirestore } = require('firebase-admin/firestore');
+const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const { createOfficialLetterService, koreaDate, numberLabel } = require('../official-letter-service');
 const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('../official-letter-pdf');
 const fs = require('node:fs');
@@ -113,9 +113,10 @@ async function officialState() {
 test('official-letter server authorization, numbering and revisions', async t => {
   try {
     await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-hr-flow-letters/databases/(default)/documents`, { method: 'DELETE' });
-    await db.doc('companies/a').set({ nameKo: '테스트 주식회사', status: 'ACTIVE' });
-    await db.doc('companies/b').set({ nameKo: '다른 회사', status: 'ACTIVE' });
-    await db.doc('companies/c').set({ nameKo: '설정 검증 회사', status: 'ACTIVE' });
+    const entitlement = { createdAt: now().toISOString(), accessUntil: Timestamp.fromDate(new Date(now().getTime() + 90 * 86400000)) };
+    await db.doc('companies/a').set({ nameKo: '테스트 주식회사', status: 'ACTIVE', ...entitlement });
+    await db.doc('companies/b').set({ nameKo: '다른 회사', status: 'ACTIVE', ...entitlement });
+    await db.doc('companies/c').set({ nameKo: '설정 검증 회사', status: 'ACTIVE', ...entitlement });
     for (const [uid, role, companyId, extra] of [
       ['admin', 'ADMIN', 'a', {}], ['member', 'MEMBER', 'a', { teamId: 'team1', divisionId: 'division1' }],
       ['lead', 'MEMBER', 'a', {}], ['head', 'SUB_ADMIN', 'a', {}],
@@ -125,7 +126,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
       ['no-division', 'SUB_ADMIN', 'a', {}], ['retired-delegate', 'SUB_ADMIN', 'a', { divisionId: 'division1', status: 'RESIGNED' }],
       ['outsider', 'ADMIN', 'b', {}], ['platform', 'SUPER_ADMIN', 'PLATFORM', {}], ['resigned', 'MEMBER', 'a', { status: 'RESIGNED' }],
       ['fresh-admin', 'ADMIN', 'c', {}],
-    ]) await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId, status: 'ACTIVE', ...extra });
+    ]) await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId, status: 'ACTIVE', mustChangePassword: false, ...extra });
     await db.doc('teams/team1').set({ companyId: 'a', leaderId: 'lead' });
     await db.doc('divisions/division1').set({ companyId: 'a', headId: 'head' });
 
@@ -135,6 +136,30 @@ test('official-letter server authorization, numbering and revisions', async t =>
       await denied(call('resigned', 'bootstrap'), 'permission-denied');
       await denied(call('peer', 'saveSettings', { settings: {} }), 'permission-denied');
       await denied(call('admin', 'unknown'), 'invalid-argument');
+    });
+    await t.test('requires completed password change, a current session and server-owned company entitlement', async () => {
+      const profileRef = db.doc('UserProfile/member');
+      const companyRef = db.doc('companies/a');
+      const profile = (await profileRef.get()).data(); const company = (await companyRef.get()).data();
+      for (const [patch, code] of [[{ mustChangePassword: true }, 'failed-precondition'], [{ sessionValidAfter: 200 }, 'unauthenticated']]) {
+        try { await profileRef.update(patch); await denied(call('member', 'bootstrap'), code); }
+        finally { await profileRef.set(profile); }
+      }
+      await profileRef.update({ sessionValidAfter: 200 });
+      try {
+        const fresh = await manage({ auth: { uid: 'member', token: { auth_time: 200 } }, data: { action: 'bootstrap' } });
+        assert.ok(fresh.templateStatus);
+      } finally { await profileRef.set(profile); }
+      for (const accessUntil of [Timestamp.fromMillis(now().getTime()), null, '2099-01-01']) {
+        try {
+          await companyRef.update({ accessUntil, subscriptionStatus: 'ACTIVE', subscriptionEndDate: '2099-01-01', createdAt: '2099-01-01' });
+          await denied(call('member', 'bootstrap'), 'permission-denied');
+        } finally { await companyRef.set(company); }
+      }
+      for (const status of ['DELETING', 'DELETED']) {
+        try { await companyRef.update({ status }); await denied(call('member', 'bootstrap'), 'permission-denied'); }
+        finally { await companyRef.set(company); }
+      }
     });
     await t.test('validates uploaded image bytes and initial counter, saves settings with optimistic version', async () => {
       const settings = { companyName: '테스트 주식회사', address: '서울특별시 강남구 테헤란로 87', representative: '홍길동',
@@ -473,8 +498,11 @@ test('official-letter server authorization, numbering and revisions', async t =>
       for (const [change, accepted] of [
         [() => profileRef.update({ role: 'MEMBER' }), ['permission-denied']],
         [() => profileRef.update({ status: 'RESIGNED' }), ['permission-denied']],
+        [() => profileRef.update({ mustChangePassword: true }), ['failed-precondition']],
+        [() => profileRef.update({ sessionValidAfter: 200 }), ['unauthenticated']],
         [() => profileRef.update({ companyId: 'b' }), ['permission-denied', 'aborted']],
         [() => companyRef.update({ status: 'SUSPENDED' }), ['permission-denied']],
+        [() => companyRef.update({ accessUntil: Timestamp.fromMillis(now().getTime()) }), ['permission-denied']],
         [() => settingsRef.update({ version: settings.version + 1 }), ['aborted']],
       ]) {
         const service = createOfficialLetterService({ db, bucket, now, renderPdf: async () => Buffer.from('%PDF'),
@@ -907,17 +935,22 @@ test('official-letter server authorization, numbering and revisions', async t =>
     await t.test('cached PDF downloads recheck access after reading private storage', async () => {
       const current = await load('legacy-issued');
       await call('member', 'pdf', { id: current.id, revision: current.revision });
-      const cachedBucket = { file: name => ({
-        save: async bytes => { files.set(name, bytes); },
-        delete: async () => { files.delete(name); },
-        download: async () => {
-          if (name.includes('/official-pdfs/')) await db.doc('UserProfile/member').update({ status: 'RESIGNED' });
-          return [files.get(name)];
-        },
-      }) };
-      const cachedService = createOfficialLetterService({ db, bucket: cachedBucket, now, renderPdf: async () => { throw new Error('a ready PDF must be downloaded from storage'); } });
-      await denied(cachedService({ auth: { uid: 'member' }, data: { action: 'pdf', id: current.id, revision: current.revision } }), 'permission-denied');
-      await db.doc('UserProfile/member').update({ status: 'ACTIVE' });
+      const profileRef = db.doc('UserProfile/member'); const companyRef = db.doc('companies/a');
+      const profile = (await profileRef.get()).data(); const company = (await companyRef.get()).data();
+      for (const [change, code] of [
+        [() => profileRef.update({ status: 'RESIGNED' }), 'permission-denied'],
+        [() => profileRef.update({ mustChangePassword: true }), 'failed-precondition'],
+        [() => profileRef.update({ sessionValidAfter: 200 }), 'unauthenticated'],
+        [() => companyRef.update({ accessUntil: Timestamp.fromMillis(now().getTime()) }), 'permission-denied'],
+      ]) {
+        const cachedBucket = { file: name => ({
+          save: async bytes => { files.set(name, bytes); }, delete: async () => { files.delete(name); },
+          download: async () => { if (name.includes('/official-pdfs/')) await change(); return [files.get(name)]; },
+        }) };
+        const cachedService = createOfficialLetterService({ db, bucket: cachedBucket, now, renderPdf: async () => { throw new Error('a ready PDF must be downloaded from storage'); } });
+        try { await denied(cachedService({ auth: { uid: 'member' }, data: { action: 'pdf', id: current.id, revision: current.revision } }), code); }
+        finally { await Promise.all([profileRef.set(profile), companyRef.set(company)]); }
+      }
     });
     await t.test('Seoul issuance day is independent of server timezone', () => {
       assert.equal(koreaDate(now()), '2026-10-23');

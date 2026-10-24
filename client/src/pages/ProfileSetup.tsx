@@ -1,24 +1,34 @@
 import React, { useState } from 'react';
-import { db } from '../firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
-import { useNavigate } from 'react-router-dom';
+import { reload, sendEmailVerification } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
+import { accountSecurity, clearCompanySignup, readCompanySignup, saveCompanySignup } from '../services/accountSecurityService';
 import { AlertCircle, Building2, User, Globe, ArrowRight, Loader2, LogOut } from 'lucide-react';
 
 export const ProfileSetup: React.FC = () => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, refreshSession } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [draft] = useState(() => readCompanySignup(user?.email || ''));
+  const [name, setName] = useState(draft.name);
+  const [orgKo, setOrgKo] = useState(draft.nameKo);
+  const [orgEn, setOrgEn] = useState(draft.nameEn);
+  const [verified, setVerified] = useState(!!user?.emailVerified);
+  const [notice, setNotice] = useState('');
 
-  const [name, setName] = useState('');
-  const [orgKo, setOrgKo] = useState('');
-  const [orgEn, setOrgEn] = useState('');
+  if (!user) return null;
 
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
+  const checkVerification = async (resend: boolean) => {
+    setError(''); setNotice(''); setLoading(true);
+    try {
+      if (resend) { await sendEmailVerification(user); setNotice('인증 메일을 보냈습니다. 받은편지함과 스팸함을 확인해 주세요.'); }
+      else {
+        await reload(user); await user.getIdToken(true); setVerified(user.emailVerified);
+        if (!user.emailVerified) setError('이메일 인증이 아직 확인되지 않았습니다. 인증 메일의 링크를 누른 후 다시 확인해 주세요.');
+        else setNotice('이메일 인증을 확인했습니다. 아래 조직 등록을 완료해 주세요.');
+      }
+    } catch (failure) { setError(failure instanceof Error ? failure.message : '이메일 인증 상태를 확인하지 못했습니다.'); }
+    finally { setLoading(false); }
+  };
 
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,55 +41,19 @@ export const ProfileSetup: React.FC = () => {
 
     setLoading(true);
     try {
-      const normalizedEmail = user.email!.trim().toLowerCase();
-      const domain = normalizedEmail.split('@')[1];
-      const companyId = domain.replace(/\./g, '_');
-
-      // 1. 회사 문서 생성
-      try {
-        await setDoc(doc(db, 'companies', companyId), {
-          nameKo: orgKo.trim(),
-          nameEn: orgEn.trim(),
-          domain,
-          adminUid: user.uid,
-          createdAt: new Date().toISOString(),
-          status: 'ACTIVE',
-          plan: 'FREE'
-        });
-      } catch {
-        // If signup created the company but stopped before profile creation,
-        // only its original owner may finish setup.
-        await updateDoc(doc(db, 'companies', companyId), {
-          nameKo: orgKo.trim(), nameEn: orgEn.trim(), domain
-        });
-      }
-
-      // 2. UserProfile 생성 (ADMIN 권한 부여)
-      await setDoc(doc(db, 'UserProfile', user.uid), {
-        uid: user.uid,
-        email: normalizedEmail,
-        name: name.trim(),
-        role: 'ADMIN',
-        companyId: companyId,
-        teamHistory: [],
-        mustChangePassword: false,
-        status: 'ACTIVE',
-        createdAt: new Date().toISOString()
-      });
-
-      // 3. Config 생성
-      await setDoc(doc(db, 'config', companyId), {
-        defaultDomain: domain,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.uid
-      });
-
-      console.log("[ProfileSetup] Recovery complete for:", companyId);
-      navigate('/dashboard', { replace: true });
-    } catch (err: any) {
-      setError('프로필 생성 중 오류가 발생했습니다: ' + err.message);
+      const company = { name: name.trim(), nameKo: orgKo.trim(), nameEn: orgEn.trim() };
+      saveCompanySignup(user.email || '', company);
+      await reload(user); await user.getIdToken(true); setVerified(user.emailVerified);
+      if (!user.emailVerified) { setError('조직 등록 전에 이메일 인증을 완료해 주세요.'); return; }
+      await accountSecurity.createCompany(company);
+      clearCompanySignup(user.email || '');
+      await refreshSession();
+      if (useAuthStore.getState().authError) throw new Error(useAuthStore.getState().authError || '계정 상태를 다시 확인해 주세요.');
+      window.location.hash = '/dashboard';
+    } catch (failure: unknown) {
+      setError(failure instanceof Error ? failure.message : '프로필 생성 중 오류가 발생했습니다.');
     } finally {
-      setLoading(true);
+      setLoading(false);
     }
   };
 
@@ -95,11 +69,19 @@ export const ProfileSetup: React.FC = () => {
           <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 rounded-2xl p-4 mb-8 flex gap-3">
             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-bold text-amber-800 dark:text-amber-300">프로필 정보가 없습니다.</p>
+              <p className="text-sm font-bold text-amber-800 dark:text-amber-300">이메일 인증 후 조직 등록을 완료해 주세요.</p>
               <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                계정은 존재하나 필수 프로필 데이터가 없습니다. 서비스 이용을 위해 정보를 다시 설정해주세요.
+                회사 식별자와 관리자 프로필은 서버에서 생성합니다. 기존 등록 복구는 해당 회사의 원래 소유자만 할 수 있습니다.
               </p>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-4 mb-6 space-y-3 text-sm">
+            <p className="font-semibold break-all">{user.email}</p>
+            <p>{verified ? '이메일 인증 완료' : '이메일 인증이 필요합니다. 인증 메일의 링크를 누른 뒤 확인해 주세요.'}</p>
+            <div className="flex flex-wrap gap-2"><button type="button" disabled={loading} onClick={() => { void checkVerification(false); }} className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-semibold">이메일 인증 확인</button>
+              {!verified && <button type="button" disabled={loading} onClick={() => { void checkVerification(true); }} className="px-3 py-2 rounded-lg bg-slate-100 text-slate-700">인증 메일 다시 보내기</button>}</div>
+            {notice && <p role="status" className="text-emerald-700">{notice}</p>}
           </div>
 
           <form onSubmit={handleSetup} className="space-y-5">
@@ -111,6 +93,7 @@ export const ProfileSetup: React.FC = () => {
                 </div>
                 <input
                   type="text"
+                  maxLength={100}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
@@ -129,6 +112,7 @@ export const ProfileSetup: React.FC = () => {
                   </div>
                   <input
                     type="text"
+                    maxLength={120}
                     value={orgKo}
                     onChange={(e) => setOrgKo(e.target.value)}
                     className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
@@ -145,6 +129,7 @@ export const ProfileSetup: React.FC = () => {
                   </div>
                   <input
                     type="text"
+                    maxLength={120}
                     value={orgEn}
                     onChange={(e) => setOrgEn(e.target.value)}
                     className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-900 dark:text-white"
@@ -164,7 +149,7 @@ export const ProfileSetup: React.FC = () => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !verified}
               className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 group active:scale-[0.98]"
             >
               {loading ? (
