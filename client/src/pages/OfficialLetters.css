@@ -12,5 +12,23 @@
 .official-letters-screen .ol-status-REJECTED { background: #fff7ed; color: #c2410c; }
 .official-letters-screen .ol-preview { max-width: 790px; padding: 40px; margin-inline: auto; border: 1px solid #e2e8f0; background: white; overflow-wrap: anywhere; }
 .official-letters-screen .ol-draft { font-size: 12px; font-weight: bold; text-align: right; color: #94a3b8; padding-bottom: 16px; }
+.official-letters-screen .ol-certificate { border: 2px solid #334155; color: #0f172a; }
+.official-letters-screen .ol-certificate-logo { max-width: 160px; max-height: 55px; object-fit: contain; margin-bottom: 24px; }
+.official-letters-screen .ol-certificate h3 { font-size: 30px; font-weight: 800; text-align: center; letter-spacing: .2em; }
+.official-letters-screen .ol-certificate-title-en { font-size: 14px; font-weight: 700; text-align: center; margin-top: 8px; }
+.official-letters-screen .ol-certificate-number { font-size: 12px; margin-block: 28px 10px; }
+.official-letters-screen .ol-certificate-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.official-letters-screen .ol-certificate-table th, .official-letters-screen .ol-certificate-table td { border: 1px solid #334155; padding: 14px 12px; vertical-align: middle; overflow-wrap: anywhere; }
+.official-letters-screen .ol-certificate-table th { background: #f8fafc; text-align: center; width: 22%; font-weight: 700; }
+.official-letters-screen .ol-certificate-table th span { display: block; margin-top: 5px; font-size: 10px; font-weight: 400; color: #475569; }
+.official-letters-screen .ol-certificate-statement { text-align: center; margin-block: 35px; line-height: 1.8; font-size: 15px; }
+.official-letters-screen .ol-certificate-statement p + p { font-size: 11px; margin-top: 10px; }
+.official-letters-screen .ol-certificate-date { text-align: center; font-size: 16px; }
+.official-letters-screen .ol-certificate-date span { display: block; margin-top: 6px; font-size: 12px; }
+.official-letters-screen .ol-certificate-signature { text-align: center; margin-block: 30px 45px; font-size: 19px; font-weight: 700; line-height: 1.9; }
+.official-letters-screen .ol-certificate-signature .ol-certificate-company-en { font-size: 13px; }
+.official-letters-screen .ol-certificate-signature span { display: block; font-size: 11px; font-weight: 400; color: #64748b; }
+.official-letters-screen .ol-certificate-footer { border-top: 1px solid #64748b; padding-top: 14px; line-height: 1.8; font-size: 10px; color: #475569; }
 @media (max-width: 600px) { .official-letters-screen .ol-card { padding: 16px; } .official-letters-screen .ol-preview { padding: 16px; } }
+@media (max-width: 600px) { .official-letters-screen .ol-certificate h3 { font-size: 24px; } .official-letters-screen .ol-certificate-table th, .official-letters-screen .ol-certificate-table td { padding: 10px 6px; font-size: 11px; } .official-letters-screen .ol-certificate-table th span { font-size: 8px; } }
 @media print { .official-letters-screen { display: none !important; } }

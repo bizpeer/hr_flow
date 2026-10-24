@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { AlertCircle, ArrowRight, FileCheck2, Loader2, RefreshCw } from 'lucide-react';
+import { officialLetters } from '../services/officialLetterService';
+import type { LetterSummary } from '../services/officialLetterService';
+import { useAuthStore } from '../store/authStore';
+
+type ApprovalFilter = 'PENDING' | 'ISSUED' | 'REJECTED' | 'ALL';
+
+function displayDate(value: string): string {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
+  }).format(date);
+}
+
+function inboxError(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+  if (code.endsWith('permission-denied')) return '서류 결재 권한이 없습니다. 회사 관리자에게 결재 권한과 소속 본부를 확인해 주세요.';
+  if (code.endsWith('unauthenticated')) return '로그인 상태를 확인한 후 다시 시도해 주세요.';
+  return '서류 결재함을 불러오지 못했습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.';
+}
+
+function ApprovalInbox({ role }: { role: 'ADMIN' | 'SUB_ADMIN' }) {
+  const alive = useRef(true);
+  const requestId = useRef(0);
+  const [state, setState] = useState<{ letters: LetterSummary[]; loading: boolean; error: string }>({ letters: [], loading: true, error: '' });
+  const [filter, setFilter] = useState<ApprovalFilter>('PENDING');
+
+  const load = useCallback(() => {
+    const request = ++requestId.current;
+    void officialLetters.approvals().then(result => {
+      if (alive.current && request === requestId.current) setState({ letters: result.letters, loading: false, error: '' });
+    }).catch((error: unknown) => {
+      if (alive.current && request === requestId.current) setState({ letters: [], loading: false, error: inboxError(error) });
+    });
+  }, []);
+
+  const refresh = useCallback(() => {
+    setState({ letters: [], loading: true, error: '' });
+    void load();
+  }, [load]);
+
+  useEffect(() => {
+    alive.current = true;
+    void load();
+    window.addEventListener('focus', refresh);
+    return () => { alive.current = false; requestId.current += 1; window.removeEventListener('focus', refresh); };
+  }, [load, refresh]);
+
+  const filtered = state.letters.filter(letter => filter === 'ALL' || letter.status === filter);
+  const statusLabels = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료' };
+
+  return (
+    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7" aria-label="서류 결재함">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><FileCheck2 className="h-5 w-5 text-indigo-600" />서류 결재함</h2>
+          <p className="mt-1 text-sm text-slate-500">{role === 'SUB_ADMIN' ? '관리자가 위임한 소속 본부의 서류를 검토할 수 있습니다.' : '회사에서 신청한 공문과 증명서의 결재를 관리합니다.'}</p>
+        </div>
+        <button type="button" disabled={state.loading} onClick={refresh} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${state.loading ? 'animate-spin' : ''}`} />새로고침</button>
+      </div>
+      <div className="mt-5 flex flex-wrap gap-2" aria-label="서류 상태 필터">
+        {(['PENDING', 'ISSUED', 'REJECTED', 'ALL'] as const).map(value => (
+          <button type="button" key={value} onClick={() => setFilter(value)} aria-pressed={filter === value} className={`rounded-xl px-3 py-2 text-xs font-bold ${filter === value ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{value === 'ALL' ? '전체' : statusLabels[value]}</button>
+        ))}
+      </div>
+      {state.loading ? <p role="status" className="flex items-center justify-center gap-2 py-12 text-sm text-slate-500"><Loader2 className="h-5 w-5 animate-spin" />서류 결재함을 불러오는 중입니다.</p> : state.error ? (
+        <div role="alert" className="mt-5 flex items-start gap-2 rounded-xl bg-rose-50 p-4 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /><div>{state.error}<button type="button" onClick={refresh} className="mt-2 block font-bold underline">다시 시도</button></div></div>
+      ) : filtered.length === 0 ? <p className="py-12 text-center text-sm text-slate-500">선택한 상태의 서류가 없습니다.</p> : (
+        <div className="mt-5 divide-y divide-slate-100">
+          {filtered.map(letter => (
+            <div key={letter.id} className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center">
+              <div className="min-w-0">
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold text-indigo-600">{letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{statusLabels[letter.status]}</span></div>
+                <p className="break-words font-bold text-slate-800">{letter.title}</p>
+                <p className="mt-1 text-xs text-slate-500">신청자 {letter.creatorName || '-'} · {displayDate(letter.createdAt || letter.updatedAt)} · {letter.number || '발행 전'}</p>
+              </div>
+              <Link to={`/documents?letter=${encodeURIComponent(letter.id)}`} className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-100 sm:self-auto">{letter.canReview ? '검토·결재' : '서류 확인'}<ArrowRight className="h-4 w-4" /></Link>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+export function DocumentApprovalInbox() {
+  const { user, userData } = useAuthStore();
+  if (!user || !userData || user.uid !== userData.uid || userData.status === 'RESIGNED' || !['ADMIN', 'SUB_ADMIN'].includes(userData.role)) {
+    return <p role="status" className="rounded-2xl bg-white p-6 text-sm text-slate-500">서류 결재 권한이 있는 회사 계정으로 로그인해 주세요.</p>;
+  }
+  return <ApprovalInbox key={`${user.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} role={userData.role === 'ADMIN' ? 'ADMIN' : 'SUB_ADMIN'} />;
+}

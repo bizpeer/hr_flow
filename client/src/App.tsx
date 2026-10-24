@@ -114,11 +114,12 @@ function App() {
                         <Route path="dashboard" element={<AttendanceDashboard />} />
                         <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
                         <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                        <Route path="official-letters" element={<ProtectedRoute><OfficialLetters /></ProtectedRoute>} />
+                        <Route path="documents" element={<ProtectedRoute><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
+                        <Route path="official-letters" element={<ProtectedRoute><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
                         <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
 
                         <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                        <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals /></ProtectedRoute>} />
+                        <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
                         <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
                         <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
                         <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />

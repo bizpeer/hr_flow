@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
+import { DocumentApprovalInbox } from '../components/DocumentApprovalInbox';
 
 interface LeaveRequest {
   id: string;
@@ -44,7 +45,7 @@ interface ExpenseRequest {
 
 export const AdminApprovals: React.FC = () => {
   const { userData, loading: authLoading } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE'>('LEAVE');
+  const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE' | 'DOCUMENT'>('LEAVE');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
@@ -95,7 +96,7 @@ export const AdminApprovals: React.FC = () => {
       unsubLeave(); unsubExpense();
       unsubDivs(); unsubTeams(); unsubUsers();
     };
-  }, [userData?.companyId]);
+  }, [authLoading, userData]);
   const handleUpdateStatus = async (collectionName: string, id: string, newStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'SUB_APPROVED') => {
     try {
       const userRole = employees.find(e => e.uid === userData?.uid)?.role || userData?.role;
@@ -137,15 +138,14 @@ export const AdminApprovals: React.FC = () => {
       const userProfile = employees.find(e => e.uid === req.userId);
       const userTeamId = req.teamId || userProfile?.teamId;
       const userTeam = teams.find(t => t.id === userTeamId);
-      const userDivId = req.divisionId || userTeam?.divisionId;
+      const userDivId = req.divisionId || userProfile?.divisionId || userTeam?.divisionId;
 
       const divMatch = selectedDivision === 'ALL' || userDivId === selectedDivision;
       const teamMatch = selectedTeam === 'ALL' || userTeamId === selectedTeam;
 
       // 4. 부관리자(SUB_ADMIN) 보안 필터링: 본인 본부 내역만 노출
       if (currentUserRole === 'SUB_ADMIN') {
-        const subAdminTeam = teams.find(t => t.id === currentProfile?.teamId);
-        const subAdminDivId = subAdminTeam?.divisionId;
+        const subAdminDivId = currentProfile?.divisionId || userData?.divisionId;
         
         // 본인 본부와 일치하지 않으면 제외
         if (userDivId !== subAdminDivId) return false;
@@ -194,7 +194,7 @@ export const AdminApprovals: React.FC = () => {
             <p className="text-slate-500 font-medium">부서별, 월별 안건을 고도화된 필터로 한눈에 조회합니다.</p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-4 bg-white p-2.5 rounded-[2.5rem] premium-shadow border border-slate-100">
+          {activeTab !== 'DOCUMENT' && <div className="flex flex-wrap items-center gap-4 bg-white p-2.5 rounded-[2.5rem] premium-shadow border border-slate-100">
             {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const).map(f => (
               <button
                 key={f}
@@ -206,11 +206,11 @@ export const AdminApprovals: React.FC = () => {
                 {f === 'PENDING' ? '결재대기' : f === 'APPROVED' ? '최종승인' : f === 'REJECTED' ? '반려건' : '전체보기'}
               </button>
             ))}
-          </div>
+          </div>}
         </div>
 
         {/* Advanced Filter Bars */}
-        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
+        {activeTab !== 'DOCUMENT' && <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
            {/* Month Selection */}
            <div className="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 flex flex-col gap-2">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -268,10 +268,10 @@ export const AdminApprovals: React.FC = () => {
                 className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
               />
            </div>
-        </div>
+        </div>}
 
         {/* Tab Selection */}
-        <div className="flex p-1.5 bg-slate-200/50 backdrop-blur-md rounded-[2.5rem] w-fit premium-shadow border border-slate-100">
+        <div className="flex flex-wrap p-1.5 bg-slate-200/50 backdrop-blur-md rounded-[2.5rem] w-fit premium-shadow border border-slate-100">
           <button 
             onClick={() => setActiveTab('LEAVE')}
             className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'LEAVE' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
@@ -286,8 +286,16 @@ export const AdminApprovals: React.FC = () => {
             <FileText className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'EXPENSE' ? 'text-emerald-600' : 'text-slate-400'}`} />
             지출 결의 ({filteredExpenses.length})
           </button>
+          <button
+            onClick={() => setActiveTab('DOCUMENT')}
+            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'DOCUMENT' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
+          >
+            <FileText className="w-4 h-4 md:w-5 md:h-5" />
+            서류 결재
+          </button>
         </div>
 
+        {activeTab === 'DOCUMENT' ? <DocumentApprovalInbox /> : <>
         {/* Desktop Table View */}
         <div className="hidden md:block bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[500px]">
            <div className="overflow-x-auto">
@@ -550,6 +558,7 @@ export const AdminApprovals: React.FC = () => {
               </div>
            </div>
         </div>
+        </>}
       </div>
 
       {/* 결재 상세 정보 모달 */}
@@ -739,13 +748,13 @@ export const AdminApprovals: React.FC = () => {
                  >
                     Close
                  </button>
-                 {selectedRequest.status === 'PENDING' && (
+                 {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && userData?.role === 'ADMIN')) && (
                     <>
                        <button 
-                        onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selectedRequest.id, 'APPROVED'); setSelectedRequest(null); }}
+                        onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selectedRequest.id); setSelectedRequest(null); }}
                         className="flex-[1.5] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
                        >
-                          Final Approve
+                          {userData?.role === 'SUB_ADMIN' ? '1차 승인' : '최종 승인'}
                        </button>
                     </>
                  )}

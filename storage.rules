@@ -36,7 +36,7 @@ service firebase.storage {
     }
 
     match /companies/{companyId}/{category}/{allPaths=**} {
-      allow read, write: if superAdmin() && category != 'official-assets';
+      allow read, write: if superAdmin() && !(category in ['official-assets', 'official-pdfs']);
     }
 
     match /{root}/{allPaths=**} {

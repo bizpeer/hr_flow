@@ -16,6 +16,7 @@ const files = new Map();
 const bucket = { file: name => ({
   save: async bytes => { files.set(name, bytes); },
   download: async () => { if (!files.has(name)) throw new Error('missing asset'); return [files.get(name)]; },
+  delete: async () => { files.delete(name); },
 }) };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 const now = () => new Date('2026-10-22T15:10:00.000Z');
@@ -26,7 +27,7 @@ const denied = (promise, code) => assert.rejects(promise, error => error.code ==
 const content = { recipient: '거래처 주식회사', reference: '사업 담당자', title: '참여의향서 제출의 건', body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n끝.', attachments: '회사 소개서 1부' };
 const load = async id => (await call('admin', 'get', { id })).letter;
 const create = async (uid = 'member') => (await call(uid, 'save', { content })).id;
-const submit = async id => { const letter = await load(id); return call('admin', 'submit', { id, revision: letter.revision }); };
+const submit = async id => { const letter = await load(id); return call(letter.creatorId === 'admin' ? 'admin2' : 'admin', 'submit', { id, revision: letter.revision }); };
 const review = async (uid, id, extras = {}) => { const letter = await load(id); return call(uid, 'review', { id, revision: letter.revision, decision: 'approve', ...extras }); };
 const allSteps = async id => { await review('lead', id); await review('head', id); return review('admin', id); };
 const inboxRef = (uid, letterId) => db.doc(`officialLetterNotifications/${uid}/items/${letterId}`);
@@ -34,6 +35,14 @@ const notification = async (uid, letterId) => (await inboxRef(uid, letterId).get
 const reassign = async (id, approverIds, extras = {}) => {
   const letter = await load(id);
   return call('admin', 'reassign', { id, revision: letter.revision, approverIds, reason: '담당자 변경', ...extras });
+};
+const certificate = { nameKo: '김문서', nameEn: 'Kim Munseo', birthDate: '1990-02-03', address: '서울특별시 강남구 테스트로 25',
+  division: '경영지원본부', position: '과장', startDate: '2021-03-15', endDate: '', purpose: '금융기관 제출용',
+  department: '인사팀', contactName: '인사담당자', contactPhone: '02-111-2222' };
+const createCertificate = async (documentType, values = certificate, uid = 'member') => (await call(uid, 'save', { documentType, content: { certificate: values } })).id;
+const setDocumentApprovers = async documentApproverIds => {
+  const settings = (await call('admin', 'bootstrap')).settings;
+  return call('admin', 'saveSettings', { settings: { ...settings, documentApproverIds }, expectedVersion: settings.version });
 };
 
 test('official-letter server authorization, numbering and revisions', async t => {
@@ -46,6 +55,8 @@ test('official-letter server authorization, numbering and revisions', async t =>
       ['lead', 'MEMBER', 'a', {}], ['head', 'SUB_ADMIN', 'a', {}],
       ['peer', 'MEMBER', 'a', { teamId: 'team2', divisionId: 'division2', annualSalary: 123456789, email: 'private@example.com' }],
       ['admin2', 'ADMIN', 'a', {}], ['retired-admin', 'ADMIN', 'a', { status: 'RESIGNED' }],
+      ['delegate', 'SUB_ADMIN', 'a', { divisionId: 'division1' }], ['delegate2', 'SUB_ADMIN', 'a', { divisionId: 'division2' }],
+      ['no-division', 'SUB_ADMIN', 'a', {}], ['retired-delegate', 'SUB_ADMIN', 'a', { divisionId: 'division1', status: 'RESIGNED' }],
       ['outsider', 'ADMIN', 'b', {}], ['platform', 'SUPER_ADMIN', 'PLATFORM', {}], ['resigned', 'MEMBER', 'a', { status: 'RESIGNED' }],
     ]) await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId, status: 'ACTIVE', ...extra });
     await db.doc('teams/team1').set({ companyId: 'a', leaderId: 'lead' });
@@ -108,7 +119,9 @@ test('official-letter server authorization, numbering and revisions', async t =>
       const current = await load(letterId);
       assert.equal(current.revision, 2); assert.equal(current.status, 'DRAFT');
       assert.ok(current.approvalLine.every(step => !step.approvedAt));
-      assert.equal((await call('admin', 'history', { id: letterId })).history[0].content.body, content.body);
+      const archived = (await call('admin', 'history', { id: letterId })).history[0];
+      assert.equal(archived.content.body, content.body);
+      assert.ok(files.has(archived.pdf.path));
       await denied(call('member', 'history', { id: letterId }), 'permission-denied');
       await denied(call('admin', 'pdf', { id: letterId, revision: 2 }), 'failed-precondition');
       await denied(call('admin', 'save', { id: letterId, revision: 1, content }), 'aborted');
@@ -116,6 +129,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal((await load(letterId)).number, '002-261023');
       await denied(call('member', 'deleteHistory', { id: letterId, revision: 2, historyId: '000001' }), 'permission-denied');
       await call('admin', 'deleteHistory', { id: letterId, revision: 2, historyId: '000001' });
+      assert.equal(files.has(archived.pdf.path), false, 'permanently deleting an archive removes its private PDF');
       assert.equal((await call('admin', 'history', { id: letterId })).history.length, 0);
       assert.equal((await db.doc('officialLetterNumbers/a_001-261023').get()).exists, true);
     });
@@ -315,6 +329,168 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal((await call('member', 'pdf', { id: 'legacy-issued', revision: 9 })).filename, '024-261014-024.pdf');
       assert.equal((await call('admin', 'history', { id: 'legacy-issued' })).history[0].number, '024-261014-024');
     });
+    await t.test('certificate validation enforces document type, required fields and real employment dates', async () => {
+      await denied(call('member', 'save', { documentType: 'UNSUPPORTED', content }), 'invalid-argument');
+      for (const field of ['nameKo', 'address', 'division', 'position', 'startDate', 'purpose']) {
+        await denied(createCertificate('EMPLOYMENT', { ...certificate, [field]: '' }), 'invalid-argument');
+      }
+      for (const values of [
+        { birthDate: '2026-02-30' }, { birthDate: '2026-10-24' }, { birthDate: '90-02-03' },
+        { startDate: '2027-01-01' }, { startDate: '2021-3-15' }, { startDate: '2021-02-29' }, { endDate: '2026-10-23' },
+      ]) await denied(createCertificate('EMPLOYMENT', { ...certificate, ...values }), 'invalid-argument');
+      for (const values of [{ endDate: '' }, { endDate: '2020-12-31' }, { endDate: '2026-10-24' }, { endDate: '2026-02-30' }]) {
+        await denied(createCertificate('CAREER', { ...certificate, ...values }), 'invalid-argument');
+      }
+      const employmentId = await createCertificate('EMPLOYMENT', { ...certificate, nameEn: '', birthDate: '', department: '', contactName: '', contactPhone: '' });
+      const employment = await load(employmentId);
+      assert.equal(employment.documentType, 'EMPLOYMENT'); assert.equal(employment.content.title, '재직증명서');
+      assert.equal(employment.content.certificate.nameKo, certificate.nameKo);
+      const careerId = await createCertificate('CAREER', { ...certificate, endDate: '2026-10-23' });
+      assert.equal((await load(careerId)).content.title, '경력증명서');
+      await denied(call('member', 'save', { id: employmentId, revision: 1, documentType: 'CAREER', content: { certificate: { ...certificate, endDate: '2026-10-23' } } }), 'invalid-argument');
+      const ordinaryId = await create();
+      assert.equal((await load(ordinaryId)).documentType, 'OFFICIAL');
+      await denied(call('member', 'save', { id: ordinaryId, revision: 1, documentType: 'EMPLOYMENT', content: { certificate } }), 'invalid-argument');
+    });
+    await t.test('only active same-company division managers can be granted final document approval', async () => {
+      for (const values of [['member'], ['admin'], ['no-division'], ['retired-delegate'], ['outsider'], ['platform'], ['missing'], ['delegate', 'delegate']]) {
+        await denied(setDocumentApprovers(values), 'invalid-argument');
+      }
+      const settings = (await call('admin', 'bootstrap')).settings;
+      await denied(call('delegate', 'saveSettings', { settings: { ...settings, documentApproverIds: ['delegate'] }, expectedVersion: settings.version }), 'permission-denied');
+      await setDocumentApprovers(['delegate', 'delegate2']);
+      assert.deepEqual((await call('admin', 'bootstrap')).settings.documentApproverIds, ['delegate', 'delegate2']);
+      assert.equal((await call('delegate', 'bootstrap')).settings.sealData, '');
+      await setDocumentApprovers([]);
+    });
+    await t.test('company changes during image upload cannot write another company settings', async () => {
+      await db.doc('UserProfile/switch-admin').set({ uid: 'switch-admin', role: 'ADMIN', companyId: 'a', status: 'ACTIVE' });
+      const settings = (await call('admin', 'bootstrap')).settings;
+      const switchingBucket = { file: name => ({
+        save: async bytes => { files.set(name, bytes); await db.doc('UserProfile/switch-admin').update({ companyId: 'b' }); },
+        download: async () => [files.get(name)], delete: async () => { files.delete(name); },
+      }) };
+      const switching = createOfficialLetterService({ db, bucket: switchingBucket, now, renderPdf: async () => Buffer.from('%PDF') });
+      await assert.rejects(switching({ auth: { uid: 'switch-admin' }, data: { action: 'saveSettings', settings: { ...settings, companyName: '다른 회사로 바뀐 세션' }, expectedVersion: settings.version } }),
+        error => ['permission-denied', 'aborted'].includes(error.code));
+      assert.equal((await call('admin', 'bootstrap')).settings.version, settings.version);
+      assert.equal((await db.doc('officialLetterSettings/b').get()).exists, false);
+    });
+    await t.test('an ADMIN author submits straight to issued with a saved private PDF but other ADMIN submissions still wait', async () => {
+      const id = await create('admin');
+      await reassign(id, ['lead', 'head']);
+      const draft = await load(id);
+      const previousFront = (await call('admin', 'bootstrap')).settings.lastFront;
+      const result = await call('admin', 'submit', { id, revision: draft.revision });
+      const issued = await load(id);
+      assert.equal(issued.status, 'ISSUED'); assert.equal(issued.automaticApproval, true);
+      assert.equal(issued.number, numberLabel(previousFront + 1, '2026-10-23'));
+      assert.equal(issued.approvedRevision, issued.revision); assert.equal(issued.approvedBy, 'admin');
+      assert.equal(result.pdfReady, true); assert.equal(issued.pdfReady, true);
+      assert.ok(issued.pdf.path.startsWith('companies/a/official-pdfs/'));
+      assert.equal(issued.pdf.revision, issued.revision); assert.equal(issued.pdf.number, issued.number);
+      assert.equal(typeof issued.pdf.readyAt, 'string'); assert.ok(files.has(issued.pdf.path));
+      const beforeDownload = renderCount;
+      await call('admin', 'pdf', { id, revision: issued.revision });
+      assert.equal(renderCount, beforeDownload, 'saved PDFs are downloaded without rendering again');
+      const waitingId = await create('admin'); await submit(waitingId);
+      assert.equal((await load(waitingId)).status, 'PENDING');
+      assert.notEqual((await load(waitingId)).automaticApproval, true);
+    });
+    await t.test('delegation is scoped to the submitted creator division and sequential approvals still apply', async () => {
+      const draftId = await create();
+      await setDocumentApprovers(['delegate', 'delegate2']);
+      await denied(call('delegate', 'get', { id: draftId }), 'permission-denied');
+      await submit(draftId);
+      const delegated = await call('delegate', 'get', { id: draftId });
+      assert.equal(delegated.letter.branding.sealData, '');
+      assert.equal(delegated.letter.permissions.canFinalApprove, false);
+      await denied(call('delegate2', 'get', { id: draftId }), 'permission-denied');
+      await assert.rejects(review('delegate', draftId), error => ['failed-precondition', 'permission-denied'].includes(error.code));
+      await review('lead', draftId); await review('head', draftId);
+      assert.equal((await call('delegate', 'get', { id: draftId })).letter.permissions.canFinalApprove, true);
+      assert.equal((await notification('delegate', draftId)).requiresAction, true);
+      // Later personnel transfers must not change the submitted document's division.
+      await db.doc('UserProfile/member').update({ divisionId: 'division2' });
+      await denied(call('delegate2', 'get', { id: draftId }), 'permission-denied');
+      const result = await review('delegate', draftId);
+      assert.equal(result.pdfReady, true); assert.equal((await load(draftId)).approvedBy, 'delegate');
+      assert.equal((await call('delegate', 'get', { id: draftId })).letter.branding.sealData, '');
+      await db.doc('UserProfile/member').update({ divisionId: 'division1' });
+      await setDocumentApprovers([]);
+      await denied(call('delegate', 'get', { id: draftId }), 'permission-denied');
+      await denied(call('delegate', 'pdf', { id: draftId, revision: 1 }), 'permission-denied');
+      assert.ok(!(await call('delegate', 'approvals')).letters.some(letter => letter.id === draftId));
+    });
+    await t.test('delegated managers cannot self-approve and revocation applies before final approval', async () => {
+      await setDocumentApprovers(['delegate']);
+      const ownId = await createCertificate('EMPLOYMENT', certificate, 'delegate'); await submit(ownId);
+      await denied(review('delegate', ownId), 'permission-denied');
+      const id = await create(); await submit(id); await review('lead', id); await review('head', id);
+      assert.equal((await notification('delegate', id)).requiresAction, true);
+      await setDocumentApprovers([]);
+      await denied(review('delegate', id), 'permission-denied');
+      await assert.rejects(call('delegate', 'ackNotification', { id }), error => ['permission-denied', 'not-found'].includes(error.code));
+      assert.equal((await load(id)).status, 'PENDING');
+      await setDocumentApprovers(['delegate']);
+      await db.doc('UserProfile/delegate').update({ status: 'RESIGNED' });
+      await denied(review('delegate', id), 'permission-denied');
+      await db.doc('UserProfile/delegate').update({ status: 'ACTIVE' });
+      await setDocumentApprovers([]);
+    });
+    await t.test('approvals and issued mine lists keep company, division, creator and draft boundaries', async () => {
+      const pending = await create(); await submit(pending);
+      const draft = await create();
+      const otherDivision = await create('peer'); await submit(otherDivision);
+      const issued = await createCertificate('EMPLOYMENT'); await submit(issued); await allSteps(issued);
+      await setDocumentApprovers(['delegate', 'delegate2']);
+      await denied(call('member', 'approvals'), 'permission-denied');
+      const adminList = (await call('admin', 'approvals')).letters;
+      assert.ok(adminList.some(letter => letter.id === pending)); assert.ok(adminList.some(letter => letter.id === otherDivision));
+      assert.ok(!adminList.some(letter => letter.id === draft));
+      const scoped = (await call('delegate', 'approvals')).letters;
+      assert.ok(scoped.some(letter => letter.id === pending));
+      assert.ok(!scoped.some(letter => [draft, otherDivision].includes(letter.id)));
+      const mine = (await call('member', 'mine')).letters;
+      assert.ok(mine.some(letter => letter.id === issued));
+      assert.ok(mine.every(letter => letter.creatorId === 'member' && letter.status === 'ISSUED'));
+      const summary = mine.find(letter => letter.id === issued);
+      assert.equal(summary.documentType, 'EMPLOYMENT'); assert.equal(summary.pdfReady, true);
+      assert.equal(typeof summary.createdAt, 'string'); assert.equal(summary.issueDate, '2026-10-23');
+      assert.ok(!(await call('peer', 'mine')).letters.some(letter => letter.id === issued));
+      await denied(call('outsider', 'get', { id: issued }), 'permission-denied');
+      await setDocumentApprovers([]);
+    });
+    await t.test('PDF generation failure preserves issuance and retries without assigning another number', async () => {
+      const id = await create('admin');
+      const failing = createOfficialLetterService({ db, bucket, now, renderPdf: async () => { throw new Error('renderer unavailable'); } });
+      const result = await failing({ auth: { uid: 'admin' }, data: { action: 'submit', id, revision: 1 } });
+      assert.equal(result.success, true); assert.equal(result.pdfReady, false);
+      const issued = await load(id);
+      assert.equal(issued.status, 'ISSUED'); assert.equal(issued.pdfReady, false);
+      const previousFront = (await call('admin', 'bootstrap')).settings.lastFront;
+      const recovered = await call('admin', 'pdf', { id, revision: 1 });
+      assert.equal(Buffer.from(recovered.base64, 'base64').toString(), '%PDF approved');
+      const ready = await load(id);
+      assert.equal(ready.pdfReady, true); assert.equal(ready.number, issued.number);
+      assert.equal((await call('admin', 'bootstrap')).settings.lastFront, previousFront);
+    });
+    await t.test('failed archive PDF deletion leaves history available for a later retry', async () => {
+      const id = await create(); await submit(id); await allSteps(id);
+      await call('admin', 'save', { id, revision: 1, content: { ...content, title: '새 보관 이력' } });
+      const archived = (await call('admin', 'history', { id })).history[0];
+      const failingBucket = { file: name => ({
+        save: async bytes => { files.set(name, bytes); }, download: async () => [files.get(name)],
+        delete: async () => { throw new Error('private storage temporarily unavailable'); },
+      }) };
+      const failing = createOfficialLetterService({ db, bucket: failingBucket, now, renderPdf: async () => Buffer.from('%PDF') });
+      await assert.rejects(failing({ auth: { uid: 'admin' }, data: { action: 'deleteHistory', id, revision: 2, historyId: archived.historyId } }));
+      assert.equal((await call('admin', 'history', { id })).history.length, 1);
+      assert.ok(files.has(archived.pdf.path));
+      await call('admin', 'deleteHistory', { id, revision: 2, historyId: archived.historyId });
+      assert.equal((await call('admin', 'history', { id })).history.length, 0);
+      assert.equal(files.has(archived.pdf.path), false);
+    });
     await t.test('concurrent issuance increments only the front counter without duplicates', async () => {
       const previous = (await call('admin', 'bootstrap')).settings.lastFront;
       const ids = await Promise.all(Array.from({ length: 4 }, () => create('admin')));
@@ -354,6 +530,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
     });
     await t.test('revalidates approval and active membership after PDF rendering', async () => {
       const current = await load(letterId);
+      await db.doc(`officialLetters/${letterId}`).update({ pdf: null, pdfReady: false });
       const revoked = createOfficialLetterService({ db, bucket, now, renderPdf: async () => {
         await db.doc(`officialLetters/${letterId}`).update({ status: 'DRAFT' }); return Buffer.from('%PDF');
       } });
@@ -363,6 +540,21 @@ test('official-letter server authorization, numbering and revisions', async t =>
         await db.doc('UserProfile/member').update({ status: 'RESIGNED' }); return Buffer.from('%PDF');
       } });
       await denied(resigned({ auth: { uid: 'member' }, data: { action: 'pdf', id: letterId, revision: current.revision } }), 'permission-denied');
+      await db.doc('UserProfile/member').update({ status: 'ACTIVE' });
+    });
+    await t.test('cached PDF downloads recheck access after reading private storage', async () => {
+      const current = await load('legacy-issued');
+      await call('member', 'pdf', { id: current.id, revision: current.revision });
+      const cachedBucket = { file: name => ({
+        save: async bytes => { files.set(name, bytes); },
+        delete: async () => { files.delete(name); },
+        download: async () => {
+          if (name.includes('/official-pdfs/')) await db.doc('UserProfile/member').update({ status: 'RESIGNED' });
+          return [files.get(name)];
+        },
+      }) };
+      const cachedService = createOfficialLetterService({ db, bucket: cachedBucket, now, renderPdf: async () => { throw new Error('a ready PDF must be downloaded from storage'); } });
+      await denied(cachedService({ auth: { uid: 'member' }, data: { action: 'pdf', id: current.id, revision: current.revision } }), 'permission-denied');
       await db.doc('UserProfile/member').update({ status: 'ACTIVE' });
     });
     await t.test('Seoul issuance day is independent of server timezone', () => {
@@ -384,6 +576,15 @@ test('official-letter server authorization, numbering and revisions', async t =>
       const output = path.resolve(__dirname, '../../tmp/pdfs'); fs.mkdirSync(output, { recursive: true });
       fs.writeFileSync(path.join(output, 'official-letter-sample.pdf'), short);
       fs.writeFileSync(path.join(output, 'official-letter-multipage.pdf'), long);
+      for (const [documentType, title, values] of [
+        ['EMPLOYMENT', '재직증명서', certificate], ['CAREER', '경력증명서', { ...certificate, endDate: '2026-09-30' }],
+      ]) {
+        const certificatePdf = await renderOfficialLetterPdf({ ...letter, documentType, content: { recipient: '', reference: '', title, body: '', attachments: '', certificate: values } }, { logo: bytes, seal: bytes });
+        assert.equal(certificatePdf.subarray(0, 5).toString(), '%PDF-');
+        assert.equal((certificatePdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1, 'a standard certificate must fit on one A4 page');
+        assert.notDeepEqual(certificatePdf, short, 'certificate layouts must differ from ordinary letters');
+        fs.writeFileSync(path.join(output, `certificate-${documentType.toLowerCase()}.pdf`), certificatePdf);
+      }
     });
   } finally { await deleteApp(app); }
 });

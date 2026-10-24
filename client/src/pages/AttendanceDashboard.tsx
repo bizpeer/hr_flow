@@ -8,6 +8,7 @@ import { collection, query, where, onSnapshot, addDoc, orderBy } from 'firebase/
 import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from 'date-fns';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
+import { MyIssuedDocuments } from '../components/MyIssuedDocuments';
 
 interface AttendanceRecord {
   id: string;
@@ -277,6 +278,8 @@ export const AttendanceDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <MyIssuedDocuments />
 
         {/* Bento Grid Layout */}
         <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">

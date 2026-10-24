@@ -1,12 +1,29 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
+export type DocumentType = 'OFFICIAL' | 'EMPLOYMENT' | 'CAREER';
+export interface CertificateContent {
+  nameKo: string;
+  nameEn: string;
+  birthDate: string;
+  address: string;
+  division: string;
+  position: string;
+  startDate: string;
+  endDate: string;
+  purpose: string;
+  department: string;
+  contactName: string;
+  contactPhone: string;
+}
+export interface DocumentApprover { uid: string; name: string; divisionId?: string | null; divisionName?: string }
 export interface LetterContent {
   recipient: string;
   reference: string;
   title: string;
   body: string;
   attachments: string;
+  certificate?: CertificateContent;
 }
 export interface ApprovalStep { uid: string; name: string; approvedAt: string | null }
 export interface ApproverCandidate {
@@ -18,6 +35,8 @@ export interface ApproverCandidate {
 }
 export interface LetterSettings {
   companyName: string;
+  companyNameEn?: string;
+  documentApproverIds?: string[];
   address: string;
   representative: string;
   phone: string;
@@ -35,6 +54,7 @@ export interface OfficialLetter {
   companyId: string;
   creatorId: string;
   creatorName: string;
+  documentType?: DocumentType;
   content: LetterContent;
   approvalLine: ApprovalStep[];
   participantIds: string[];
@@ -48,19 +68,35 @@ export interface OfficialLetter {
   rejectionReason?: string;
   reassignment?: { reason: string; by: string; at: string; previousApproverIds: string[] };
   updatedAt: string;
-  branding?: Pick<LetterSettings, 'companyName' | 'address' | 'representative' | 'phone' | 'email'> & { logoData?: string; sealData?: string };
+  permissions?: { canReview: boolean; canFinalApprove: boolean };
+  pdfReady?: boolean;
+  branding?: Pick<LetterSettings, 'companyName' | 'companyNameEn' | 'address' | 'representative' | 'phone' | 'email'> & { logoData?: string; sealData?: string };
 }
 export interface LetterSummary {
   id: string;
   title: string;
   recipient: string;
   creatorName: string;
+  documentType?: DocumentType;
+  creatorId?: string;
+  createdAt?: string;
+  issueDate?: string;
+  pdfReady?: boolean;
+  canReview?: boolean;
   status: OfficialLetter['status'];
   revision: number;
   number: string;
   updatedAt: string;
 }
 export interface LetterHistory extends OfficialLetter { historyId: string; archivedAt: string; archivedBy: string }
+export interface LetterBootstrap {
+  settings: LetterSettings | null;
+  companyName: string;
+  approvalLine: ApprovalStep[];
+  employeeDefaults?: Partial<CertificateContent>;
+  canApproveDocuments?: boolean;
+  documentApprovers?: DocumentApprover[];
+}
 
 const callable = httpsCallable<Record<string, unknown>, unknown>(functions, 'manageOfficialLetters');
 async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
@@ -68,12 +104,14 @@ async function call<T>(action: string, payload: Record<string, unknown> = {}): P
   return response.data as T;
 }
 export const officialLetters = {
-  bootstrap: () => call<{ settings: LetterSettings | null; companyName: string; approvalLine: ApprovalStep[] }>('bootstrap'),
+  bootstrap: () => call<LetterBootstrap>('bootstrap'),
   list: () => call<{ letters: LetterSummary[] }>('list'),
+  approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
+  mine: () => call<{ letters: LetterSummary[] }>('mine'),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
   saveSettings: (settings: LetterSettings) => call('saveSettings', { settings, expectedVersion: settings.version }),
-  save: (content: LetterContent, letter: OfficialLetter | null) => call<{ id: string }>('save', {
-    content, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
+  save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {
+    content, documentType, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),
   submit: (letter: OfficialLetter) => call('submit', { id: letter.id, revision: letter.revision }),
   review: (letter: OfficialLetter, decision: 'approve' | 'reject', options: { reason?: string; front?: number } = {}) =>

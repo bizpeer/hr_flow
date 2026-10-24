@@ -142,7 +142,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
     try {
       // This also checks current membership before opening a possibly stale alert.
       await acknowledgeOfficialNotification(notification);
-      if (alive.current) goTo(`/official-letters?letter=${encodeURIComponent(notification.letterId)}&notification=${encodeURIComponent(`${notification.revision}:${notification.updatedAt}`)}`);
+      if (alive.current) goTo(`/documents?letter=${encodeURIComponent(notification.letterId)}&notification=${encodeURIComponent(`${notification.revision}:${notification.updatedAt}`)}`);
     } catch (error) {
       if (alive.current) setActionError(officialNotificationError(error));
     } finally {
@@ -155,8 +155,8 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
   const knownUnread = !uncertain && unread.count !== null ? unread.count : null;
   const badgeLabel = knownUnread !== null && knownUnread > 99 ? '99+' : knownUnread;
   const accessibleLabel = !enabled ? '알림 및 공지사항' : uncertain
-    ? '공문 알림 연결 상태 확인 필요'
-    : `공문 알림 ${knownUnread}개 미확인`;
+    ? '서류 알림 연결 상태 확인 필요'
+    : `서류 알림 ${knownUnread}개 미확인`;
 
   return (
     <>
@@ -185,20 +185,20 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
           ref={panel}
           id={panelId}
           role="dialog"
-          aria-label="공문 결재 알림"
+          aria-label="서류 결재 알림"
           tabIndex={-1}
           className="fixed z-[200] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl outline-none"
           style={position}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
             <div>
-              <h2 className="text-sm font-bold">공문 결재 알림</h2>
-              <p className="mt-0.5 text-xs text-slate-500">최근 알림 20개 · 공문별 최신 상태</p>
+              <h2 className="text-sm font-bold">서류 결재 알림</h2>
+              <p className="mt-0.5 text-xs text-slate-500">최근 알림 20개 · 서류별 최신 상태</p>
             </div>
             <button type="button" onClick={() => { setOpen(false); anchor.current?.focus(); }} aria-label="알림 닫기" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><X className="h-4 w-4" /></button>
           </div>
           <div className="min-h-0 overflow-y-auto" aria-live="polite">
-            {!enabled ? <p className="p-4 text-sm text-slate-500">로그인 후 회사의 공문 알림을 확인할 수 있습니다.</p> : (
+            {!enabled ? <p className="p-4 text-sm text-slate-500">로그인 후 회사의 서류 알림을 확인할 수 있습니다.</p> : (
               <>
                 {(loadError || actionError) && (
                   <div role="alert" className="m-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
@@ -213,7 +213,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
                   </div>
                 )}
                 {!inbox.loaded && !loadError && <div className="flex items-center justify-center gap-2 p-6 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />알림을 불러오는 중입니다.</div>}
-                {inbox.loaded && !inbox.error && inbox.items.length === 0 && !inbox.fromCache && <p className="p-6 text-center text-sm text-slate-500">새로운 공문 알림이 없습니다.</p>}
+                {inbox.loaded && !inbox.error && inbox.items.length === 0 && !inbox.fromCache && <p className="p-6 text-center text-sm text-slate-500">새로운 서류 알림이 없습니다.</p>}
                 {!loadError && inbox.items.map(notification => (
                   <button
                     type="button"
@@ -235,7 +235,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
             )}
           </div>
           <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3 text-xs font-semibold">
-            <button type="button" onClick={() => goTo('/official-letters')} className="text-indigo-700 hover:underline">공문 관리 열기</button>
+            <button type="button" onClick={() => goTo('/documents')} className="text-indigo-700 hover:underline">서류발급 열기</button>
             <button type="button" onClick={() => goTo('/board')} className="flex items-center gap-1 text-slate-600 hover:underline"><BookOpen className="h-3.5 w-3.5" />공지사항 보기</button>
           </div>
         </div>,

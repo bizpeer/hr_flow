@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
-import { ref, uploadBytes, getBytes } from 'firebase/storage';
+import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 
 const testEnv = await initializeTestEnvironment({
   projectId: 'demo-hr-flow',
@@ -99,6 +99,8 @@ try {
     ]) await setDoc(doc(seed, 'officialLetterNotifications', uid, 'items', 'letter-a'), notification(uid, role, companyId));
     await setDoc(doc(seed, 'officialLetterNotifications', 'bob', 'items', 'wrong-company'), notification('bob', 'MEMBER', 'b'));
     await setDoc(doc(seed, 'officialLetterNotifications', 'bob', 'items', 'wrong-role'), notification('bob', 'ADMIN'));
+    await uploadBytes(ref(context.storage('test.appspot.com'), 'companies/a/official-pdfs/letter-a/r1.pdf'),
+      new Uint8Array([37, 80, 68, 70, 45]), { contentType: 'application/pdf' });
   });
 
   await assertFails(updateDoc(profile(bob, 'bob'), { role: 'SUPER_ADMIN' }));
@@ -166,6 +168,9 @@ try {
     const privateStorage = context.storage('test.appspot.com');
     await assertFails(uploadBytes(ref(privateStorage, 'companies/a/official-assets/seal.png'), png, { contentType: 'image/png' }));
     await assertFails(getBytes(ref(privateStorage, 'companies/a/official-assets/seal.png')));
+    await assertFails(uploadBytes(ref(privateStorage, 'companies/a/official-pdfs/letter-a/r1.pdf'), png, { contentType: 'application/pdf' }));
+    await assertFails(getBytes(ref(privateStorage, 'companies/a/official-pdfs/letter-a/r1.pdf')));
+    await assertFails(deleteObject(ref(privateStorage, 'companies/a/official-pdfs/letter-a/r1.pdf')));
   }
 
   const inboxItem = (context, uid, letterId = 'letter-a') => doc(db(context), 'officialLetterNotifications', uid, 'items', letterId);
