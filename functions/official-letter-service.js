@@ -82,7 +82,7 @@ function contentInput(data, type, today) {
 }
 
 /** All official-letter writes go through this service, including ADMIN writes. */
-function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Date() }) {
+function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf, now = () => new Date() }) {
   const read = (reader, ref) => reader === db ? ref.get() : reader.get(ref);
   const settingsRef = companyId => db.collection('officialLetterSettings').doc(companyId);
   const letterRef = letterId => db.collection('officialLetters').doc(id(letterId));
@@ -340,6 +340,36 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         .map(d => ({ uid: d.id, name: d.data().name || d.id, role: d.data().role,
           teamId: d.data().teamId || '', divisionId: d.data().divisionId || '' }))
         .sort((a, b) => a.name.localeCompare(b.name, 'ko')) };
+    }
+    if (action === 'sealPrintTest') {
+      // Test output uses only the current company's saved assets and never issues a document.
+      const { user, settings } = await db.runTransaction(async tx => {
+        const user = await actor(request, tx); admin(user);
+        const settings = (await tx.get(settingsRef(user.companyId))).data();
+        requireTemplate(settings);
+        if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) {
+          fail('invalid-argument', '저장된 템플릿 버전을 확인해 주세요.');
+        }
+        if (settings.version !== input.expectedVersion) fail('aborted', '회사 템플릿이 변경되었습니다. 최신 설정을 다시 불러와 주세요.');
+        if (settings.sealWidthMm == null || settings.sealHeightMm == null) {
+          fail('failed-precondition', '인감 가로·세로 mm 크기를 지정하고 회사 템플릿을 먼저 저장해 주세요.');
+        }
+        sealDimension(settings.sealWidthMm); sealDimension(settings.sealHeightMm);
+        return { user, settings };
+      });
+      const [seal] = await bucket.file(settings.sealPath).download();
+      const bytes = await renderPrintTestPdf(settings, { seal });
+      // Recheck access and the saved snapshot after rendering, before disclosing a seal PDF.
+      await db.runTransaction(async tx => {
+        const currentUser = await actor(request, tx); admin(currentUser);
+        if (currentUser.companyId !== user.companyId) fail('aborted', '소속 회사가 변경되었습니다. 다시 로그인해 주세요.');
+        const current = (await tx.get(settingsRef(user.companyId))).data();
+        if (current?.version !== settings.version || current.sealPath !== settings.sealPath ||
+            current.sealWidthMm !== settings.sealWidthMm || current.sealHeightMm !== settings.sealHeightMm) {
+          fail('aborted', '회사 템플릿이 변경되었습니다. 최신 설정으로 다시 테스트해 주세요.');
+        }
+      });
+      return { base64: bytes.toString('base64'), filename: 'seal-print-test.pdf' };
     }
     // Read paths also authorize against server profiles, never browser role claims.
     if (action === 'bootstrap') {

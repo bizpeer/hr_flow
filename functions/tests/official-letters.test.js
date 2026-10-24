@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { createOfficialLetterService, koreaDate, numberLabel } = require('../official-letter-service');
-const { renderOfficialLetterPdf } = require('../official-letter-pdf');
+const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('../official-letter-pdf');
 const fs = require('node:fs');
 const path = require('node:path');
 const { inflateSync } = require('node:zlib');
@@ -22,13 +22,18 @@ const bucket = { file: name => ({
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 const rectangularPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAA2UlEQVR4nO3YoRWAUBDEQFpI/x1ck9ACLisi1vMyH3PPwduYafDYH9AI5IYfQn8IPkIg+OEDwY8dCH7gQPCjBoIfMhD8eIHgBwsEP1Ig+GECGYhxA+t0go8QCH74QPBjB4IfOBD8qIHghwwEP14g+MECwY8UCH6YQAZi3MA6neAjBIIfPhD82IHgBw4EP2og+CEDwY8XCH6wQPAjBYIfJpCBGDewTif4CIHghw8EP3Yg+IEDwY8aCH7IQPDjBYIfLBD8SIHghwlkIMYNrNMJPkIg+OEDwY/9Zx+g/wbmoISrngAAAABJRU5ErkJggg==';
 // Read the final PDF's compressed drawing commands, without any PDF parser dependency.
-function imageMatrices(pdf) {
+function decodedPdfStreams(pdf) {
   const source = pdf.toString('latin1');
-  const matrices = [];
+  const streams = [];
   for (const stream of source.matchAll(/(\d+) 0 obj\b([\s\S]*?)stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
     if (!/\/FlateDecode\b/.test(stream[2])) continue;
-    let decoded;
-    try { decoded = inflateSync(Buffer.from(stream[3], 'latin1')).toString('latin1'); } catch { continue; }
+    try { streams.push(inflateSync(Buffer.from(stream[3], 'latin1')).toString('latin1')); } catch { /* Not a drawable Flate stream. */ }
+  }
+  return streams;
+}
+function imageMatrices(pdf) {
+  const matrices = [];
+  for (const decoded of decodedPdfStreams(pdf)) {
     for (const drawing of decoded.matchAll(/([-\d.]+) 0 0 ([-\d.]+) [-\d.]+ [-\d.]+ cm\s*\/(I\d+) Do/g)) {
       matrices.push({ width: Math.abs(Number(drawing[1])), height: Math.abs(Number(drawing[2])), image: drawing[3] });
     }
@@ -37,7 +42,11 @@ function imageMatrices(pdf) {
 }
 const now = () => new Date('2026-10-22T15:10:00.000Z');
 let renderCount = 0;
-const manage = createOfficialLetterService({ db, bucket, now, renderPdf: async () => { renderCount++; return Buffer.from('%PDF approved'); } });
+const printJobs = [];
+const manage = createOfficialLetterService({ db, bucket, now,
+  renderPdf: async () => { renderCount++; return Buffer.from('%PDF approved'); },
+  renderPrintTestPdf: async (settings, images) => { printJobs.push({ settings, images }); return Buffer.from('%PDF print calibration'); },
+});
 const call = (uid, action, data = {}) => manage({ ...(uid ? { auth: { uid, token: { role: 'SUPER_ADMIN' } } } : {}), data: { action, ...data } });
 const denied = (promise, code) => assert.rejects(promise, error => error.code === code);
 const content = { recipient: '거래처 주식회사', reference: '사업 담당자', title: '참여의향서 제출의 건', body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n끝.', attachments: '회사 소개서 1부' };
@@ -60,6 +69,16 @@ const setDocumentApprovers = async documentApproverIds => {
   const settings = (await call('admin', 'bootstrap')).settings;
   return call('admin', 'saveSettings', { settings: { ...settings, documentApproverIds }, expectedVersion: settings.version });
 };
+const records = snapshot => snapshot.docs.map(document => ({ path: document.ref.path, ...document.data() })).sort((a, b) => a.path.localeCompare(b.path));
+async function officialState() {
+  const [settings, letters, numbers, notifications] = await Promise.all([
+    db.collection('officialLetterSettings').get(), db.collection('officialLetters').get(),
+    db.collection('officialLetterNumbers').get(), db.collectionGroup('items').get(),
+  ]);
+  const histories = await Promise.all(letters.docs.map(document => document.ref.collection('history').get()));
+  return { settings: records(settings), letters: records(letters), numbers: records(numbers), notifications: records(notifications),
+    histories: histories.flatMap(records).sort((a, b) => a.path.localeCompare(b.path)) };
+}
 
 test('official-letter server authorization, numbering and revisions', async t => {
   try {
@@ -213,6 +232,75 @@ test('official-letter server authorization, numbering and revisions', async t =>
       await call('lead', 'review', { id, revision: 2, decision: 'reject', reason: '내용 보완 요청' });
       assert.equal((await load(id)).status, 'REJECTED');
       await submit(id); assert.equal((await load(id)).status, 'PENDING');
+    });
+    await t.test('seal print calibration requires the current company ADMIN, a saved template and a current settings version', async () => {
+      const { settings } = await call('admin', 'bootstrap');
+      const jobsBefore = printJobs.length;
+      await denied(call(null, 'sealPrintTest', { expectedVersion: settings.version }), 'unauthenticated');
+      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned', 'retired-admin']) {
+        await denied(call(uid, 'sealPrintTest', { expectedVersion: settings.version }), 'permission-denied');
+      }
+      await denied(call('outsider', 'sealPrintTest', { expectedVersion: settings.version, companyId: 'a', settings }), 'failed-precondition');
+      await denied(call('fresh-admin', 'sealPrintTest', { expectedVersion: 0 }), 'failed-precondition');
+      for (const expectedVersion of [undefined, '1', -1, 1.5]) {
+        await denied(call('admin', 'sealPrintTest', { expectedVersion }), 'invalid-argument');
+      }
+      await denied(call('admin', 'sealPrintTest', { expectedVersion: settings.version - 1 }), 'aborted');
+      assert.equal(printJobs.length, jobsBefore, 'unauthorized or stale requests must never render a seal');
+    });
+    await t.test('legacy or partially missing seal dimensions must be saved before print calibration', async () => {
+      const { settings } = await call('admin', 'bootstrap');
+      const jobsBefore = printJobs.length;
+      for (const [sealWidthMm, sealHeightMm] of [[undefined, undefined], [20, undefined], [undefined, 30]]) {
+        const legacy = { ...settings, companyId: 'c' };
+        delete legacy.logoData; delete legacy.sealData; delete legacy.sealWidthMm; delete legacy.sealHeightMm;
+        if (sealWidthMm !== undefined) legacy.sealWidthMm = sealWidthMm;
+        if (sealHeightMm !== undefined) legacy.sealHeightMm = sealHeightMm;
+        await db.doc('officialLetterSettings/c').set(legacy);
+        await denied(call('fresh-admin', 'sealPrintTest', { expectedVersion: legacy.version }), 'failed-precondition');
+      }
+      await db.doc('officialLetterSettings/c').delete();
+      assert.equal(printJobs.length, jobsBefore);
+    });
+    await t.test('print calibration returns only the PDF and leaves document history, numbering, inboxes and storage unchanged', async () => {
+      const { settings } = await call('admin', 'bootstrap');
+      const before = await officialState();
+      const storedBefore = [...files.entries()].map(([name, bytes]) => [name, Buffer.from(bytes)]);
+      const result = await call('admin', 'sealPrintTest', { expectedVersion: settings.version });
+      assert.equal(Buffer.from(result.base64, 'base64').toString(), '%PDF print calibration');
+      assert.match(result.filename, /\.pdf$/i);
+      assert.deepEqual(Object.keys(result).sort(), ['base64', 'filename']);
+      const job = printJobs.at(-1);
+      assert.equal(job.settings.companyId, 'a');
+      assert.equal(job.settings.sealWidthMm, settings.sealWidthMm);
+      assert.equal(job.settings.sealHeightMm, settings.sealHeightMm);
+      assert.deepEqual(job.images.seal, files.get(settings.sealPath));
+      assert.deepEqual(await officialState(), before);
+      assert.deepEqual([...files.entries()], storedBefore);
+    });
+    await t.test('print calibration rechecks ADMIN role, active membership, company and template version after rendering', async () => {
+      const profileRef = db.doc('UserProfile/admin2');
+      const settingsRef = db.doc('officialLetterSettings/a');
+      const companyRef = db.doc('companies/a');
+      const profile = (await profileRef.get()).data();
+      const settings = (await settingsRef.get()).data();
+      const company = (await companyRef.get()).data();
+      for (const [change, accepted] of [
+        [() => profileRef.update({ role: 'MEMBER' }), ['permission-denied']],
+        [() => profileRef.update({ status: 'RESIGNED' }), ['permission-denied']],
+        [() => profileRef.update({ companyId: 'b' }), ['permission-denied', 'aborted']],
+        [() => companyRef.update({ status: 'SUSPENDED' }), ['permission-denied']],
+        [() => settingsRef.update({ version: settings.version + 1 }), ['aborted']],
+      ]) {
+        const service = createOfficialLetterService({ db, bucket, now, renderPdf: async () => Buffer.from('%PDF'),
+          renderPrintTestPdf: async () => { await change(); return Buffer.from('%PDF stale seal'); },
+        });
+        try {
+          await assert.rejects(service({ auth: { uid: 'admin2' }, data: { action: 'sealPrintTest', expectedVersion: settings.version } }), error => accepted.includes(error.code));
+        } finally {
+          await Promise.all([profileRef.set(profile), settingsRef.set(settings), companyRef.set(company)]);
+        }
+      }
     });
     await t.test('submitted branding is frozen and only admins can retrieve its raw seal', async () => {
       const id = await create(); await submit(id);
@@ -707,6 +795,38 @@ test('official-letter server authorization, numbering and revisions', async t =>
         const seal = imageMatrices(pdf).at(-1);
         assert.ok(seal, 'the legacy PDF must still contain the seal');
         assert.equal(seal.width, legacyWidth); assert.equal(seal.height, legacyWidth / 2);
+      }
+    });
+    await t.test('seal print calibration PDF uses one A4 sheet, exact seal size and physical reference vectors', async () => {
+      const { settings } = await call('admin', 'bootstrap');
+      const output = path.resolve(__dirname, '../../tmp/pdfs');
+      const sealBytes = Buffer.from(rectangularPng.split(',')[1], 'base64');
+      const near = (value, points) => Math.abs(value - points) < 0.002;
+      for (const [sealWidthMm, sealHeightMm] of [[20, 30], [50, 50]]) {
+        const pdf = await renderSealPrintTestPdf({ ...settings, sealWidthMm, sealHeightMm }, { seal: sealBytes });
+        assert.equal(pdf.subarray(0, 8).toString(), '%PDF-1.7');
+        assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1);
+        assert.match(pdf.toString('latin1'), /\/MediaBox\s*\[0 0 595\.28 841\.89\]/);
+        assert.match(pdf.toString('latin1'), /\/PrintScaling\s*\/None\b/);
+        const seal = imageMatrices(pdf).at(-1);
+        assert.ok(seal); assert.ok(near(seal.width, sealWidthMm * 72 / 25.4)); assert.ok(near(seal.height, sealHeightMm * 72 / 25.4));
+        const commands = decodedPdfStreams(pdf).join('\n');
+        const lines = [...commands.matchAll(/([-\d.]+) ([-\d.]+) m\s+([-\d.]+) ([-\d.]+) l/g)].map(match => ({
+          x: Number(match[1]), y: Number(match[2]),
+          width: Math.abs(Number(match[3]) - Number(match[1])), height: Math.abs(Number(match[4]) - Number(match[2])),
+        }));
+        assert.ok(lines.some(line => near(line.width, 100 * 72 / 25.4) && line.height === 0), 'horizontal 100 mm ruler must be an actual vector of that length');
+        assert.ok(lines.some(line => near(line.height, 100 * 72 / 25.4) && line.width === 0), 'vertical 100 mm ruler must be an actual vector of that length');
+        for (let millimeters = 0; millimeters <= 100; millimeters++) {
+          const tick = millimeters % 10 === 0 ? 3 : millimeters % 5 === 0 ? 2 : 1;
+          assert.ok(lines.some(line => near(line.x, (40 + millimeters) * 72 / 25.4) && near(line.y, 176 * 72 / 25.4) &&
+            line.width === 0 && near(line.height, tick * 72 / 25.4)), `horizontal ruler tick ${millimeters} must be at its exact 1 mm position`);
+          assert.ok(lines.some(line => near(line.x, 40 * 72 / 25.4) && near(line.y, (176 + millimeters) * 72 / 25.4) &&
+            line.height === 0 && near(line.width, tick * 72 / 25.4)), `vertical ruler tick ${millimeters} must be at its exact 1 mm position`);
+        }
+        const squares = [...commands.matchAll(/[-\d.]+ [-\d.]+ ([-\d.]+) ([-\d.]+) re/g)];
+        assert.ok(squares.some(square => near(Math.abs(Number(square[1])), 50 * 72 / 25.4) && near(Math.abs(Number(square[2])), 50 * 72 / 25.4)), 'the physical reference square must measure 50 mm on both sides');
+        fs.writeFileSync(path.join(output, `seal-print-test-${sealWidthMm}x${sealHeightMm}.pdf`), pdf);
       }
     });
   } finally { await deleteApp(app); }

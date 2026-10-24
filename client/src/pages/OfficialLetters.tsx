@@ -347,6 +347,26 @@ export function OfficialLetters() {
       } catch (e) { viewer?.close(); throw e; }
     });
   }
+  async function downloadSealPrintTest(openViewer: boolean) {
+    const stored = savedSettingsRef.current;
+    if (!isAdmin || !stored || !canSealPrintTest || settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size) {
+      setError('저장된 인감과 mm 규격으로 시험인쇄하려면 회사 템플릿 저장을 먼저 완료해 주세요.'); return;
+    }
+    const viewer = openViewer ? window.open('about:blank', '_blank') : null;
+    await run(async () => {
+      try {
+        const result = await officialLetters.sealPrintTest(stored.version);
+        const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        if (viewer) viewer.location.replace(url);
+        else {
+          const anchor = document.createElement('a'); anchor.href = url; anchor.download = result.filename; anchor.click();
+        }
+        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+        setNotice(`${openViewer && !viewer ? '새 창이 차단되어 시험인쇄 PDF를 다운로드했습니다. ' : ''}저장된 인감과 mm 눈금이 포함된 시험용 PDF입니다. A4 · 실제 크기(100%)로 인쇄하고 자로 크기를 확인해 주세요. 문서번호와 발급 이력은 변경되지 않습니다.`);
+      } catch (failure) { viewer?.close(); throw failure; }
+    });
+  }
 
   if (!userData || userData.role === 'SUPER_ADMIN') return <div className="p-8">가입 회사 계정으로 접근해 주세요.</div>;
   const canEdit = !selected || isAdmin || (!selected.everIssued && selected.participantIds.includes(userData.uid));
@@ -365,6 +385,9 @@ export function OfficialLetters() {
     setContent(previous => certificateContent(documentType, { ...emptyCertificate(previous.certificate), [key]: value })); setDirty(true);
   };
   const hasUnavailableApprover = approverIds.some(uid => !candidates.some(candidate => candidate.uid === uid));
+  const savedSealMmKnown = [savedSettings?.sealWidthMm, savedSettings?.sealHeightMm].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 5 && value <= 50 && Math.abs(value * 10 - Math.round(value * 10)) < 0.000001);
+  const storedTemplateComplete = templateStatus?.configured ?? Boolean(savedSettings?.companyName && savedSettings.address && savedSettings.representative && savedSettings.logoPath && savedSettings.sealPath);
+  const canSealPrintTest = isAdmin && !busy && !settingsDirty && storedTemplateComplete && savedSealMmKnown && Boolean(savedSettings?.sealPath && savedSettings.version > 0);
 
   return <div className="official-letters-screen p-4 md:p-8 space-y-6">
     <header className="flex flex-wrap items-center justify-between gap-4">
@@ -409,6 +432,14 @@ export function OfficialLetters() {
         <div className="grid md:grid-cols-2 gap-4">{([['sealWidthMm', '인감 가로 (mm)'], ['sealHeightMm', '인감 세로 (mm)']] as const).map(([key, label]) => <label key={key} className="ol-label">{label}<input className="ol-input" type="number" required min={5} max={50} step={0.1} value={settings[key] ?? 23.3} onChange={event => changeSettings(previous => ({ ...previous, [key]: Number(event.target.value) }))} /></label>)}</div>
         <p className="text-sm text-slate-600">A4 PDF에서 이미지 전체의 가로·세로가 입력한 mm로 출력됩니다. 이미지 안의 흰색·투명 여백도 크기에 포함되므로 인감 테두리에 맞게 잘라낸 PNG를 권장합니다. 가로·세로를 원본 비율과 다르게 지정하면 인감 모양도 해당 비율로 늘어나거나 줄어듭니다.</p>
         <p className="text-sm font-semibold text-indigo-900">정확한 크기로 출력하려면 PDF 인쇄 설정을 ‘실제 크기 / 100%’로 선택하고 ‘페이지에 맞추기’ 등 확대·축소를 사용하지 마세요. 화면 미리보기의 실제 길이는 모니터 배율에 따라 다를 수 있습니다.</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"><h4 className="font-semibold">저장된 인감 시험인쇄</h4>
+          <p className="text-sm text-slate-600">서버에 저장된 인감과 가로·세로 mm 규격으로 A4 시험용 PDF를 만듭니다. PDF의 눈금을 실제 자와 비교해 인쇄 배율을 확인할 수 있으며 문서번호나 발급 이력은 변경하지 않습니다.</p>
+          {savedSealMmKnown && <p className="text-sm">저장된 인감 크기: <strong>{savedSettings?.sealWidthMm?.toFixed(1)} × {savedSettings?.sealHeightMm?.toFixed(1)} mm</strong></p>}
+          {(!storedTemplateComplete || !savedSealMmKnown) && <p className="text-sm font-semibold text-amber-800">회사정보·로고·인감과 mm 규격을 등록한 뒤 템플릿을 먼저 저장해 주세요. 예전 설정에 mm 규격이 없으면 현재 가로·세로 값을 저장해야 합니다.</p>}
+          {settingsDirty && <p className="text-sm font-semibold text-amber-800">미저장 변경이 있습니다. ‘템플릿 저장’을 완료한 뒤 시험인쇄할 수 있습니다.</p>}
+          {(settingsSaving || imageReadCount > 0) && <p className="text-sm text-indigo-700">이미지 처리와 템플릿 저장이 완료된 뒤 시험인쇄할 수 있습니다.</p>}
+          <div className="flex flex-wrap gap-2"><button type="button" className="ol-button" disabled={!canSealPrintTest} onClick={() => { void downloadSealPrintTest(false); }}><Download size={16} />인감 시험인쇄 PDF 다운로드</button><button type="button" className="ol-button" disabled={!canSealPrintTest} onClick={() => { void downloadSealPrintTest(true); }}>인감 시험인쇄 PDF 열기·인쇄</button></div>
+        </div>
       </div>
       <div className="bg-slate-50 rounded-xl p-4 space-y-3">
         <h3 className="font-bold">문서번호 시작점</h3>

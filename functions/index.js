@@ -9,7 +9,7 @@ initializeApp();
 // 서류는 ADMIN/위임받은 본부 SUB_ADMIN 승인과 현재 개정본 권한을 서버에서 검사합니다.
 const { getStorage } = require('firebase-admin/storage');
 const { createOfficialLetterService } = require('./official-letter-service');
-const { renderOfficialLetterPdf } = require('./official-letter-pdf');
+const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('./official-letter-pdf');
 const { createMemberService } = require('./member-service');
 exports.manageOfficialLetters = onCall({ memory: '512MiB', timeoutSeconds: 60, maxInstances: 10 }, async request => {
   try {
@@ -17,6 +17,7 @@ exports.manageOfficialLetters = onCall({ memory: '512MiB', timeoutSeconds: 60, m
       db: getFirestore('(default)'),
       bucket: getStorage().bucket('weberp-8f25f.firebasestorage.app'),
       renderPdf: renderOfficialLetterPdf,
+      renderPrintTestPdf: renderSealPrintTestPdf,
     })(request);
   } catch (error) {
     if (error instanceof HttpsError) throw error;

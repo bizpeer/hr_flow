@@ -115,6 +115,7 @@ export const officialLetters = {
   mine: () => call<{ letters: LetterSummary[] }>('mine'),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
   saveSettings: (settings: LetterSettings) => call<LetterSettingsSaved>('saveSettings', { settings, expectedVersion: settings.version }),
+  sealPrintTest: (expectedVersion: number) => call<{ base64: string; filename: string }>('sealPrintTest', { expectedVersion }),
   save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {
     content, documentType, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),
