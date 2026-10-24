@@ -1,5 +1,8 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
+const { createPrinterInspectionService, printerInspectionActions } = require('./official-letter-printers');
+
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 const fail = (code, message, details) => { throw new HttpsError(code, message, details); };
 const templateFields = { companyName: '회사명', address: '회사 주소', representative: '대표자', logoPath: '회사 로고', sealPath: '대표자 인감' };
@@ -146,11 +149,12 @@ function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf
   }
   async function uploadImage(value, companyId) {
     if (!value) return '';
-    if (typeof value !== 'string' || value.length > 420000) fail('invalid-argument', '이미지는 300KB 이하여야 합니다.');
+    // Bound base64 allocation before decoding; the JPEG data-URL prefix is 23 characters.
+    if (typeof value !== 'string' || value.length > 4 * Math.ceil(MAX_IMAGE_BYTES / 3) + 23) fail('invalid-argument', '이미지는 3MB 이하여야 합니다.');
     const match = /^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
     if (!match) fail('invalid-argument', 'PNG 또는 JPEG 이미지만 등록할 수 있습니다.');
     const bytes = Buffer.from(match[2], 'base64');
-    if (!bytes.length || bytes.length > 300 * 1024) fail('invalid-argument', '이미지는 300KB 이하여야 합니다.');
+    if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) fail('invalid-argument', '이미지는 3MB 이하여야 합니다.');
     // PDFKit validates actual image bytes and dimensions, not just the MIME label.
     const PDFImage = require('pdfkit/js/pdfkit').prototype.openImage;
     let parsed;
@@ -310,9 +314,11 @@ function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf
     return bytes;
   }
 
+  const managePrinters = createPrinterInspectionService({ db, actor, admin, text, id, now, koreaDate, certificateDate, requireTemplate, sealDimension });
   return async function manage(request) {
     const input = request.data || {};
     const action = input.action;
+    if (printerInspectionActions.includes(action)) return managePrinters(request);
     if (action === 'ackNotification') {
       return db.runTransaction(async tx => {
         const user = await actor(request, tx);

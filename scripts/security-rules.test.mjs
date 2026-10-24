@@ -78,6 +78,10 @@ try {
     await setDoc(doc(seed, 'officialLetters', 'letter-a', 'history', '000001'), { companyId: 'a', content: 'archived' });
     await setDoc(doc(seed, 'officialLetterSettings', 'a'), { companyId: 'a', lastFront: 1, lastSerial: 1 });
     await setDoc(doc(seed, 'officialLetterNumbers', 'a_001-261023-001'), { companyId: 'a' });
+    await setDoc(doc(seed, 'officialLetterPrinters', 'a', 'printers', 'printer-a'), { companyId: 'a', name: 'Private printer', version: 1, active: true });
+    await setDoc(doc(seed, 'officialLetterPrinters', 'a', 'printers', 'printer-a', 'inspections', 'inspection-a'), {
+      companyId: 'a', printerId: 'printer-a', recordedBy: 'alice', result: 'PASS', note: 'Private inspection'
+    });
     await setDoc(doc(seed, 'UserProfile', 'formeradmin'), {
       uid: 'formeradmin', role: 'MEMBER', companyId: 'a', status: 'ACTIVE'
     });
@@ -165,6 +169,18 @@ try {
     await assertFails(getDoc(doc(db(context), 'officialLetters', 'letter-a', 'history', '000001')));
     await assertFails(setDoc(doc(db(context), 'officialLetterSettings', 'a'), { companyId: 'a', lastSerial: 999 }));
     await assertFails(setDoc(doc(db(context), 'officialLetterNumbers', 'forged'), { companyId: 'a' }));
+    const printer = doc(db(context), 'officialLetterPrinters', 'a', 'printers', 'printer-a');
+    const inspection = doc(printer, 'inspections', 'inspection-a');
+    await assertFails(getDoc(printer));
+    await assertFails(getDocs(collection(db(context), 'officialLetterPrinters', 'a', 'printers')));
+    await assertFails(setDoc(printer, { companyId: 'a', active: false }));
+    await assertFails(updateDoc(printer, { name: 'Browser edit' }));
+    await assertFails(deleteDoc(printer));
+    await assertFails(getDoc(inspection));
+    await assertFails(getDocs(collection(printer, 'inspections')));
+    await assertFails(setDoc(doc(printer, 'inspections', 'forged'), { companyId: 'a', result: 'PASS' }));
+    await assertFails(updateDoc(inspection, { result: 'PASS', note: 'History overwritten' }));
+    await assertFails(deleteDoc(inspection));
     const privateStorage = context.storage('test.appspot.com');
     await assertFails(uploadBytes(ref(privateStorage, 'companies/a/official-assets/seal.png'), png, { contentType: 'image/png' }));
     await assertFails(getBytes(ref(privateStorage, 'companies/a/official-assets/seal.png')));

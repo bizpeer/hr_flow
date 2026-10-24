@@ -3,6 +3,8 @@ import type { FormEvent } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Settings, Download, History, CheckCircle, Send, RefreshCw, X, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { PrinterInspections } from '../components/PrinterInspections';
+import type { PrinterNavigationGuard } from '../components/PrinterInspections';
 import { officialLetters, seoulDate, koreanDate, previewNumber, readLetterImage } from '../services/officialLetterService';
 import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import './OfficialLetters.css';
@@ -71,6 +73,7 @@ export function OfficialLetters() {
   const settingsDirtyRef = useRef(false);
   const settingsEditRef = useRef(0);
   const settingsSavingRef = useRef(false);
+  const printerGuardRef = useRef<PrinterNavigationGuard | null>(null);
   const pendingImageReads = useRef(new Set<Promise<void>>());
   const imageReadTokens = useRef({ logoData: 0, sealData: 0 });
   const imageErrorsRef = useRef<Partial<Record<TemplateImageKey, string>>>({});
@@ -117,6 +120,18 @@ export function OfficialLetters() {
     settingsEditRef.current++; imageErrorsRef.current = {}; setImageErrors({});
     return true;
   }, []);
+  const registerPrinterGuard = useCallback((guard: PrinterNavigationGuard | null) => { printerGuardRef.current = guard; }, []);
+  const confirmLeaveWorkspace = useCallback(() => {
+    const guard = printerGuardRef.current;
+    const printerPending = !!guard?.hasPending();
+    if (printerPending) {
+      if (guard?.isSaving()) { setError('프린터 등록 정보 또는 점검을 저장하고 있습니다. 완료된 뒤 이동해 주세요.'); return false; }
+      if (!window.confirm('저장하지 않은 프린터 등록 정보 또는 점검 입력이 있습니다. 내용을 버리고 이동할까요?')) return false;
+    }
+    if (!confirmLeaveSettings()) return false;
+    if (printerPending) guard?.discard();
+    return true;
+  }, [confirmLeaveSettings]);
 
   function changeSettings(updater: (previous: LetterSettings) => LetterSettings, imageCompletion = false) {
     if (settingsSavingRef.current && !imageCompletion) return;
@@ -168,7 +183,7 @@ export function OfficialLetters() {
   }, []);
   useEffect(() => { navigationUrlRef.current = window.location.href; }, [routerLocation.key, routerLocation.pathname, routerLocation.search, routerLocation.hash]);
   useEffect(() => {
-    const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0;
+    const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0 || !!printerGuardRef.current?.hasPending();
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (hasPendingSettings() || dirtyRef.current) { event.preventDefault(); event.returnValue = ''; }
     };
@@ -176,14 +191,14 @@ export function OfficialLetters() {
       if (!hasPendingSettings() || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
       if (!(anchor instanceof HTMLAnchorElement) || anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.href === window.location.href) return;
-      if (!confirmLeaveSettings()) { event.preventDefault(); event.stopImmediatePropagation(); }
+      if (!confirmLeaveWorkspace()) { event.preventDefault(); event.stopImmediatePropagation(); }
     };
     const beforeProgrammaticNavigation = (event: Event) => {
-      if (hasPendingSettings() && !confirmLeaveSettings()) event.preventDefault();
+      if (hasPendingSettings() && !confirmLeaveWorkspace()) event.preventDefault();
     };
     const beforeHistory = (event: Event) => {
       if (window.location.href === navigationUrlRef.current) return;
-      if (hasPendingSettings() && !confirmLeaveSettings()) {
+      if (hasPendingSettings() && !confirmLeaveWorkspace()) {
         event.stopImmediatePropagation();
         const previous = new URL(navigationUrlRef.current);
         window.history.replaceState(window.history.state, '', previous.href);
@@ -200,14 +215,14 @@ export function OfficialLetters() {
       window.removeEventListener('hr-flow:before-navigation', beforeProgrammaticNavigation);
       if (activeTemplateHistoryGuard === beforeHistory) activeTemplateHistoryGuard = null;
     };
-  }, [confirmLeaveSettings]);
+  }, [confirmLeaveWorkspace]);
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
   useEffect(() => {
     if (!linkedLetterId || handledLink.current === linkedKey || !currentUserId || currentRole === 'SUPER_ADMIN') return;
     let active = true;
     Promise.resolve().then(async () => {
       if (!active) return;
-      if (!confirmLeaveSettings()) { handledLink.current = linkedKey; setSettledLink(linkedKey); return; }
+      if (!confirmLeaveWorkspace()) { handledLink.current = linkedKey; setSettledLink(linkedKey); return; }
       if (dirtyRef.current && !window.confirm('저장하지 않은 입력을 닫고 알림의 서류를 열까요?')) {
         handledLink.current = linkedKey; setSettledLink(linkedKey); return;
       }
@@ -218,7 +233,7 @@ export function OfficialLetters() {
       setApprovalOpen(false); setReassignmentOpen(false); setTab('documents'); setError('');
     }).catch(e => { if (active) { handledLink.current = linkedKey; setSettledLink(linkedKey); setError(errorMessage(e)); } });
     return () => { active = false; };
-  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings]);
+  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveWorkspace]);
 
   function setLetterLink(id?: string) {
     const key = letterLinkKey(id || '');
@@ -238,7 +253,7 @@ export function OfficialLetters() {
     try { await action(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   async function open(id: string) {
-    if (!confirmLeaveSettings()) return;
+    if (!confirmLeaveWorkspace()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 선택한 서류를 열까요?')) return;
     setLetterLink(id);
     await run(async () => {
@@ -269,7 +284,7 @@ export function OfficialLetters() {
     });
   }
   function begin(type: DocumentType) {
-    if (!confirmLeaveSettings()) return;
+    if (!confirmLeaveWorkspace()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새 서류를 작성할까요?')) return;
     setLetterLink(); setTab('documents'); setSelected(null); setDocumentType(type);
     setContent(type === 'OFFICIAL' ? emptyContent() : certificateContent(type, emptyCertificate(employeeDefaults)));
@@ -396,7 +411,7 @@ export function OfficialLetters() {
       <div className="flex flex-wrap gap-2">{(Object.keys(documentLabels) as DocumentType[]).map(type => <button key={type} className="ol-primary" disabled={busy} onClick={() => begin(type)}><Plus size={17} />{documentLabels[type]} 작성</button>)}</div>
     </header>
     <div className="flex flex-wrap gap-2">
-      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveSettings()) setTab('documents'); }}><FileText size={16} />서류함</button>
+      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveWorkspace()) setTab('documents'); }}><FileText size={16} />서류함</button>
       {isAdmin && <button className={tab === 'settings' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
       <button className="ol-button" disabled={busy} onClick={() => { if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새로고침할까요?')) return; void run(async () => { await reloadSelected(); setNotice('최신 내용을 불러왔습니다.'); }); }}><RefreshCw size={16} />새로고침</button>
       {busy && <span role="status" className="text-sm self-center text-indigo-600">처리 중…</span>}
@@ -406,9 +421,9 @@ export function OfficialLetters() {
     {templateStatus && !templateStatus.configured && <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{missingTemplateMessage(templateStatus.missingFields)}{isAdmin && tab !== 'settings' && <button type="button" className="ol-button mt-2" disabled={busy} onClick={() => setTab('settings')}>회사 템플릿 등록</button>}</div>}
     {!isAdmin && canApproveDocuments && <p className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900">서류 최종 승인 권한이 부여되어 있습니다. 본인 작성 서류를 제외한 같은 본부의 서류를 순차 결재 완료 후 최종 승인할 수 있습니다. 회사 로고·인감·번호 설정은 회사 관리자만 변경할 수 있습니다.</p>}
 
-    {tab === 'settings' && isAdmin ? <form className="ol-card space-y-5" onSubmit={event => { void saveTemplate(event); }}>
+    {tab === 'settings' && isAdmin ? <><form className="ol-card space-y-5" onSubmit={event => { void saveTemplate(event); }}>
       <h2 className="text-xl font-bold">회사 서류 기본정보</h2>
-      <p className="text-sm text-slate-500">로고와 인감은 300KB 이하 PNG/JPEG, 최대 4096px로 등록합니다. 인감 원본은 회사 관리자에게만 표시됩니다.</p>
+      <p className="text-sm text-slate-500">로고와 인감은 3MB 이하 PNG/JPEG, 최대 4096px로 등록합니다. 인감 원본은 회사 관리자에게만 표시됩니다.</p>
       {settingsDirty && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-900">저장하지 않은 템플릿 변경이 있습니다. 이미지 미리보기만으로는 등록되지 않습니다. 아래 ‘템플릿 저장’을 눌러 서버 저장 완료를 확인해 주세요.</p>}
       {imageReadCount > 0 && <p role="status" className="text-sm text-indigo-700">이미지 형식·크기를 확인하고 읽는 중입니다. 완료 후 템플릿을 저장할 수 있습니다.</p>}
       {settingsSaving && <p role="status" className="text-sm text-indigo-700">회사정보·이미지·인감 규격을 저장하고 서버 저장본을 다시 확인하는 중입니다.</p>}
@@ -455,7 +470,7 @@ export function OfficialLetters() {
       </fieldset>
       <div className="flex flex-wrap gap-2"><button className="ol-primary" disabled={busy || Object.values(imageErrors).some(Boolean)}>템플릿 저장</button><button type="button" className="ol-button" disabled={busy || !settingsDirty} onClick={() => { confirmLeaveSettings(); }}>저장 전 변경 취소</button></div>
       </fieldset>
-    </form> : <>
+    </form><PrinterInspections savedSettings={savedSettings} templateReady={storedTemplateComplete && savedSealMmKnown && Boolean(savedSettings?.version)} templatePending={settingsDirty || settingsSaving || imageReadCount > 0} registerGuard={registerPrinterGuard} /></> : <>
       <section className="ol-card">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
           <div className="flex flex-wrap gap-2"><select aria-label="서류 종류 필터" className="ol-input max-w-48" value={typeFilter} onChange={event => setTypeFilter(event.target.value as DocumentType | 'ALL')}><option value="ALL">모든 서류</option>{(Object.keys(documentLabels) as DocumentType[]).map(type => <option key={type} value={type}>{documentLabels[type]}</option>)}</select><input aria-label="서류 검색" placeholder="문서번호, 제목, 대상자, 작성자 검색" className="ol-input max-w-sm" value={search} onChange={e => setSearch(e.target.value)} /></div></div>

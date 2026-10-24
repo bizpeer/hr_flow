@@ -6,7 +6,8 @@ const { createOfficialLetterService, koreaDate, numberLabel } = require('../offi
 const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('../official-letter-pdf');
 const fs = require('node:fs');
 const path = require('node:path');
-const { inflateSync } = require('node:zlib');
+const { inflateSync, deflateSync, crc32 } = require('node:zlib');
+const { randomUUID } = require('node:crypto');
 
 if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '')) {
   throw new Error('A loopback FIRESTORE_EMULATOR_HOST is required; production tests are prohibited.');
@@ -21,6 +22,25 @@ const bucket = { file: name => ({
 }) };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
 const rectangularPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAA2UlEQVR4nO3YoRWAUBDEQFpI/x1ck9ACLisi1vMyH3PPwduYafDYH9AI5IYfQn8IPkIg+OEDwY8dCH7gQPCjBoIfMhD8eIHgBwsEP1Ig+GECGYhxA+t0go8QCH74QPBjB4IfOBD8qIHghwwEP14g+MECwY8UCH6YQAZi3MA6neAjBIIfPhD82IHgBw4EP2og+CEDwY8XCH6wQPAjBYIfJpCBGDewTif4CIHghw8EP3Yg+IEDwY8aCH7IQPDjBYIfLBD8SIHghwlkIMYNrNMJPkIg+OEDwY/9Zx+g/wbmoISrngAAAABJRU5ErkJggg==';
+const jpeg = 'data:image/jpeg;base64,/9j/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABQf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCNgCFDf//Z';
+function pngFixture(width, height, compression = 0, targetBytes, pixel = 136) {
+  const chunk = (name, data) => {
+    const type = Buffer.from(name); const size = Buffer.alloc(4); size.writeUInt32BE(data.length);
+    const checksum = Buffer.alloc(4); checksum.writeUInt32BE(crc32(Buffer.concat([type, data])));
+    return Buffer.concat([size, type, data, checksum]);
+  };
+  const header = Buffer.alloc(13); header.writeUInt32BE(width); header.writeUInt32BE(height, 4); header[8] = 8; header[9] = 6;
+  const rows = Buffer.alloc((width * 4 + 1) * height, pixel);
+  for (let y = 0; y < height; y++) rows[y * (width * 4 + 1)] = 0;
+  const chunks = [Buffer.from('89504e470d0a1a0a', 'hex'), chunk('IHDR', header), chunk('IDAT', deflateSync(rows, { level: compression }))];
+  if (targetBytes) {
+    const text = Buffer.alloc(targetBytes - Buffer.concat(chunks).length - 24, 120);
+    text[0] = 110; text[1] = 0; // A valid PNG tEXt keyword and separator, before the IEND chunk.
+    chunks.push(chunk('tEXt', text));
+  }
+  chunks.push(chunk('IEND', Buffer.alloc(0)));
+  return Buffer.concat(chunks);
+}
 // Read the final PDF's compressed drawing commands, without any PDF parser dependency.
 function decodedPdfStreams(pdf) {
   const source = pdf.toString('latin1');
@@ -69,6 +89,16 @@ const setDocumentApprovers = async documentApproverIds => {
   const settings = (await call('admin', 'bootstrap')).settings;
   return call('admin', 'saveSettings', { settings: { ...settings, documentApproverIds }, expectedVersion: settings.version });
 };
+const createPrinter = async (values = {}, uid = 'admin') => (await call(uid, 'savePrinter', {
+  printer: { name: '총무팀 프린터', model: 'Office Laser 500', location: '서울 본사 3층', active: true, ...values }, expectedVersion: 0,
+})).printer;
+const printerInspection = settings => ({ inspectedOn: '2026-10-23', measuredSealWidthMm: settings.sealWidthMm,
+  measuredSealHeightMm: settings.sealHeightMm, horizontal100Mm: 100, vertical100Mm: 100,
+  toleranceMm: 0.5, note: '실제 크기 출력 후 자로 확인', printSettings: 'A4 / 실제 크기 100%', actualSizeConfirmed: true });
+const recordInspection = async (printer, settings, values = {}, extras = {}, uid = 'admin') => call(uid, 'recordPrinterInspection', {
+  printerId: printer.id, expectedPrinterVersion: printer.version, expectedSettingsVersion: settings.version,
+  requestId: randomUUID(), inspection: { ...printerInspection(settings), ...values }, ...extras,
+});
 const records = snapshot => snapshot.docs.map(document => ({ path: document.ref.path, ...document.data() })).sort((a, b) => a.path.localeCompare(b.path));
 async function officialState() {
   const [settings, letters, numbers, notifications] = await Promise.all([
@@ -170,6 +200,161 @@ test('official-letter server authorization, numbering and revisions', async t =>
       await call('admin', 'saveSettings', { settings: { ...limits, sealWidthMm: 20.1, sealHeightMm: 30.2 }, expectedVersion: limits.version });
       const precise = (await call('admin', 'bootstrap')).settings;
       assert.equal(precise.sealWidthMm, 20.1); assert.equal(precise.sealHeightMm, 30.2);
+    });
+
+    await t.test('valid PNG uploads above the former 300 KiB limit and up to 3 MiB are accepted', async () => {
+      const before = (await call('admin', 'bootstrap')).settings;
+      const large = pngFixture(1023, 768, 0, 3 * 1024 * 1024);
+      const largeSeal = pngFixture(1023, 768, 0, 3 * 1024 * 1024, 170);
+      assert.equal(large.length, 3 * 1024 * 1024); assert.equal(largeSeal.length, large.length);
+      const logoData = `data:image/png;base64,${large.toString('base64')}`;
+      const sealData = `data:image/png;base64,${largeSeal.toString('base64')}`;
+      await call('admin', 'saveSettings', { settings: { ...before, logoData, sealData }, expectedVersion: before.version });
+      const saved = (await call('admin', 'bootstrap')).settings;
+      assert.equal(saved.logoData, logoData); assert.equal(saved.sealData, sealData);
+      assert.deepEqual(files.get(saved.logoPath), large); assert.deepEqual(files.get(saved.sealPath), largeSeal);
+      const rawSettings = (await db.doc('officialLetterSettings/a').get()).data();
+      assert.equal(rawSettings.logoData, undefined); assert.equal(rawSettings.sealData, undefined);
+      assert.ok(!JSON.stringify(rawSettings).includes('data:image/'), 'large image bytes must stay outside Firestore');
+      const pdf = await renderOfficialLetterPdf({ number: 'UPLOAD-TEST', revision: 1, issueDate: '2026-10-23', branding: saved, content }, { logo: large, seal: largeSeal });
+      assert.equal(pdf.subarray(0, 5).toString(), '%PDF-'); assert.equal(imageMatrices(pdf).length, 2);
+      const oversized = pngFixture(1023, 768, 0, 3 * 1024 * 1024 + 1);
+      assert.equal(oversized.length, 3 * 1024 * 1024 + 1);
+      await denied(call('admin', 'saveSettings', { settings: { ...saved, logoData: `data:image/png;base64,${oversized.toString('base64')}` }, expectedVersion: saved.version }), 'invalid-argument');
+      assert.equal((await call('admin', 'bootstrap')).settings.version, saved.version);
+      await call('admin', 'saveSettings', { settings: { ...saved, ...before }, expectedVersion: saved.version });
+    });
+    await t.test('larger upload limits preserve PNG and JPEG byte validation and the 4096 pixel boundary', async () => {
+      let settings = (await call('admin', 'bootstrap')).settings;
+      const before = settings;
+      await call('admin', 'saveSettings', { settings: { ...settings, logoData: jpeg }, expectedVersion: settings.version });
+      settings = (await call('admin', 'bootstrap')).settings;
+      assert.equal(settings.logoData, jpeg);
+      for (const [width, height] of [[4096, 1], [1, 4096]]) {
+        await call('admin', 'saveSettings', { settings: { ...settings, logoData: `data:image/png;base64,${pngFixture(width, height, 9).toString('base64')}` }, expectedVersion: settings.version });
+        settings = (await call('admin', 'bootstrap')).settings;
+      }
+      for (const logoData of [
+        png.replace('image/png', 'image/jpeg'), jpeg.replace('image/jpeg', 'image/png'), 'data:image/jpeg;base64,/9j/AA==',
+        ...[[4097, 1], [1, 4097]].map(([width, height]) => `data:image/png;base64,${pngFixture(width, height, 9).toString('base64')}`),
+      ]) await denied(call('admin', 'saveSettings', { settings: { ...settings, logoData }, expectedVersion: settings.version }), 'invalid-argument');
+      assert.equal((await call('admin', 'bootstrap')).settings.version, settings.version);
+      await call('admin', 'saveSettings', { settings: { ...settings, ...before }, expectedVersion: settings.version });
+    });
+    await t.test('printer administration requires active company ADMIN and ignores spoofed ownership fields', async () => {
+      await denied(call(null, 'listPrinters'), 'unauthenticated');
+      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned']) {
+        await denied(call(uid, 'listPrinters'), 'permission-denied');
+        await denied(createPrinter({}, uid), 'permission-denied');
+      }
+      const before = await officialState();
+      const printer = await createPrinter({ companyId: 'b', id: 'spoofed-id', version: 999, createdBy: 'outsider', createdAt: '2000-01-01' });
+      assert.equal(printer.companyId, 'a'); assert.notEqual(printer.id, 'spoofed-id');
+      assert.equal(printer.createdBy, 'admin'); assert.equal(printer.version, 1); assert.equal(printer.createdAt, now().toISOString());
+      const edited = (await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: printer.version,
+        printer: { name: '변경 프린터', model: 'Laser 600', location: '4층', active: true, companyId: 'b', createdBy: 'outsider' } })).printer;
+      assert.equal(edited.version, 2); assert.equal(edited.companyId, 'a'); assert.equal(edited.createdBy, 'admin');
+      await denied(call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: 1, printer: edited }), 'aborted');
+      await assert.rejects(call('outsider', 'savePrinter', { printerId: printer.id, expectedVersion: 2, printer: edited }), error => ['permission-denied', 'not-found'].includes(error.code));
+      assert.ok(!(await call('outsider', 'listPrinters', { companyId: 'a' })).printers.some(item => item.id === printer.id));
+      assert.deepEqual(await officialState(), before, 'printer settings must not change official letters, templates, counters or inboxes');
+      for (const values of [{ name: '' }, { name: 'x'.repeat(101) }, { model: 'x'.repeat(101) }, { location: 'x'.repeat(201) }, { active: 'true' }]) {
+        await denied(createPrinter(values), 'invalid-argument');
+      }
+      await denied(call('admin', 'savePrinter', { printerId: '../bad', expectedVersion: 1, printer: edited }), 'invalid-argument');
+    });
+    await t.test('printer inspections are append-only, compute results on the server and freeze printer and template snapshots', async () => {
+      const settings = (await call('admin', 'bootstrap')).settings;
+      const printer = await createPrinter({ name: '점검 대상' });
+      const before = await officialState();
+      const requestId = randomUUID();
+      const payload = { requestId, companyId: 'b', recordedBy: 'outsider', recordedAt: '2000-01-01', result: 'RECHECK' };
+      const result = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
+        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5,
+        companyId: 'b', result: 'RECHECK', recordedBy: 'outsider', recordedAt: '2000-01-01', paperSize: 'A3', scalePercent: 75 }, payload);
+      const entry = result.inspection;
+      assert.equal(entry.id, requestId.toLowerCase());
+      assert.equal(entry.companyId, 'a'); assert.equal(entry.printerId, printer.id); assert.equal(entry.recordedBy, 'admin');
+      assert.equal(entry.recordedAt, now().toISOString()); assert.equal(entry.paperSize, 'A4'); assert.equal(entry.scalePercent, 100);
+      assert.equal(entry.result, 'PASS');
+      assert.deepEqual(entry.deviations, { sealWidthMm: 0.5, sealHeightMm: -0.5, horizontal100Mm: 0.5, vertical100Mm: -0.5 });
+      assert.equal(entry.printerSnapshot.name, printer.name); assert.equal(entry.printerSnapshot.version, printer.version);
+      assert.equal(entry.templateSnapshot.companyName, settings.companyName); assert.equal(entry.templateSnapshot.version, settings.version);
+      assert.equal(entry.templateSnapshot.sealWidthMm, settings.sealWidthMm); assert.equal(entry.templateSnapshot.sealHeightMm, settings.sealHeightMm);
+      assert.equal(typeof entry.templateSnapshot.sealAssetId, 'string'); assert.ok(entry.templateSnapshot.sealAssetId.length > 0);
+      assert.equal(entry.templateSnapshot.sealData, undefined);
+      const duplicate = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
+        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5,
+        companyId: 'b', result: 'RECHECK', recordedBy: 'outsider', recordedAt: '2000-01-01', paperSize: 'A3', scalePercent: 75 }, payload);
+      assert.equal(duplicate.inspection.id, entry.id);
+      const upperCaseRetry = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
+        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId: requestId.toUpperCase() });
+      assert.equal(upperCaseRetry.inspection.id, entry.id);
+      await denied(recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
+        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId }, 'admin2'), 'already-exists');
+      await denied(recordInspection(printer, settings, { note: '같은 요청 ID의 다른 내용' }, { requestId }), 'already-exists');
+      const recheck = (await recordInspection(printer, settings, { horizontal100Mm: 100.6 })).inspection;
+      assert.equal(recheck.result, 'RECHECK'); assert.equal(recheck.deviations.horizontal100Mm, 0.6);
+      assert.deepEqual(await officialState(), before, 'recording inspection results must leave template versions, issuance and letters unchanged');
+      await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: 1, printer: { ...printer, name: '변경된 장비', active: false } });
+      await call('admin', 'saveSettings', { expectedVersion: settings.version, settings: { ...settings, sealWidthMm: 25, sealHeightMm: 25 } });
+      const archivedEntries = (await call('admin', 'listPrinterInspections', { printerId: printer.id })).inspections;
+      assert.equal(archivedEntries.length, 2); assert.deepEqual(archivedEntries.find(item => item.id === entry.id), entry);
+      const retryAfterChanges = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
+        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId });
+      assert.deepEqual(retryAfterChanges.inspection, entry, 'a committed request remains idempotent after archive or template changes');
+      const currentSettings = (await call('admin', 'bootstrap')).settings;
+      await call('admin', 'saveSettings', { expectedVersion: currentSettings.version, settings: { ...currentSettings, ...settings } });
+      const after = await officialState();
+      assert.deepEqual(after.letters, before.letters); assert.deepEqual(after.numbers, before.numbers); assert.deepEqual(after.histories, before.histories);
+      assert.deepEqual(after.notifications, before.notifications); assert.equal(after.settings.find(item => item.companyId === 'a').lastFront, settings.lastFront);
+      await denied(call('admin', 'updatePrinterInspection', { printerId: printer.id, inspectionId: entry.id, inspection: { result: 'PASS' } }), 'invalid-argument');
+      await denied(call('admin', 'deletePrinterInspection', { printerId: printer.id, inspectionId: entry.id }), 'invalid-argument');
+    });
+    await t.test('printer inspection input, archived printers and stale versions cannot create records', async () => {
+      const settings = (await call('admin', 'bootstrap')).settings;
+      const printer = await createPrinter();
+      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned']) {
+        await denied(recordInspection(printer, settings, {}, {}, uid), 'permission-denied');
+        await denied(call(uid, 'listPrinterInspections', { printerId: printer.id }), 'permission-denied');
+      }
+      await assert.rejects(recordInspection(printer, settings, {}, {}, 'outsider'), error => ['permission-denied', 'not-found'].includes(error.code));
+      for (const values of [
+        { inspectedOn: '2026-10-24' }, { inspectedOn: '2026-02-30' }, { inspectedOn: '2026-1-1' }, { inspectedOn: '1899-12-31' }, { actualSizeConfirmed: false },
+        { measuredSealWidthMm: 0 }, { measuredSealHeightMm: 200.1 }, { horizontal100Mm: '100' }, { vertical100Mm: 99.95 },
+        { toleranceMm: 0 }, { toleranceMm: 5.1 }, { note: 'x'.repeat(1001) }, { printSettings: 'x'.repeat(201) },
+      ]) await denied(recordInspection(printer, settings, values), 'invalid-argument');
+      await denied(recordInspection(printer, settings, {}, { requestId: 'not-a-uuid' }), 'invalid-argument');
+      await denied(recordInspection(printer, settings, {}, { expectedPrinterVersion: 0 }), 'aborted');
+      await denied(recordInspection(printer, settings, {}, { expectedSettingsVersion: settings.version - 1 }), 'aborted');
+      const archived = (await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: printer.version, printer: { ...printer, active: false } })).printer;
+      await denied(recordInspection(archived, settings), 'failed-precondition');
+      assert.deepEqual((await call('admin', 'listPrinterInspections', { printerId: printer.id })).inspections, []);
+    });
+    await t.test('printer and inspection pagination uses opaque scoped cursors without duplicate entries', async () => {
+      const settings = (await call('admin', 'bootstrap')).settings;
+      const printer = await createPrinter({ name: '페이지 확인' });
+      for (let index = 0; index < 5; index++) await recordInspection(printer, settings, { note: `점검 ${index}` });
+      const walk = async (action, key, payload = {}) => {
+        const all = []; let after;
+        for (let pages = 0; pages < 20; pages++) {
+          const response = await call('admin', action, { ...payload, pageSize: 2, ...(after ? { after } : {}) });
+          assert.ok(response[key].length <= 2); all.push(...response[key]);
+          if (!response.nextCursor) return all;
+          assert.notDeepEqual(response.nextCursor, after); after = response.nextCursor;
+        }
+        assert.fail('pagination must finish');
+      };
+      const inspections = await walk('listPrinterInspections', 'inspections', { printerId: printer.id });
+      assert.equal(inspections.length, 5); assert.equal(new Set(inspections.map(item => item.id)).size, 5);
+      const printers = await walk('listPrinters', 'printers');
+      assert.equal(new Set(printers.map(item => item.id)).size, printers.length);
+      assert.deepEqual(printers.map(item => item.id).sort(), (await call('admin', 'listPrinters', { pageSize: 50 })).printers.map(item => item.id).sort());
+      for (const pageSize of [0, 51, 1.5, '2']) await denied(call('admin', 'listPrinters', { pageSize }), 'invalid-argument');
+      await denied(call('admin', 'listPrinterInspections', { printerId: '../bad' }), 'invalid-argument');
+      const foreign = await createPrinter({ name: '다른 회사 장비' }, 'outsider');
+      await assert.rejects(call('admin', 'listPrinterInspections', { printerId: foreign.id }), error => ['not-found', 'permission-denied'].includes(error.code));
+      await denied(call('admin', 'listPrinters', { after: foreign.id }), 'invalid-argument');
     });
 
     let letterId;

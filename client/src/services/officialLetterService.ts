@@ -102,6 +102,49 @@ export interface LetterBootstrap {
   templateStatus?: { configured: boolean; missingFields: string[] };
 }
 export interface LetterSettingsSaved { success: true; version: number; assets: { logoRegistered: boolean; sealRegistered: boolean } }
+export interface PrinterDetails { name: string; model: string; location: string; active: boolean }
+export interface PrinterProfile extends PrinterDetails {
+  id: string;
+  companyId: string;
+  version: number;
+  createdAt: string;
+  createdBy: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+export interface PrinterInspectionInput {
+  inspectedOn: string;
+  measuredSealWidthMm: number;
+  measuredSealHeightMm: number;
+  horizontal100Mm: number;
+  vertical100Mm: number;
+  toleranceMm: number;
+  note: string;
+  printSettings: string;
+  actualSizeConfirmed: true;
+}
+export interface PrinterInspection extends PrinterInspectionInput {
+  id: string;
+  companyId: string;
+  printerId: string;
+  paperSize: 'A4';
+  scalePercent: 100;
+  result: 'PASS' | 'RECHECK';
+  deviations: { sealWidthMm: number; sealHeightMm: number; horizontal100Mm: number; vertical100Mm: number };
+  printerSnapshot: Pick<PrinterProfile, 'name' | 'model' | 'location' | 'version'>;
+  templateSnapshot: { version: number; companyName: string; sealWidthMm: number; sealHeightMm: number; sealAssetId: string };
+  recordedAt: string;
+  recordedBy: string;
+  recordedByName: string;
+}
+export interface PrinterInspectionRequest {
+  printerId: string;
+  expectedPrinterVersion: number;
+  expectedSettingsVersion: number;
+  requestId: string;
+  inspection: PrinterInspectionInput;
+}
+interface PageOptions { after?: string; pageSize?: number }
 
 const callable = httpsCallable<Record<string, unknown>, unknown>(functions, 'manageOfficialLetters');
 async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
@@ -116,6 +159,12 @@ export const officialLetters = {
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
   saveSettings: (settings: LetterSettings) => call<LetterSettingsSaved>('saveSettings', { settings, expectedVersion: settings.version }),
   sealPrintTest: (expectedVersion: number) => call<{ base64: string; filename: string }>('sealPrintTest', { expectedVersion }),
+  listPrinters: (options: PageOptions = {}) => call<{ printers: PrinterProfile[]; nextCursor: string | null }>('listPrinters', { ...options }),
+  savePrinter: (printer: PrinterDetails, existing?: PrinterProfile) => call<{ printer: PrinterProfile }>('savePrinter', {
+    printer, expectedVersion: existing?.version ?? 0, ...(existing ? { printerId: existing.id } : {}),
+  }),
+  listPrinterInspections: (printerId: string, options: PageOptions = {}) => call<{ inspections: PrinterInspection[]; nextCursor: string | null }>('listPrinterInspections', { printerId, ...options }),
+  recordPrinterInspection: (request: PrinterInspectionRequest) => call<{ inspection: PrinterInspection }>('recordPrinterInspection', { ...request }),
   save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {
     content, documentType, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),
@@ -141,8 +190,8 @@ export function previewNumber(front: number, date: string): string {
   return `${String(front).padStart(3, '0')}-${date.replaceAll('-', '').slice(2)}`;
 }
 export async function readLetterImage(file: File): Promise<string> {
-  if (!['image/png', 'image/jpeg'].includes(file.type) || !file.size || file.size > 300 * 1024) {
-    throw new Error('300KB 이하 PNG 또는 JPEG 이미지를 선택해 주세요.');
+  if (!['image/png', 'image/jpeg'].includes(file.type) || !file.size || file.size > 3 * 1024 * 1024) {
+    throw new Error('3MB 이하 PNG 또는 JPEG 이미지를 선택해 주세요.');
   }
   const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
   const validSignature = file.type === 'image/png'
