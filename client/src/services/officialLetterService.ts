@@ -45,6 +45,9 @@ export interface LetterSettings {
   sealData: string;
   logoPath?: string;
   sealPath?: string;
+  sealWidthMm?: number;
+  sealHeightMm?: number;
+  updatedAt?: string;
   lastFront: number;
   lastSerial?: number;
   version: number;
@@ -70,7 +73,7 @@ export interface OfficialLetter {
   updatedAt: string;
   permissions?: { canReview: boolean; canFinalApprove: boolean };
   pdfReady?: boolean;
-  branding?: Pick<LetterSettings, 'companyName' | 'companyNameEn' | 'address' | 'representative' | 'phone' | 'email'> & { logoData?: string; sealData?: string };
+  branding?: Pick<LetterSettings, 'companyName' | 'companyNameEn' | 'address' | 'representative' | 'phone' | 'email' | 'sealWidthMm' | 'sealHeightMm'> & { logoData?: string; sealData?: string };
 }
 export interface LetterSummary {
   id: string;
@@ -96,7 +99,9 @@ export interface LetterBootstrap {
   employeeDefaults?: Partial<CertificateContent>;
   canApproveDocuments?: boolean;
   documentApprovers?: DocumentApprover[];
+  templateStatus?: { configured: boolean; missingFields: string[] };
 }
+export interface LetterSettingsSaved { success: true; version: number; assets: { logoRegistered: boolean; sealRegistered: boolean } }
 
 const callable = httpsCallable<Record<string, unknown>, unknown>(functions, 'manageOfficialLetters');
 async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
@@ -109,7 +114,7 @@ export const officialLetters = {
   approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
   mine: () => call<{ letters: LetterSummary[] }>('mine'),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
-  saveSettings: (settings: LetterSettings) => call('saveSettings', { settings, expectedVersion: settings.version }),
+  saveSettings: (settings: LetterSettings) => call<LetterSettingsSaved>('saveSettings', { settings, expectedVersion: settings.version }),
   save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {
     content, documentType, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),
@@ -135,13 +140,29 @@ export function previewNumber(front: number, date: string): string {
   return `${String(front).padStart(3, '0')}-${date.replaceAll('-', '').slice(2)}`;
 }
 export async function readLetterImage(file: File): Promise<string> {
-  if (!['image/png', 'image/jpeg'].includes(file.type) || file.size > 300 * 1024) {
+  if (!['image/png', 'image/jpeg'].includes(file.type) || !file.size || file.size > 300 * 1024) {
     throw new Error('300KB 이하 PNG 또는 JPEG 이미지를 선택해 주세요.');
   }
-  return new Promise((resolve, reject) => {
+  const header = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+  const validSignature = file.type === 'image/png'
+    ? header.length === 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, index) => header[index] === byte)
+    : header[0] === 255 && header[1] === 216;
+  if (!validSignature) throw new Error('파일의 실제 형식이 PNG 또는 JPEG와 일치하지 않습니다.');
+  const data = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
     reader.onerror = () => reject(new Error('이미지 파일을 읽지 못했습니다.'));
+    reader.onabort = () => reject(new Error('이미지 읽기가 취소되었습니다. 다시 선택해 주세요.'));
     reader.readAsDataURL(file);
   });
+  await new Promise<void>((resolve, reject) => {
+    const decoded = new Image();
+    decoded.onload = () => {
+      if (decoded.naturalWidth < 1 || decoded.naturalHeight < 1 || decoded.naturalWidth > 4096 || decoded.naturalHeight > 4096) reject(new Error('이미지 가로·세로는 각각 1~4096px이어야 합니다.'));
+      else resolve();
+    };
+    decoded.onerror = () => reject(new Error('이미지를 읽을 수 없습니다. 정상적인 PNG 또는 JPEG 파일을 선택해 주세요.'));
+    decoded.src = data;
+  });
+  return data;
 }

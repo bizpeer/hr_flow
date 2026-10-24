@@ -131,6 +131,8 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
   };
 
   const goTo = (path: string) => {
+    const beforeNavigation = new CustomEvent('hr-flow:before-navigation', { cancelable: true, detail: { path } });
+    if (!window.dispatchEvent(beforeNavigation)) return;
     setOpen(false);
     navigate(path);
     onNavigate?.();

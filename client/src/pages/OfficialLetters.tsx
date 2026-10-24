@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Settings, Download, History, CheckCircle, Send, RefreshCw, X, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { officialLetters, seoulDate, koreanDate, previewNumber, readLetterImage } from '../services/officialLetterService';
-import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterContent, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
+import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import './OfficialLetters.css';
 
 const emptyContent = (): LetterContent => ({ recipient: '', reference: '', title: '',
@@ -21,14 +21,39 @@ function certificateContent(type: DocumentType, certificate: CertificateContent)
     attachments: '', certificate };
 }
 const blankSettings = (companyName = ''): LetterSettings => ({ companyName, address: '', representative: '',
-  phone: '', email: '', logoData: '', sealData: '', lastFront: 0, version: 0 });
+  phone: '', email: '', logoData: '', sealData: '', sealWidthMm: 23.3, sealHeightMm: 23.3, lastFront: 0, version: 0 });
 const statuses = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료' };
-const errorMessage = (error: unknown) => error instanceof Error ? error.message : '처리 중 오류가 발생했습니다.';
+const templateFieldLabels: Record<string, string> = { companyName: '회사명', address: '회사 주소', representative: '대표자 이름', logoPath: '회사 로고', logoData: '회사 로고', sealPath: '대표자 인감', sealData: '대표자 인감', sealWidthMm: '인감 가로 크기', sealHeightMm: '인감 세로 크기' };
+const missingTemplateMessage = (fields: string[]) => `회사 서류 템플릿의 ${fields.map(field => templateFieldLabels[field] || field).join(', ')} 등록이 필요합니다. 회사 관리자가 템플릿을 저장한 뒤 다시 제출해 주세요.`;
+const errorMessage = (error: unknown) => {
+  const details = typeof error === 'object' && error !== null && 'details' in error ? error.details : null;
+  if (typeof details === 'object' && details !== null && 'missingFields' in details && Array.isArray(details.missingFields)) {
+    const fields = details.missingFields.filter((field): field is string => typeof field === 'string');
+    if (fields.length) return missingTemplateMessage(fields);
+  }
+  return error instanceof Error ? error.message : '처리 중 오류가 발생했습니다.';
+};
 const letterLinkKey = (id: string, notification = '') => id ? JSON.stringify([id, notification]) : '';
+type TemplateImageKey = 'logoData' | 'sealData';
+let activeTemplateHistoryGuard: ((event: Event) => void) | null = null;
+const dispatchTemplateHistory = (event: Event) => activeTemplateHistoryGuard?.(event);
+if (typeof window !== 'undefined') {
+  // This module loads before HashRouter mounts, so cancel a native history
+  // change before the router queues an update that would unmount local edits.
+  window.addEventListener('popstate', dispatchTemplateHistory, true);
+  window.addEventListener('hashchange', dispatchTemplateHistory, true);
+  import.meta.hot?.dispose(() => {
+    window.removeEventListener('popstate', dispatchTemplateHistory, true);
+    window.removeEventListener('hashchange', dispatchTemplateHistory, true);
+    activeTemplateHistoryGuard = null;
+  });
+}
 
 export function OfficialLetters() {
   const { userData } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
+  const routerLocation = useLocation();
+  const navigationUrlRef = useRef(window.location.href);
   const linkedLetterId = searchParams.get('letter') || '';
   const linkedKey = letterLinkKey(linkedLetterId, searchParams.get('notification') || '');
   const handledLink = useRef('');
@@ -40,6 +65,21 @@ export function OfficialLetters() {
   const [letters, setLetters] = useState<LetterSummary[]>([]);
   const [settings, setSettings] = useState<LetterSettings>(blankSettings());
   const [savedSettings, setSavedSettings] = useState<LetterSettings | null>(null);
+  const settingsRef = useRef<LetterSettings>(blankSettings());
+  const savedSettingsRef = useRef<LetterSettings | null>(null);
+  const companyNameRef = useRef('');
+  const settingsDirtyRef = useRef(false);
+  const settingsEditRef = useRef(0);
+  const settingsSavingRef = useRef(false);
+  const pendingImageReads = useRef(new Set<Promise<void>>());
+  const imageReadTokens = useRef({ logoData: 0, sealData: 0 });
+  const imageErrorsRef = useRef<Partial<Record<TemplateImageKey, string>>>({});
+  const [settingsDirty, setSettingsDirty] = useState(false);
+  const [settingsSaving, setSettingsSaving] = useState(false);
+  const [imageReadCount, setImageReadCount] = useState(0);
+  const [imageErrors, setImageErrors] = useState<Partial<Record<TemplateImageKey, string>>>({});
+  const [templateStatus, setTemplateStatus] = useState<LetterBootstrap['templateStatus']>();
+  const [templateConfirmation, setTemplateConfirmation] = useState<{ version: number; at: string } | null>(null);
   const [defaultLine, setDefaultLine] = useState<ApprovalStep[]>([]);
   const [employeeDefaults, setEmployeeDefaults] = useState<Partial<CertificateContent>>({});
   const [canApproveDocuments, setCanApproveDocuments] = useState(false);
@@ -64,12 +104,49 @@ export function OfficialLetters() {
   const [approverIds, setApproverIds] = useState<string[]>([]);
   const [reassignmentReason, setReassignmentReason] = useState('');
   const [candidateToAdd, setCandidateToAdd] = useState('');
-  const busy = working || Boolean(linkedKey && settledLink !== linkedKey);
+  const busy = working || settingsSaving || imageReadCount > 0 || Boolean(linkedKey && settledLink !== linkedKey);
+
+  const confirmLeaveSettings = useCallback(() => {
+    if (settingsSavingRef.current || pendingImageReads.current.size) {
+      setError('회사 템플릿의 이미지 처리 또는 저장이 진행 중입니다. 완료된 뒤 이동해 주세요.'); return false;
+    }
+    if (!settingsDirtyRef.current) return true;
+    if (!window.confirm('회사 서류 템플릿에 저장하지 않은 변경이 있습니다. 변경 내용을 버리고 이동할까요? 선택한 로고·인감도 저장되지 않습니다.')) return false;
+    const stored = savedSettingsRef.current || blankSettings(companyNameRef.current);
+    settingsRef.current = stored; setSettings(stored); settingsDirtyRef.current = false; setSettingsDirty(false);
+    settingsEditRef.current++; imageErrorsRef.current = {}; setImageErrors({});
+    return true;
+  }, []);
+
+  function changeSettings(updater: (previous: LetterSettings) => LetterSettings, imageCompletion = false) {
+    if (settingsSavingRef.current && !imageCompletion) return;
+    const next = updater(settingsRef.current); settingsRef.current = next; setSettings(next);
+    settingsEditRef.current++; settingsDirtyRef.current = true; setSettingsDirty(true); setTemplateConfirmation(null);
+  }
+
+  function selectTemplateImage(key: TemplateImageKey, file: File) {
+    if (settingsSavingRef.current) return;
+    const token = ++imageReadTokens.current[key];
+    settingsDirtyRef.current = true; settingsEditRef.current++; setSettingsDirty(true); setTemplateConfirmation(null);
+    imageErrorsRef.current = { ...imageErrorsRef.current, [key]: undefined }; setImageErrors(imageErrorsRef.current);
+    const operation = readLetterImage(file).then(data => {
+      if (token !== imageReadTokens.current[key]) return;
+      changeSettings(previous => ({ ...previous, [key]: data }), true);
+    }).catch((failure: unknown) => {
+      if (token !== imageReadTokens.current[key]) return;
+      imageErrorsRef.current = { ...imageErrorsRef.current, [key]: errorMessage(failure) }; setImageErrors(imageErrorsRef.current);
+    }).finally(() => { pendingImageReads.current.delete(operation); setImageReadCount(pendingImageReads.current.size); });
+    pendingImageReads.current.add(operation); setImageReadCount(pendingImageReads.current.size);
+  }
 
   async function refresh() {
+    const edit = settingsEditRef.current;
     const [bootstrap, list] = await Promise.all([officialLetters.bootstrap(), officialLetters.list()]);
-    setSavedSettings(bootstrap.settings);
-    setSettings(bootstrap.settings || blankSettings(bootstrap.companyName));
+    savedSettingsRef.current = bootstrap.settings; setSavedSettings(bootstrap.settings);
+    companyNameRef.current = bootstrap.companyName; setTemplateStatus(bootstrap.templateStatus);
+    if (!settingsDirtyRef.current && !pendingImageReads.current.size && !settingsSavingRef.current && edit === settingsEditRef.current) {
+      const stored = bootstrap.settings || blankSettings(bootstrap.companyName); settingsRef.current = stored; setSettings(stored);
+    }
     setDefaultLine(bootstrap.approvalLine);
     setEmployeeDefaults(bootstrap.employeeDefaults || {}); setCanApproveDocuments(!!bootstrap.canApproveDocuments);
     setDocumentApprovers(bootstrap.documentApprovers || []);
@@ -79,19 +156,58 @@ export function OfficialLetters() {
     let active = true;
     Promise.all([officialLetters.bootstrap(), officialLetters.list()]).then(([bootstrap, list]) => {
       if (!active) return;
-      setSettings(bootstrap.settings || blankSettings(bootstrap.companyName));
-      setSavedSettings(bootstrap.settings); setDefaultLine(bootstrap.approvalLine); setLetters(list.letters);
+      if (!settingsDirtyRef.current && !pendingImageReads.current.size && !settingsSavingRef.current) {
+        const stored = bootstrap.settings || blankSettings(bootstrap.companyName); settingsRef.current = stored; setSettings(stored);
+      }
+      savedSettingsRef.current = bootstrap.settings; setSavedSettings(bootstrap.settings); companyNameRef.current = bootstrap.companyName;
+      setTemplateStatus(bootstrap.templateStatus); setDefaultLine(bootstrap.approvalLine); setLetters(list.letters);
       setEmployeeDefaults(bootstrap.employeeDefaults || {}); setCanApproveDocuments(!!bootstrap.canApproveDocuments);
       setDocumentApprovers(bootstrap.documentApprovers || []);
     }).catch(e => { if (active) setError(errorMessage(e)); }).finally(() => { if (active) setBusy(false); });
     return () => { active = false; };
   }, []);
+  useEffect(() => { navigationUrlRef.current = window.location.href; }, [routerLocation.key, routerLocation.pathname, routerLocation.search, routerLocation.hash]);
+  useEffect(() => {
+    const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0;
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasPendingSettings() || dirtyRef.current) { event.preventDefault(); event.returnValue = ''; }
+    };
+    const beforeLink = (event: MouseEvent) => {
+      if (!hasPendingSettings() || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (!(anchor instanceof HTMLAnchorElement) || anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.href === window.location.href) return;
+      if (!confirmLeaveSettings()) { event.preventDefault(); event.stopImmediatePropagation(); }
+    };
+    const beforeProgrammaticNavigation = (event: Event) => {
+      if (hasPendingSettings() && !confirmLeaveSettings()) event.preventDefault();
+    };
+    const beforeHistory = (event: Event) => {
+      if (window.location.href === navigationUrlRef.current) return;
+      if (hasPendingSettings() && !confirmLeaveSettings()) {
+        event.stopImmediatePropagation();
+        const previous = new URL(navigationUrlRef.current);
+        window.history.replaceState(window.history.state, '', previous.href);
+        return;
+      }
+      navigationUrlRef.current = window.location.href;
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    document.addEventListener('click', beforeLink, true);
+    window.addEventListener('hr-flow:before-navigation', beforeProgrammaticNavigation);
+    activeTemplateHistoryGuard = beforeHistory;
+    return () => {
+      window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', beforeLink, true);
+      window.removeEventListener('hr-flow:before-navigation', beforeProgrammaticNavigation);
+      if (activeTemplateHistoryGuard === beforeHistory) activeTemplateHistoryGuard = null;
+    };
+  }, [confirmLeaveSettings]);
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
   useEffect(() => {
     if (!linkedLetterId || handledLink.current === linkedKey || !currentUserId || currentRole === 'SUPER_ADMIN') return;
     let active = true;
     Promise.resolve().then(async () => {
       if (!active) return;
+      if (!confirmLeaveSettings()) { handledLink.current = linkedKey; setSettledLink(linkedKey); return; }
       if (dirtyRef.current && !window.confirm('저장하지 않은 입력을 닫고 알림의 서류를 열까요?')) {
         handledLink.current = linkedKey; setSettledLink(linkedKey); return;
       }
@@ -102,7 +218,7 @@ export function OfficialLetters() {
       setApprovalOpen(false); setReassignmentOpen(false); setTab('documents'); setError('');
     }).catch(e => { if (active) { handledLink.current = linkedKey; setSettledLink(linkedKey); setError(errorMessage(e)); } });
     return () => { active = false; };
-  }, [linkedLetterId, linkedKey, currentUserId, currentRole]);
+  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings]);
 
   function setLetterLink(id?: string) {
     const key = letterLinkKey(id || '');
@@ -117,10 +233,12 @@ export function OfficialLetters() {
   }
 
   async function run(action: () => Promise<void>) {
+    if (!confirmLeaveSettings()) return;
     setBusy(true); setError(''); setNotice('');
     try { await action(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   async function open(id: string) {
+    if (!confirmLeaveSettings()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 선택한 서류를 열까요?')) return;
     setLetterLink(id);
     await run(async () => {
@@ -140,6 +258,7 @@ export function OfficialLetters() {
   }
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (!confirmLeaveSettings()) return;
     await run(async () => {
       const savedContent = documentType === 'OFFICIAL' ? content : certificateContent(documentType, emptyCertificate(content.certificate));
       const { id } = await officialLetters.save(savedContent, selected, documentType);
@@ -150,10 +269,49 @@ export function OfficialLetters() {
     });
   }
   function begin(type: DocumentType) {
+    if (!confirmLeaveSettings()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새 서류를 작성할까요?')) return;
     setLetterLink(); setTab('documents'); setSelected(null); setDocumentType(type);
     setContent(type === 'OFFICIAL' ? emptyContent() : certificateContent(type, emptyCertificate(employeeDefaults)));
     setEditing(true); setDirty(false); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false); setError(''); setNotice('');
+  }
+  async function saveTemplate(event: FormEvent) {
+    event.preventDefault();
+    if (settingsSavingRef.current) return;
+    settingsSavingRef.current = true; setSettingsSaving(true); setError(''); setNotice('');
+    let confirmedWrite = false;
+    try {
+      await Promise.all([...pendingImageReads.current]);
+      const imageFailure = Object.values(imageErrorsRef.current).find(Boolean);
+      if (imageFailure) throw new Error(`이미지 등록을 완료해 주세요. ${imageFailure}`);
+      const requested = { ...settingsRef.current, sealWidthMm: settingsRef.current.sealWidthMm ?? 23.3, sealHeightMm: settingsRef.current.sealHeightMm ?? 23.3 };
+      const missing = (['companyName', 'address', 'representative'] as const).filter(key => !requested[key].trim()) as string[];
+      if (!requested.logoData && !requested.logoPath) missing.push('logoPath');
+      if (!requested.sealData && !requested.sealPath) missing.push('sealPath');
+      if (missing.length) throw new Error(missingTemplateMessage(missing));
+      for (const dimension of [requested.sealWidthMm, requested.sealHeightMm]) {
+        if (!Number.isFinite(dimension) || dimension < 5 || dimension > 50 || Math.abs(dimension * 10 - Math.round(dimension * 10)) > 0.000001) throw new Error('인감 가로·세로는 각각 5~50mm 범위에서 소수 첫째 자리까지 입력해 주세요.');
+      }
+      const edit = settingsEditRef.current;
+      const result = await officialLetters.saveSettings(requested); confirmedWrite = true;
+      const bootstrap = await officialLetters.bootstrap();
+      const persisted = bootstrap.settings;
+      const sameText = persisted && (['companyName', 'companyNameEn', 'address', 'representative', 'phone', 'email'] as const).every(key => (persisted[key] || '') === (requested[key] || '').trim());
+      const sameImages = persisted && (['logoData', 'sealData'] as const).every(key => !requested[key] || persisted[key] === requested[key]);
+      const sameApprovers = persisted && JSON.stringify([...(persisted.documentApproverIds || [])].sort()) === JSON.stringify([...(requested.documentApproverIds || [])].sort());
+      if (!persisted || persisted.version !== result.version || !result.assets?.logoRegistered || !result.assets?.sealRegistered || !persisted.logoPath || !persisted.sealPath || !sameText || !sameImages || !sameApprovers || persisted.sealWidthMm !== requested.sealWidthMm || persisted.sealHeightMm !== requested.sealHeightMm || bootstrap.templateStatus?.configured === false) {
+        throw new Error('서버에 저장된 회사정보·로고·인감·규격의 일치 여부를 확인하지 못했습니다. 입력은 유지됩니다. 새로고침에서 저장본을 확인한 뒤 다시 시도해 주세요.');
+      }
+      savedSettingsRef.current = persisted; setSavedSettings(persisted); setTemplateStatus(bootstrap.templateStatus);
+      setError('');
+      setTemplateConfirmation({ version: persisted.version, at: new Date().toISOString() });
+      if (edit === settingsEditRef.current && !pendingImageReads.current.size) {
+        settingsRef.current = persisted; setSettings(persisted); settingsDirtyRef.current = false; setSettingsDirty(false);
+        setNotice(`서버에 저장된 회사 서류 템플릿 버전 ${persisted.version}을 다시 확인했습니다. 로고·인감과 규격이 등록되었습니다. 이미 결재 요청한 서류는 요청 당시 템플릿을 유지합니다.`);
+      } else setNotice('서버 저장본을 확인했습니다. 저장 중 추가된 변경은 아직 저장되지 않았으므로 다시 저장해 주세요.');
+    } catch (failure) {
+      setError(`${confirmedWrite ? '저장 요청은 완료되었지만 저장본 확인이 필요합니다. ' : ''}${errorMessage(failure)}`);
+    } finally { settingsSavingRef.current = false; setSettingsSaving(false); }
   }
   async function beginReassignment() {
     if (!selected || !isAdmin) return;
@@ -215,45 +373,57 @@ export function OfficialLetters() {
       <div className="flex flex-wrap gap-2">{(Object.keys(documentLabels) as DocumentType[]).map(type => <button key={type} className="ol-primary" disabled={busy} onClick={() => begin(type)}><Plus size={17} />{documentLabels[type]} 작성</button>)}</div>
     </header>
     <div className="flex flex-wrap gap-2">
-      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} onClick={() => setTab('documents')}><FileText size={16} />서류함</button>
-      {isAdmin && <button className={tab === 'settings' ? 'ol-primary' : 'ol-button'} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
+      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveSettings()) setTab('documents'); }}><FileText size={16} />서류함</button>
+      {isAdmin && <button className={tab === 'settings' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
       <button className="ol-button" disabled={busy} onClick={() => { if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새로고침할까요?')) return; void run(async () => { await reloadSelected(); setNotice('최신 내용을 불러왔습니다.'); }); }}><RefreshCw size={16} />새로고침</button>
       {busy && <span role="status" className="text-sm self-center text-indigo-600">처리 중…</span>}
     </div>
-    {error && <div role="alert" className="rounded-xl bg-red-50 text-red-800 p-4">{error}<p className="mt-1 text-sm">충돌이 발생한 경우 입력 내용을 복사한 뒤 새로고침해 주세요.</p></div>}
+    {error && <div role="alert" className="rounded-xl bg-red-50 text-red-800 p-4">{error}</div>}
     {notice && <div role="status" className="rounded-xl bg-emerald-50 text-emerald-800 p-4">{notice}</div>}
+    {templateStatus && !templateStatus.configured && <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{missingTemplateMessage(templateStatus.missingFields)}{isAdmin && tab !== 'settings' && <button type="button" className="ol-button mt-2" disabled={busy} onClick={() => setTab('settings')}>회사 템플릿 등록</button>}</div>}
     {!isAdmin && canApproveDocuments && <p className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900">서류 최종 승인 권한이 부여되어 있습니다. 본인 작성 서류를 제외한 같은 본부의 서류를 순차 결재 완료 후 최종 승인할 수 있습니다. 회사 로고·인감·번호 설정은 회사 관리자만 변경할 수 있습니다.</p>}
 
-    {tab === 'settings' && isAdmin ? <form className="ol-card space-y-5" onSubmit={event => {
-      event.preventDefault(); void run(async () => { await officialLetters.saveSettings(settings); await refresh(); setNotice('회사 서류 템플릿을 저장했습니다. 이미 결재 요청한 서류는 요청 당시의 템플릿을 유지합니다.'); });
-    }}>
+    {tab === 'settings' && isAdmin ? <form className="ol-card space-y-5" onSubmit={event => { void saveTemplate(event); }}>
       <h2 className="text-xl font-bold">회사 서류 기본정보</h2>
       <p className="text-sm text-slate-500">로고와 인감은 300KB 이하 PNG/JPEG, 최대 4096px로 등록합니다. 인감 원본은 회사 관리자에게만 표시됩니다.</p>
+      {settingsDirty && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-900">저장하지 않은 템플릿 변경이 있습니다. 이미지 미리보기만으로는 등록되지 않습니다. 아래 ‘템플릿 저장’을 눌러 서버 저장 완료를 확인해 주세요.</p>}
+      {imageReadCount > 0 && <p role="status" className="text-sm text-indigo-700">이미지 형식·크기를 확인하고 읽는 중입니다. 완료 후 템플릿을 저장할 수 있습니다.</p>}
+      {settingsSaving && <p role="status" className="text-sm text-indigo-700">회사정보·이미지·인감 규격을 저장하고 서버 저장본을 다시 확인하는 중입니다.</p>}
+      {templateConfirmation && !settingsDirty && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">서버 저장본 확인 완료 · 버전 {templateConfirmation.version} · {new Date(templateConfirmation.at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>}
+      <fieldset disabled={busy} className="space-y-5">
       <div className="grid md:grid-cols-2 gap-4">
         {([['companyName', '회사명', 120], ['companyNameEn', '영문 회사명 (선택)', 120], ['representative', '대표자 이름', 80], ['address', '회사 주소', 300], ['phone', '전화번호', 80], ['email', '이메일', 120]] as const).map(([key, label, max]) =>
-          <label className="ol-label" key={key}>{label}<input className="ol-input" required={!['phone', 'email', 'companyNameEn'].includes(key)} maxLength={max} value={settings[key] || ''} onChange={e => setSettings(previous => ({ ...previous, [key]: e.target.value }))} /></label>)}
+          <label className="ol-label" key={key}>{label}<input className="ol-input" required={!['phone', 'email', 'companyNameEn'].includes(key)} maxLength={max} value={settings[key] || ''} onChange={e => changeSettings(previous => ({ ...previous, [key]: e.target.value }))} /></label>)}
       </div>
       <div className="grid md:grid-cols-2 gap-4">{([['logoData', '회사 로고'], ['sealData', '대표자 인감']] as const).map(([key, label]) =>
         <label key={key} className="ol-label">{label}
-          <input className="ol-input" type="file" accept="image/png,image/jpeg" disabled={busy} onChange={event => {
+          <input aria-label={`${label} 이미지 선택`} className="ol-input" type="file" accept="image/png,image/jpeg" required={!(key === 'logoData' ? settings.logoPath : settings.sealPath) && !settings[key]} onChange={event => {
             const file = event.target.files?.[0]; if (!file) return;
-            void run(async () => { const data = await readLetterImage(file); setSettings(previous => ({ ...previous, [key]: data })); });
+            selectTemplateImage(key, file); event.target.value = '';
           }} />
-          {settings[key] && <img src={settings[key]} alt={label} className="max-h-24 max-w-52 object-contain border rounded-lg p-2" />}
+          <span className="text-xs font-normal text-slate-500">{(key === 'logoData' ? savedSettings?.logoPath : savedSettings?.sealPath) ? '서버에 등록된 이미지가 있습니다.' : '서버 등록 전입니다. 이미지를 선택한 뒤 템플릿을 저장해 주세요.'}</span>
+          {imageErrors[key] && <span role="alert" className="text-sm text-red-700">{imageErrors[key]}</span>}
+          {settings[key] && (key === 'sealData' ? <span className="ol-seal-preview"><img src={settings[key]} alt="대표자 인감 규격 미리보기" className="ol-seal-image" style={{ width: `${settings.sealWidthMm && settings.sealWidthMm >= 5 && settings.sealWidthMm <= 50 ? settings.sealWidthMm : 23.3}mm`, height: `${settings.sealHeightMm && settings.sealHeightMm >= 5 && settings.sealHeightMm <= 50 ? settings.sealHeightMm : 23.3}mm` }} /></span> : <img src={settings[key]} alt={label} className="max-h-24 max-w-52 object-contain border rounded-lg p-2" />)}
         </label>)}</div>
+      <div className="rounded-xl bg-slate-50 p-4 space-y-3"><h3 className="font-bold">인감 인쇄 크기</h3>
+        <div className="grid md:grid-cols-2 gap-4">{([['sealWidthMm', '인감 가로 (mm)'], ['sealHeightMm', '인감 세로 (mm)']] as const).map(([key, label]) => <label key={key} className="ol-label">{label}<input className="ol-input" type="number" required min={5} max={50} step={0.1} value={settings[key] ?? 23.3} onChange={event => changeSettings(previous => ({ ...previous, [key]: Number(event.target.value) }))} /></label>)}</div>
+        <p className="text-sm text-slate-600">A4 PDF에서 이미지 전체의 가로·세로가 입력한 mm로 출력됩니다. 이미지 안의 흰색·투명 여백도 크기에 포함되므로 인감 테두리에 맞게 잘라낸 PNG를 권장합니다. 가로·세로를 원본 비율과 다르게 지정하면 인감 모양도 해당 비율로 늘어나거나 줄어듭니다.</p>
+        <p className="text-sm font-semibold text-indigo-900">정확한 크기로 출력하려면 PDF 인쇄 설정을 ‘실제 크기 / 100%’로 선택하고 ‘페이지에 맞추기’ 등 확대·축소를 사용하지 마세요. 화면 미리보기의 실제 길이는 모니터 배율에 따라 다를 수 있습니다.</p>
+      </div>
       <div className="bg-slate-50 rounded-xl p-4 space-y-3">
         <h3 className="font-bold">문서번호 시작점</h3>
         <p className="text-sm text-slate-600">최초 등록 시 이전에 발행한 문서번호의 앞 세 자리 숫자를 입력합니다. 최초 발행이면 000으로 입력합니다. 앞 세 자리만 새 발행마다 1씩 증가하며 날짜·연도 변경 시 초기화되지 않습니다. 뒤 여섯 자리는 한국 시간 기준 실제 발행일(YYMMDD)로 자동 기록됩니다.</p>
-        <label className="ol-label max-w-sm">이전 발행번호 앞 세 자리<input type="number" className="ol-input" min={0} max={999} required disabled={settings.version > 0} value={settings.lastFront} onChange={event => setSettings(previous => ({ ...previous, lastFront: Number(event.target.value) }))} /></label>
+        <label className="ol-label max-w-sm">이전 발행번호 앞 세 자리<input type="number" className="ol-input" min={0} max={999} required disabled={settings.version > 0} value={settings.lastFront} onChange={event => changeSettings(previous => ({ ...previous, lastFront: Number(event.target.value) }))} /></label>
         <p className="text-sm font-semibold">다음 예상 번호: {previewNumber(settings.lastFront + 1, issueDate)} · {koreanDate(issueDate)}</p>
         <p className="text-xs text-slate-500">예: 2026년 11월 5일의 첫 문서번호는 001-261105입니다. 저장 후 시작점은 보존됩니다. 관리자는 최종 승인 창에서 앞 세 자리 번호를 직접 지정할 수 있습니다. 999 다음 번호는 자동 발행을 중단하고 관리자 번호 입력이 필요합니다.</p>
       </div>
       <fieldset disabled={busy} className="rounded-xl border border-slate-200 p-4 space-y-3"><legend className="font-bold px-2">서류 최종 승인 권한 위임</legend>
         <p className="text-sm text-slate-600">활성 부서관리자(SUB_ADMIN) 최대 50명에게 같은 본부 구성원의 서류 최종 승인 권한을 부여합니다. 인감·회사정보·문서번호 설정과 발행본 수정 권한은 위임되지 않습니다.</p>
-        {documentApprovers.length ? documentApprovers.map(approver => <label key={approver.uid} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" checked={(settings.documentApproverIds || []).includes(approver.uid)} disabled={!(settings.documentApproverIds || []).includes(approver.uid) && (settings.documentApproverIds || []).length >= 50} onChange={event => setSettings(previous => ({ ...previous, documentApproverIds: event.target.checked ? [...new Set([...(previous.documentApproverIds || []), approver.uid])] : (previous.documentApproverIds || []).filter(uid => uid !== approver.uid) }))} /><span className="font-semibold">{approver.name}</span><span className="text-slate-500">{approver.divisionName || '소속 본부 서류'}</span></label>) : <p className="text-sm text-slate-500">권한을 위임할 활성 부서관리자가 없습니다.</p>}
-        {(settings.documentApproverIds || []).some(uid => !documentApprovers.some(approver => approver.uid === uid)) && <button type="button" className="ol-button" onClick={() => setSettings(previous => ({ ...previous, documentApproverIds: (previous.documentApproverIds || []).filter(uid => documentApprovers.some(approver => approver.uid === uid)) }))}>현재 선택할 수 없는 관리자의 기존 승인 권한 제거</button>}
+        {documentApprovers.length ? documentApprovers.map(approver => <label key={approver.uid} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" checked={(settings.documentApproverIds || []).includes(approver.uid)} disabled={!(settings.documentApproverIds || []).includes(approver.uid) && (settings.documentApproverIds || []).length >= 50} onChange={event => changeSettings(previous => ({ ...previous, documentApproverIds: event.target.checked ? [...new Set([...(previous.documentApproverIds || []), approver.uid])] : (previous.documentApproverIds || []).filter(uid => uid !== approver.uid) }))} /><span className="font-semibold">{approver.name}</span><span className="text-slate-500">{approver.divisionName || '소속 본부 서류'}</span></label>) : <p className="text-sm text-slate-500">권한을 위임할 활성 부서관리자가 없습니다.</p>}
+        {(settings.documentApproverIds || []).some(uid => !documentApprovers.some(approver => approver.uid === uid)) && <button type="button" className="ol-button" onClick={() => changeSettings(previous => ({ ...previous, documentApproverIds: (previous.documentApproverIds || []).filter(uid => documentApprovers.some(approver => approver.uid === uid)) }))}>현재 선택할 수 없는 관리자의 기존 승인 권한 제거</button>}
       </fieldset>
-      <button className="ol-primary" disabled={busy}>템플릿 저장</button>
+      <div className="flex flex-wrap gap-2"><button className="ol-primary" disabled={busy || Object.values(imageErrors).some(Boolean)}>템플릿 저장</button><button type="button" className="ol-button" disabled={busy || !settingsDirty} onClick={() => { confirmLeaveSettings(); }}>저장 전 변경 취소</button></div>
+      </fieldset>
     </form> : <>
       <section className="ol-card">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
@@ -366,7 +536,7 @@ export function OfficialLetters() {
         }}><h3 className="font-bold">서류 최종 승인</h3>
           <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-2">
             <p>{branding.companyName} · 대표 {branding.representative}</p><p>{branding.address}</p>
-            {isAdmin && selected.branding?.sealData && <img src={selected.branding.sealData} alt="결재 요청 당시 인감 (관리자 전용)" className="h-20 w-20 object-contain" />}
+            {isAdmin && selected.branding?.sealData && <div className="space-y-2"><p>결재 요청 당시 인감 규격: {(selected.branding.sealWidthMm ?? 66 * 25.4 / 72).toFixed(1)} × {(selected.branding.sealHeightMm ?? 66 * 25.4 / 72).toFixed(1)} mm</p><img src={selected.branding.sealData} alt="결재 요청 당시 인감 (관리자 전용)" className="ol-seal-image" style={{ width: `${selected.branding.sealWidthMm ?? 66 * 25.4 / 72}mm`, height: `${selected.branding.sealHeightMm ?? 66 * 25.4 / 72}mm` }} /></div>}
           </div>
           <p className="text-sm text-slate-600">아래 내용과 결재 요청 당시의 회사정보를 확인한 후 승인합니다. 번호는 발행 시 서버에서 확정하며, 동시 발행 시 예상 번호가 달라질 수 있습니다.</p>
           <p className="text-sm">발행일: <strong>{koreanDate(issueDate)}</strong> (한국 시간 기준 실제 최종 승인일로 자동 기록)</p>

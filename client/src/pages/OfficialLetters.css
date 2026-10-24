@@ -12,6 +12,8 @@
 .official-letters-screen .ol-status-REJECTED { background: #fff7ed; color: #c2410c; }
 .official-letters-screen .ol-preview { max-width: 790px; padding: 40px; margin-inline: auto; border: 1px solid #e2e8f0; background: white; overflow-wrap: anywhere; }
 .official-letters-screen .ol-draft { font-size: 12px; font-weight: bold; text-align: right; color: #94a3b8; padding-bottom: 16px; }
+.official-letters-screen .ol-seal-preview { display: flex; width: fit-content; max-width: 100%; padding: 12px; border: 1px dashed #94a3b8; border-radius: 10px; background: white; overflow: auto; }
+.official-letters-screen .ol-seal-image { display: block; flex-shrink: 0; max-width: none; object-fit: fill; padding: 0; }
 .official-letters-screen .ol-certificate { border: 2px solid #334155; color: #0f172a; }
 .official-letters-screen .ol-certificate-logo { max-width: 160px; max-height: 55px; object-fit: contain; margin-bottom: 24px; }
 .official-letters-screen .ol-certificate h3 { font-size: 30px; font-weight: 800; text-align: center; letter-spacing: .2em; }

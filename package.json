@@ -9,6 +9,7 @@
     "deploy": "npm run client:build && firebase deploy",
     "emulators": "firebase emulators:start",
     "test:official-letters": "node --test --experimental-test-coverage --test-coverage-include=functions/official-letter-*.js functions/tests/official-letters.test.js",
+    "test:members": "node --test --experimental-test-coverage --test-coverage-include=functions/member-service.js functions/tests/members.test.js",
     "test:rules": "node scripts/security-rules.test.mjs"
   },
   "dependencies": {

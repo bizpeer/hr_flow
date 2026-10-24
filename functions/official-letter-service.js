@@ -1,7 +1,23 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
 
-const fail = (code, message) => { throw new HttpsError(code, message); };
+const fail = (code, message, details) => { throw new HttpsError(code, message, details); };
+const templateFields = { companyName: '회사명', address: '회사 주소', representative: '대표자', logoPath: '회사 로고', sealPath: '대표자 인감' };
+function templateStatus(settings) {
+  const missingFields = Object.keys(templateFields).filter(key => typeof settings?.[key] !== 'string' || !settings[key].trim());
+  return { configured: missingFields.length === 0, missingFields };
+}
+function requireTemplate(settings) {
+  const status = templateStatus(settings);
+  if (!status.configured) fail('failed-precondition',
+    `회사 서류 템플릿에 ${status.missingFields.map(key => templateFields[key]).join('·')}이(가) 저장되지 않았습니다. ADMIN이 회사 서류 템플릿에서 필수 항목을 입력하고 템플릿 저장을 완료해 주세요.`, { ...status, code: 'MISSING_TEMPLATE_FIELDS' });
+}
+function sealDimension(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 5 || value > 50 || Math.abs(value * 10 - Math.round(value * 10)) > 1e-7) {
+    fail('invalid-argument', '인감 가로·세로 크기는 각각 5~50mm 범위에서 0.1mm 단위로 입력해 주세요.');
+  }
+  return value;
+}
 const text = (value, max, required = true) => {
   if (typeof value !== 'string' || value.length > max || (required && !value.trim())) {
     fail('invalid-argument', '입력값의 형식 또는 길이를 확인해 주세요.');
@@ -342,6 +358,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       return {
         settings: settings ? { ...visibleSettings, logoData: await imageData(settings.logoPath),
           sealData: user.role === 'ADMIN' ? await imageData(settings.sealPath) : '' } : null,
+        templateStatus: templateStatus(settings),
         companyName: user.companyName, approvalLine: await routing(user, db),
         canApproveDocuments: user.role === 'ADMIN' || user.documentApprovalGranted, documentApprovers,
         employeeDefaults: { nameKo: user.name || '', nameEn: '', birthDate: '', address: user.address || '',
@@ -387,15 +404,15 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       admin(user);
       const data = input.settings || {};
       const values = {
-        companyId: user.companyId, companyName: text(data.companyName, 120),
+        companyId: user.companyId, companyName: text(data.companyName ?? '', 120, false),
         companyNameEn: text(data.companyNameEn || '', 120, false),
-        address: text(data.address, 300), representative: text(data.representative, 80),
+        address: text(data.address ?? '', 300, false), representative: text(data.representative ?? '', 80, false),
         phone: text(data.phone || '', 80, false), email: text(data.email || '', 120, false),
       };
       const [logoPath, sealPath] = await Promise.all([
         uploadImage(data.logoData, user.companyId), uploadImage(data.sealData, user.companyId),
       ]);
-      const revoked = await db.runTransaction(async tx => {
+      const saved = await db.runTransaction(async tx => {
         const currentUser = await actor(request, tx); admin(currentUser);
         if (currentUser.companyId !== user.companyId) fail('aborted', '소속 회사가 변경되었습니다. 다시 로그인해 주세요.');
         const ref = settingsRef(user.companyId);
@@ -411,16 +428,22 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
               (person.status && person.status !== 'ACTIVE')) fail('invalid-argument', '본부가 지정된 소속 회사의 활성 SUB_ADMIN만 서류 승인자로 지정할 수 있습니다.');
         }
         const initial = !existing ? {
-          lastFront: integer(data.lastFront),
+          lastFront: integer(data.lastFront ?? 0),
         } : {};
-        tx.set(ref, { ...existing, ...values, ...initial, documentApproverIds, logoPath: logoPath || existing?.logoPath || '',
-          sealPath: sealPath || existing?.sealPath || '', version: (existing?.version || 0) + 1,
+        const finalValues = { ...existing, ...values, ...initial, documentApproverIds, logoPath: logoPath || existing?.logoPath || '',
+          sealPath: sealPath || existing?.sealPath || '',
+          sealWidthMm: sealDimension(data.sealWidthMm ?? existing?.sealWidthMm ?? 23.3),
+          sealHeightMm: sealDimension(data.sealHeightMm ?? existing?.sealHeightMm ?? 23.3), version: (existing?.version || 0) + 1,
+        };
+        requireTemplate(finalValues);
+        tx.set(ref, { ...finalValues,
           updatedAt: now().toISOString(), updatedBy: user.uid });
-        return (existing?.documentApproverIds || []).filter(uid => !documentApproverIds.includes(uid));
+        return { revoked: (existing?.documentApproverIds || []).filter(uid => !documentApproverIds.includes(uid)),
+          version: finalValues.version, assets: { logoRegistered: Boolean(finalValues.logoPath), sealRegistered: Boolean(finalValues.sealPath) } };
       });
       // Content access is revoked by settings immediately. Clear generic inbox tasks
       // separately, rechecking each current item to preserve reassigned/new grants.
-      for (const uid of revoked) {
+      for (const uid of saved.revoked) {
         const inbox = await db.collection('officialLetterNotifications').doc(uid).collection('items').where('companyId', '==', user.companyId).get();
         const refs = inbox.docs.filter(d => d.data().delegatedApproval).map(d => d.ref);
         for (let offset = 0; offset < refs.length; offset += 200) {
@@ -436,7 +459,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           });
         }
       }
-      return { success: true };
+      return { success: true, version: saved.version, assets: saved.assets };
     }
     if (action === 'save') {
       const ref = input.id ? letterRef(input.id) : db.collection('officialLetters').doc();
@@ -528,11 +551,11 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           // Revalidate stored certificate dates against the actual submission date.
           contentInput(current.content, current.documentType || 'OFFICIAL', koreaDate(now()));
           const settings = (await tx.get(settingsRef(user.companyId))).data();
-          if (!settings?.logoPath || !settings?.sealPath || !settings?.representative || !settings?.address) {
-            fail('failed-precondition', '회사 관리자가 먼저 로고·주소·대표자·인감을 등록해야 합니다.');
-          }
+          requireTemplate(settings);
           const { companyName, address, representative, phone, email, logoPath, sealPath } = settings;
-          const changed = { ...current, status: 'PENDING', branding: { companyName, companyNameEn: settings.companyNameEn || '', address, representative, phone, email, logoPath, sealPath },
+          const sealSize = settings.sealWidthMm != null && settings.sealHeightMm != null ?
+            { sealWidthMm: sealDimension(settings.sealWidthMm), sealHeightMm: sealDimension(settings.sealHeightMm) } : {};
+          const changed = { ...current, status: 'PENDING', branding: { companyName, companyNameEn: settings.companyNameEn || '', address, representative, phone, email, logoPath, sealPath, ...sealSize },
             approvalLine: current.approvalLine.map(step => ({ ...step, approvedAt: null })),
             updatedAt: timestamp, updatedBy: user.uid, rejectionReason: '' };
           if (user.role === 'ADMIN' && current.creatorId === user.uid) {

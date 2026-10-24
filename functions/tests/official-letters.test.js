@@ -6,6 +6,7 @@ const { createOfficialLetterService, koreaDate, numberLabel } = require('../offi
 const { renderOfficialLetterPdf } = require('../official-letter-pdf');
 const fs = require('node:fs');
 const path = require('node:path');
+const { inflateSync } = require('node:zlib');
 
 if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '')) {
   throw new Error('A loopback FIRESTORE_EMULATOR_HOST is required; production tests are prohibited.');
@@ -19,6 +20,21 @@ const bucket = { file: name => ({
   delete: async () => { files.delete(name); },
 }) };
 const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=';
+const rectangularPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAAAyCAYAAACqNX6+AAAACXBIWXMAAAPoAAAD6AG1e1JrAAAA2UlEQVR4nO3YoRWAUBDEQFpI/x1ck9ACLisi1vMyH3PPwduYafDYH9AI5IYfQn8IPkIg+OEDwY8dCH7gQPCjBoIfMhD8eIHgBwsEP1Ig+GECGYhxA+t0go8QCH74QPBjB4IfOBD8qIHghwwEP14g+MECwY8UCH6YQAZi3MA6neAjBIIfPhD82IHgBw4EP2og+CEDwY8XCH6wQPAjBYIfJpCBGDewTif4CIHghw8EP3Yg+IEDwY8aCH7IQPDjBYIfLBD8SIHghwlkIMYNrNMJPkIg+OEDwY/9Zx+g/wbmoISrngAAAABJRU5ErkJggg==';
+// Read the final PDF's compressed drawing commands, without any PDF parser dependency.
+function imageMatrices(pdf) {
+  const source = pdf.toString('latin1');
+  const matrices = [];
+  for (const stream of source.matchAll(/(\d+) 0 obj\b([\s\S]*?)stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    if (!/\/FlateDecode\b/.test(stream[2])) continue;
+    let decoded;
+    try { decoded = inflateSync(Buffer.from(stream[3], 'latin1')).toString('latin1'); } catch { continue; }
+    for (const drawing of decoded.matchAll(/([-\d.]+) 0 0 ([-\d.]+) [-\d.]+ [-\d.]+ cm\s*\/(I\d+) Do/g)) {
+      matrices.push({ width: Math.abs(Number(drawing[1])), height: Math.abs(Number(drawing[2])), image: drawing[3] });
+    }
+  }
+  return matrices;
+}
 const now = () => new Date('2026-10-22T15:10:00.000Z');
 let renderCount = 0;
 const manage = createOfficialLetterService({ db, bucket, now, renderPdf: async () => { renderCount++; return Buffer.from('%PDF approved'); } });
@@ -50,6 +66,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
     await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-hr-flow-letters/databases/(default)/documents`, { method: 'DELETE' });
     await db.doc('companies/a').set({ nameKo: '테스트 주식회사', status: 'ACTIVE' });
     await db.doc('companies/b').set({ nameKo: '다른 회사', status: 'ACTIVE' });
+    await db.doc('companies/c').set({ nameKo: '설정 검증 회사', status: 'ACTIVE' });
     for (const [uid, role, companyId, extra] of [
       ['admin', 'ADMIN', 'a', {}], ['member', 'MEMBER', 'a', { teamId: 'team1', divisionId: 'division1' }],
       ['lead', 'MEMBER', 'a', {}], ['head', 'SUB_ADMIN', 'a', {}],
@@ -58,6 +75,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
       ['delegate', 'SUB_ADMIN', 'a', { divisionId: 'division1' }], ['delegate2', 'SUB_ADMIN', 'a', { divisionId: 'division2' }],
       ['no-division', 'SUB_ADMIN', 'a', {}], ['retired-delegate', 'SUB_ADMIN', 'a', { divisionId: 'division1', status: 'RESIGNED' }],
       ['outsider', 'ADMIN', 'b', {}], ['platform', 'SUPER_ADMIN', 'PLATFORM', {}], ['resigned', 'MEMBER', 'a', { status: 'RESIGNED' }],
+      ['fresh-admin', 'ADMIN', 'c', {}],
     ]) await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId, status: 'ACTIVE', ...extra });
     await db.doc('teams/team1').set({ companyId: 'a', leaderId: 'lead' });
     await db.doc('divisions/division1').set({ companyId: 'a', headId: 'head' });
@@ -73,15 +91,66 @@ test('official-letter server authorization, numbering and revisions', async t =>
       const settings = { companyName: '테스트 주식회사', address: '서울특별시 강남구 테헤란로 87', representative: '홍길동',
         phone: '02-123-4567', email: 'office@example.com', logoData: png, sealData: png, lastFront: 0 };
       await denied(call('admin', 'saveSettings', { settings: { ...settings, logoData: 'data:image/png;base64,aGVsbG8=' }, expectedVersion: 0 }), 'invalid-argument');
-      await call('admin', 'saveSettings', { settings, expectedVersion: 0 });
+      const saved = await call('admin', 'saveSettings', { settings, expectedVersion: 0 });
+      assert.equal(saved.version, 1); assert.deepEqual(saved.assets, { logoRegistered: true, sealRegistered: true });
       await denied(call('admin', 'saveSettings', { settings, expectedVersion: 0 }), 'aborted');
       const bootstrap = await call('member', 'bootstrap');
       assert.equal(bootstrap.settings.sealData, '');
       assert.equal(bootstrap.settings.logoData, png);
       assert.deepEqual(bootstrap.approvalLine.map(step => step.uid), ['lead', 'head']);
       assert.equal((await call('admin', 'bootstrap')).settings.sealData, png);
+      assert.equal(bootstrap.settings.sealWidthMm, 23.3); assert.equal(bootstrap.settings.sealHeightMm, 23.3);
+      assert.deepEqual(bootstrap.templateStatus, { configured: true, missingFields: [] });
       // A legacy serial value must never affect the new front-date numbering.
       await db.doc('officialLetterSettings/a').update({ lastSerial: 999 });
+    });
+    await t.test('incomplete templates report missing fields without persisting a false successful save', async () => {
+      const bootstrap = await call('fresh-admin', 'bootstrap');
+      assert.equal(bootstrap.templateStatus.configured, false);
+      assert.deepEqual([...bootstrap.templateStatus.missingFields].sort(), ['companyName', 'address', 'representative', 'logoPath', 'sealPath'].sort());
+      for (const settings of [{ lastFront: 0 }, { companyName: '검증 회사', address: '서울특별시', representative: '대표자', logoData: png, lastFront: 0 }]) {
+        await assert.rejects(call('fresh-admin', 'saveSettings', { settings, expectedVersion: 0 }), error =>
+          error.code === 'failed-precondition' && Array.isArray(error.details?.missingFields) && error.details.missingFields.includes('sealPath'));
+        assert.equal((await db.doc('officialLetterSettings/c').get()).exists, false);
+      }
+      const valid = (await call('admin', 'bootstrap')).settings;
+      for (const field of ['companyName', 'address', 'representative']) {
+        await assert.rejects(call('admin', 'saveSettings', { settings: { ...valid, [field]: '' }, expectedVersion: valid.version }), error =>
+          error.code === 'failed-precondition' && error.details?.missingFields?.includes(field));
+        assert.equal((await call('admin', 'bootstrap')).settings.version, valid.version);
+      }
+    });
+    await t.test('saving omitted or empty image fields retains registered company assets and seal dimensions', async () => {
+      const before = (await call('admin', 'bootstrap')).settings;
+      const { logoData, sealData, sealWidthMm, sealHeightMm, ...withoutUploads } = before;
+      assert.ok(logoData && sealData && sealWidthMm && sealHeightMm);
+      const saved = await call('admin', 'saveSettings', { settings: { ...withoutUploads, phone: '02-555-1111' }, expectedVersion: before.version });
+      assert.equal(saved.version, before.version + 1); assert.deepEqual(saved.assets, { logoRegistered: true, sealRegistered: true });
+      const after = (await call('admin', 'bootstrap')).settings;
+      assert.equal(after.logoPath, before.logoPath); assert.equal(after.sealPath, before.sealPath);
+      assert.equal(after.logoData, png); assert.equal(after.sealData, png);
+      assert.equal(after.sealWidthMm, before.sealWidthMm); assert.equal(after.sealHeightMm, before.sealHeightMm);
+      await call('admin', 'saveSettings', { settings: { ...withoutUploads, logoData: '', sealData: '' }, expectedVersion: after.version });
+      assert.equal((await call('admin', 'bootstrap')).settings.sealPath, before.sealPath);
+      const invalidVersion = (await call('admin', 'bootstrap')).settings.version;
+      await denied(call('admin', 'saveSettings', { settings: { ...withoutUploads, sealData: 'data:image/png;base64,aGVsbG8=' }, expectedVersion: invalidVersion }), 'invalid-argument');
+      assert.equal((await call('admin', 'bootstrap')).settings.version, invalidVersion);
+    });
+    await t.test('millimeter seal dimensions validate their range and precision and round-trip through settings', async () => {
+      for (const invalid of [4.9, 50.1, 20.05, '20', Number.NaN, Number.POSITIVE_INFINITY]) {
+        const settings = (await call('admin', 'bootstrap')).settings;
+        for (const field of ['sealWidthMm', 'sealHeightMm']) {
+          await denied(call('admin', 'saveSettings', { settings: { ...settings, [field]: invalid }, expectedVersion: settings.version }), 'invalid-argument');
+        }
+        assert.equal((await call('admin', 'bootstrap')).settings.version, settings.version);
+      }
+      const settings = (await call('admin', 'bootstrap')).settings;
+      await call('admin', 'saveSettings', { settings: { ...settings, sealWidthMm: 5, sealHeightMm: 50 }, expectedVersion: settings.version });
+      const limits = (await call('admin', 'bootstrap')).settings;
+      assert.equal(limits.sealWidthMm, 5); assert.equal(limits.sealHeightMm, 50);
+      await call('admin', 'saveSettings', { settings: { ...limits, sealWidthMm: 20.1, sealHeightMm: 30.2 }, expectedVersion: limits.version });
+      const precise = (await call('admin', 'bootstrap')).settings;
+      assert.equal(precise.sealWidthMm, 20.1); assert.equal(precise.sealHeightMm, 30.2);
     });
 
     let letterId;
@@ -154,6 +223,26 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal(pending.branding.sealData, png);
       assert.equal((await call('member', 'get', { id })).letter.branding.sealData, '');
       assert.equal((await call('admin', 'bootstrap')).settings.companyName, '변경된 회사명');
+    });
+    await t.test('submitted seal dimensions and issued cached files remain frozen after changing the template', async () => {
+      const before = (await call('admin', 'bootstrap')).settings;
+      const id = await create(); await submit(id);
+      const pendingBefore = await load(id);
+      assert.equal(pendingBefore.branding.sealWidthMm, before.sealWidthMm);
+      assert.equal(pendingBefore.branding.sealHeightMm, before.sealHeightMm);
+      const issuedBefore = await load(letterId);
+      const cachedBytes = Buffer.from(files.get(issuedBefore.pdf.path));
+      const renderBefore = renderCount;
+      await call('admin', 'saveSettings', { settings: { ...before, sealData: rectangularPng, sealWidthMm: 35.5, sealHeightMm: 25.5 }, expectedVersion: before.version });
+      const pendingAfter = await load(id);
+      assert.equal(pendingAfter.branding.sealPath, pendingBefore.branding.sealPath);
+      assert.equal(pendingAfter.branding.sealWidthMm, before.sealWidthMm);
+      assert.equal(pendingAfter.branding.sealHeightMm, before.sealHeightMm);
+      const downloaded = await call('member', 'pdf', { id: letterId, revision: issuedBefore.revision });
+      assert.deepEqual(Buffer.from(downloaded.base64, 'base64'), cachedBytes);
+      assert.equal(renderCount, renderBefore, 'a template change must not regenerate an already issued PDF');
+      assert.deepEqual((await load(letterId)).pdf, issuedBefore.pdf);
+      assert.equal((await load(letterId)).branding.sealWidthMm, issuedBefore.branding.sealWidthMm);
     });
     await t.test('approver candidates require a company admin and expose only active eligible profile fields', async () => {
       const id = await create();
@@ -579,11 +668,45 @@ test('official-letter server authorization, numbering and revisions', async t =>
       for (const [documentType, title, values] of [
         ['EMPLOYMENT', '재직증명서', certificate], ['CAREER', '경력증명서', { ...certificate, endDate: '2026-09-30' }],
       ]) {
-        const certificatePdf = await renderOfficialLetterPdf({ ...letter, documentType, content: { recipient: '', reference: '', title, body: '', attachments: '', certificate: values } }, { logo: bytes, seal: bytes });
+        const certificatePdf = await renderOfficialLetterPdf({ ...letter, documentType,
+          branding: { ...letter.branding, sealWidthMm: 23.3, sealHeightMm: 23.3 },
+          content: { recipient: '', reference: '', title, body: '', attachments: '', certificate: values } }, { logo: bytes, seal: bytes });
         assert.equal(certificatePdf.subarray(0, 5).toString(), '%PDF-');
         assert.equal((certificatePdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1, 'a standard certificate must fit on one A4 page');
         assert.notDeepEqual(certificatePdf, short, 'certificate layouts must differ from ordinary letters');
         fs.writeFileSync(path.join(output, `certificate-${documentType.toLowerCase()}.pdf`), certificatePdf);
+      }
+    });
+    await t.test('PDF seal drawing matrices use exact millimeters and disable automatic print scaling', async () => {
+      const source = await load(letterId);
+      const images = { logo: Buffer.from(png.split(',')[1], 'base64'), seal: Buffer.from(rectangularPng.split(',')[1], 'base64') };
+      const output = path.resolve(__dirname, '../../tmp/pdfs');
+      for (const documentType of ['OFFICIAL', 'EMPLOYMENT', 'CAREER']) for (const [widthMm, heightMm] of [[20, 30], [50, 50]]) {
+        const letter = { ...source, documentType, branding: { ...source.branding, sealWidthMm: widthMm, sealHeightMm: heightMm },
+          content: documentType === 'OFFICIAL' ? content : { title: documentType === 'CAREER' ? '경력증명서' : '재직증명서', certificate: { ...certificate, endDate: documentType === 'CAREER' ? '2026-09-30' : '' } } };
+        const pdf = await renderOfficialLetterPdf(letter, images);
+        assert.equal(pdf.subarray(0, 8).toString(), '%PDF-1.7');
+        assert.match(pdf.toString('latin1'), /\/PrintScaling\s*\/None\b/);
+        const matrices = imageMatrices(pdf);
+        assert.ok(matrices.length >= 2, 'the PDF must draw both company logo and seal');
+        const seal = matrices.at(-1);
+        assert.ok(Math.abs(seal.width - widthMm * 72 / 25.4) < 0.002, `${documentType} seal width must be exactly ${widthMm} mm`);
+        assert.ok(Math.abs(seal.height - heightMm * 72 / 25.4) < 0.002, `${documentType} seal height must be exactly ${heightMm} mm`);
+        fs.writeFileSync(path.join(output, `seal-${widthMm}x${heightMm}-${documentType.toLowerCase()}.pdf`), pdf);
+      }
+    });
+    await t.test('legacy snapshots keep their original aspect-ratio fitted seal sizes', async () => {
+      const source = await load(letterId);
+      const images = { logo: Buffer.from(png.split(',')[1], 'base64'), seal: Buffer.from(rectangularPng.split(',')[1], 'base64') };
+      const { sealWidthMm, sealHeightMm, ...legacyBranding } = source.branding;
+      assert.ok(sealWidthMm && sealHeightMm);
+      for (const [documentType, legacyWidth] of [['OFFICIAL', 66], ['EMPLOYMENT', 64], ['CAREER', 64]]) {
+        const letter = { ...source, documentType, branding: legacyBranding,
+          content: documentType === 'OFFICIAL' ? content : { title: '증명서', certificate: { ...certificate, endDate: documentType === 'CAREER' ? '2026-09-30' : '' } } };
+        const pdf = await renderOfficialLetterPdf(letter, images);
+        const seal = imageMatrices(pdf).at(-1);
+        assert.ok(seal, 'the legacy PDF must still contain the seal');
+        assert.equal(seal.width, legacyWidth); assert.equal(seal.height, legacyWidth / 2);
       }
     });
   } finally { await deleteApp(app); }

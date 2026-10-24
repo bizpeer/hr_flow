@@ -67,7 +67,7 @@ export const OrganizationAdmin: React.FC = () => {
   const [newDivName, setNewDivName] = useState('');
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
-  const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', password: '', joinDate: new Date().toISOString().split('T')[0] });
+  const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
   const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
 
   // 정보 수정용 (임명/이동)
@@ -197,11 +197,6 @@ export const OrganizationAdmin: React.FC = () => {
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newEmp.password.length < 12) {
-      alert("임시 비밀번호는 최소 12자 이상이어야 합니다.");
-      return;
-    }
-
     try {
       setIsSubmittingEmployee(true);
       const loginInput = newEmp.email.trim().toLowerCase();
@@ -227,7 +222,6 @@ export const OrganizationAdmin: React.FC = () => {
       const result = await createMemberFn({
         name: newEmp.name,
         email: finalEmail,
-        password: newEmp.password,
         teamId: newEmp.teamId,
         joinDate: newEmp.joinDate
       });
@@ -236,11 +230,11 @@ export const OrganizationAdmin: React.FC = () => {
       const newUid = data.uid;
       
       // 3. 로그 기록 및 알림
-      await logAction('CREATE_MEMBER', newUid, newEmp.name, `직원 등록 (${finalEmail}) / 임비: ${newEmp.password}`);
-      alert(`[안내] 신규 직원 계정이 생성되었습니다.\n아이디: ${finalEmail}\n임시 비밀번호: ${newEmp.password}\n\n* 해당 직원은 첫 로그인 시 비밀번호를 의무적으로 변경해야 합니다.`);
+      await logAction('CREATE_MEMBER', newUid, newEmp.name, `직원 등록 (${finalEmail}) / 최초 로그인 시 비밀번호 변경 필요`);
+      alert(`[안내] 신규 직원 계정이 생성되었습니다.\n아이디: ${finalEmail}\n임시 비밀번호: !123456\n\n* 해당 직원은 첫 로그인 시 12자 이상의 새 비밀번호로 의무적으로 변경해야 합니다.`);
       
       setShowEmployeeModal(false);
-      setNewEmp({ name: '', email: '', teamId: '', password: '', joinDate: new Date().toISOString().split('T')[0] });
+      setNewEmp({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
     } catch (err: any) {
       console.error("Employee Registration Error:", err);
       alert("직원 등록 실패: " + (err.message || String(err)));
@@ -789,7 +783,7 @@ export const OrganizationAdmin: React.FC = () => {
                 <input type="text" required placeholder="아이디(이메일)" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <input type="password" required placeholder="임시 비밀번호" value={newEmp.password} onChange={(e) => setNewEmp({...newEmp, password: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+                <div className="rounded-[2rem] bg-indigo-50 p-5 text-sm text-indigo-700"><span className="block font-bold">초기 임시 비밀번호: !123456</span><span className="mt-1 block text-xs">자동 발급되며 최초 로그인 시 반드시 변경합니다.</span></div>
                 <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newEmp.teamId} onChange={(e) => setNewEmp({...newEmp, teamId: e.target.value})}>
                   <option value="">팀 선택(선택사항)</option>
                   {teams.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}

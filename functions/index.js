@@ -10,6 +10,7 @@ initializeApp();
 const { getStorage } = require('firebase-admin/storage');
 const { createOfficialLetterService } = require('./official-letter-service');
 const { renderOfficialLetterPdf } = require('./official-letter-pdf');
+const { createMemberService } = require('./member-service');
 exports.manageOfficialLetters = onCall({ memory: '512MiB', timeoutSeconds: 60, maxInstances: 10 }, async request => {
   try {
     return await createOfficialLetterService({
@@ -156,90 +157,11 @@ exports.adminResetPassword = onCall(async (request) => {
  * 호출자는 반드시 'ADMIN' 또는 'SUPER_ADMIN' 권한을 가지고 있어야 합니다.
  */
 exports.adminCreateMember = onCall(async (request) => {
-  // 1. 인증 정보 확인
-  if (!request.auth) {
-    throw new HttpsError("unauthenticated", "인증이 필요한 요청입니다.");
-  }
-
-  const { name, email, password, teamId, joinDate } = request.data;
-
-  // 2. 필수 데이터 검증
-  if (typeof name !== "string" || !name.trim() ||
-      typeof email !== "string" || !email.includes("@") ||
-      typeof password !== "string" || password.length < 12 || password.length > 128 ||
-      (teamId && typeof teamId !== "string")) {
-    throw new HttpsError("invalid-argument", "이름, 이메일, 12~128자 비밀번호를 확인해 주세요.");
-  }
-
   try {
-    const db = getFirestore(DATABASE_ID);
-
-    // 3. 호출자(관리자) 정보 및 권한 조회
-    const callerSnap = await db.collection("UserProfile").doc(request.auth.uid).get();
-    if (!callerSnap.exists) {
-      throw new HttpsError("permission-denied", "관리자 정보를 찾을 수 없습니다.");
-    }
-    const callerData = callerSnap.data();
-
-    if (callerData.role !== "ADMIN" && callerData.role !== "SUPER_ADMIN") {
-      throw new HttpsError("permission-denied", "직원을 등록할 권한이 없습니다.");
-    }
-
-    const companyId = callerData.role === "SUPER_ADMIN" ? "PLATFORM" : callerData.companyId;
-
-    // 팀 소속 정보가 있다면 divisionId 조회
-    let divisionId = "";
-    if (teamId) {
-      const teamSnap = await db.collection("teams").doc(teamId).get();
-      if (!teamSnap.exists || teamSnap.data().companyId !== companyId) {
-        throw new HttpsError("invalid-argument", "소속 회사의 팀을 선택해 주세요.");
-      }
-      divisionId = teamSnap.data().divisionId || "";
-    }
-
-    // Validate organization data before creating an Auth account.
-    const userRecord = await getAuth().createUser({
-      email: email.toLowerCase().trim(),
-      password,
-      displayName: name.trim(),
-    });
-
-    const userData = {
-      uid: userRecord.uid,
-      email: email.toLowerCase().trim(),
-      name: name.trim(),
-      role: "MEMBER",
-      companyId: companyId,
-      teamId: teamId || "",
-      divisionId: divisionId,
-      teamHistory: [],
-      joinDate: joinDate || new Date().toISOString().split('T')[0],
-      mustChangePassword: true, // 로그인 후 비밀번호 변경 강제
-      status: "ACTIVE",
-      createdAt: new Date().toISOString()
-    };
-
-    try {
-      await db.collection("UserProfile").doc(userRecord.uid).set(userData);
-    } catch (writeError) {
-      await getAuth().deleteUser(userRecord.uid);
-      throw writeError;
-    }
-
-    console.log(`[AdminCreateMember] New member ${userRecord.uid} created by ${request.auth.uid} (Company: ${companyId})`);
-
-    return {
-      success: true,
-      uid: userRecord.uid,
-      message: "신규 직원 계정 및 프로필이 성공적으로 생성되었습니다."
-    };
-
+    return await createMemberService({ db: getFirestore(DATABASE_ID), auth: getAuth() })(request);
   } catch (error) {
-    console.error(`[AdminCreateMemberError]`, error);
-    if (error.code === 'auth/email-already-in-use') {
-      throw new HttpsError("already-exists", "이미 등록된 이메일 주소입니다.");
-    }
     if (error instanceof HttpsError) throw error;
+    console.error('[AdminCreateMemberError]', error.code || 'internal');
     throw new HttpsError("internal", "직원 등록 중 오류가 발생했습니다.");
   }
 });
