@@ -1,6 +1,5 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
-const { createPrinterInspectionService, printerInspectionActions } = require('./official-letter-printers');
 const { authorizeContext } = require('./security-context');
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
@@ -86,7 +85,7 @@ function contentInput(data, type, today) {
 }
 
 /** All official-letter writes go through this service, including ADMIN writes. */
-function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf, now = () => new Date() }) {
+function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Date() }) {
   const read = (reader, ref) => reader === db ? ref.get() : reader.get(ref);
   const settingsRef = companyId => db.collection('officialLetterSettings').doc(companyId);
   const letterRef = letterId => db.collection('officialLetters').doc(id(letterId));
@@ -283,32 +282,24 @@ function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf
         metadata: { contentType: 'application/pdf', cacheControl: 'private, no-store' } });
     }
     // A cached or newly rendered file is never returned after access/approval revocation.
-    try {
-      await db.runTransaction(async tx => {
-        const currentUser = await actor(request, tx);
-        const current = (await tx.get(ref)).data(); access(currentUser, current); expected(current, revision);
-        if (current.status !== 'ISSUED' || current.approvedRevision !== revision || current.number !== letter.number) {
-          fail('aborted', '승인 상태가 변경되었습니다.');
-        }
-        if (!current.pdfReady || current.pdf?.path !== path) {
-          tx.update(ref, { pdfReady: true, pdf: { path, revision, number: letter.number, readyAt: now().toISOString() } });
-        }
-      });
-    } catch (error) {
-      const current = (await ref.get()).data();
-      if (!current || current.revision !== revision || current.number !== letter.number || current.status !== 'ISSUED') {
-        try { await bucket.file(path).delete({ ignoreNotFound: true }); } catch { /* Private stale files remain inaccessible. */ }
+    // A concurrent revision may archive this same path. Keep the private file;
+    // only explicit ADMIN history deletion may remove an archived PDF.
+    await db.runTransaction(async tx => {
+      const currentUser = await actor(request, tx);
+      const current = (await tx.get(ref)).data(); access(currentUser, current); expected(current, revision);
+      if (current.status !== 'ISSUED' || current.approvedRevision !== revision || current.number !== letter.number) {
+        fail('aborted', '승인 상태가 변경되었습니다.');
       }
-      throw error;
-    }
+      if (!current.pdfReady || current.pdf?.path !== path) {
+        tx.update(ref, { pdfReady: true, pdf: { path, revision, number: letter.number, readyAt: now().toISOString() } });
+      }
+    });
     return bytes;
   }
 
-  const managePrinters = createPrinterInspectionService({ db, actor, admin, text, id, now, koreaDate, certificateDate, requireTemplate, sealDimension });
   return async function manage(request) {
     const input = request.data || {};
     const action = input.action;
-    if (printerInspectionActions.includes(action)) return managePrinters(request);
     if (action === 'ackNotification') {
       return db.runTransaction(async tx => {
         const user = await actor(request, tx);
@@ -336,36 +327,6 @@ function createOfficialLetterService({ db, bucket, renderPdf, renderPrintTestPdf
         .map(d => ({ uid: d.id, name: d.data().name || d.id, role: d.data().role,
           teamId: d.data().teamId || '', divisionId: d.data().divisionId || '' }))
         .sort((a, b) => a.name.localeCompare(b.name, 'ko')) };
-    }
-    if (action === 'sealPrintTest') {
-      // Test output uses only the current company's saved assets and never issues a document.
-      const { user, settings } = await db.runTransaction(async tx => {
-        const user = await actor(request, tx); admin(user);
-        const settings = (await tx.get(settingsRef(user.companyId))).data();
-        requireTemplate(settings);
-        if (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1) {
-          fail('invalid-argument', '저장된 템플릿 버전을 확인해 주세요.');
-        }
-        if (settings.version !== input.expectedVersion) fail('aborted', '회사 템플릿이 변경되었습니다. 최신 설정을 다시 불러와 주세요.');
-        if (settings.sealWidthMm == null || settings.sealHeightMm == null) {
-          fail('failed-precondition', '인감 가로·세로 mm 크기를 지정하고 회사 템플릿을 먼저 저장해 주세요.');
-        }
-        sealDimension(settings.sealWidthMm); sealDimension(settings.sealHeightMm);
-        return { user, settings };
-      });
-      const [seal] = await bucket.file(settings.sealPath).download();
-      const bytes = await renderPrintTestPdf(settings, { seal });
-      // Recheck access and the saved snapshot after rendering, before disclosing a seal PDF.
-      await db.runTransaction(async tx => {
-        const currentUser = await actor(request, tx); admin(currentUser);
-        if (currentUser.companyId !== user.companyId) fail('aborted', '소속 회사가 변경되었습니다. 다시 로그인해 주세요.');
-        const current = (await tx.get(settingsRef(user.companyId))).data();
-        if (current?.version !== settings.version || current.sealPath !== settings.sealPath ||
-            current.sealWidthMm !== settings.sealWidthMm || current.sealHeightMm !== settings.sealHeightMm) {
-          fail('aborted', '회사 템플릿이 변경되었습니다. 최신 설정으로 다시 테스트해 주세요.');
-        }
-      });
-      return { base64: bytes.toString('base64'), filename: 'seal-print-test.pdf' };
     }
     // Read paths also authorize against server profiles, never browser role claims.
     if (action === 'bootstrap') {

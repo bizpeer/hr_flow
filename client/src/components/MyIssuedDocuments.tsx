@@ -77,7 +77,7 @@ function IssuedDocuments({ uid }: { uid: string }) {
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7" aria-label="내 발급 서류">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><FileCheck2 className="h-5 w-5 text-indigo-600" />내 발급 서류</h2><p className="mt-1 text-sm text-slate-500">내가 신청하고 승인·발행이 완료된 서류를 내려받습니다.</p></div>
+        <div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><FileCheck2 className="h-5 w-5 text-indigo-600" />내 발급 서류</h2><p className="mt-1 text-sm text-slate-500">승인·발행된 PDF를 다운로드해 외부 PDF 프로그램에서 인쇄합니다.</p></div>
         <div className="flex items-center gap-3"><Link to="/documents" className="text-sm font-bold text-indigo-600 hover:underline">서류발급</Link><button type="button" disabled={state.loading} onClick={refresh} aria-label="내 발급 서류 새로고침" className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${state.loading ? 'animate-spin' : ''}`} /></button></div>
       </div>
       {downloadError && <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{downloadError}</div>}
@@ -88,7 +88,7 @@ function IssuedDocuments({ uid }: { uid: string }) {
           {state.letters.map(letter => (
             <div key={letter.id} className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center">
               <div className="min-w-0"><p className="text-xs font-semibold text-indigo-600">{letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</p><Link to={`/documents?letter=${encodeURIComponent(letter.id)}`} className="mt-1 block break-words text-sm font-bold text-slate-800 hover:text-indigo-600">{letter.title}</Link><p className="mt-1 text-xs text-slate-500">{letter.number} · 발행일 {letter.issueDate || '-'}</p></div>
-              <button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 sm:self-auto">{downloading === letter.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}{letter.pdfReady ? 'PDF 다운로드' : 'PDF 생성·다운로드'}</button>
+              <button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 sm:self-auto">{downloading === letter.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}PDF 다운로드</button>
             </div>
           ))}
         </div>

@@ -4,7 +4,7 @@ const { getAuth } = require('firebase-admin/auth');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
 const { createOfficialLetterService } = require('./official-letter-service');
-const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('./official-letter-pdf');
+const { renderOfficialLetterPdf } = require('./official-letter-pdf');
 const { createMemberService } = require('./member-service');
 const { createAccountSecurityService } = require('./account-security-service');
 const { createAdminSecurityService } = require('./admin-security-service');
@@ -32,7 +32,7 @@ const callable = (handler, options = {}) => onCall({ maxInstances: 10, timeoutSe
   }
 });
 exports.manageOfficialLetters = callable((request, dep) => createOfficialLetterService({ ...dep,
-  renderPdf: renderOfficialLetterPdf, renderPrintTestPdf: renderSealPrintTestPdf })(request), { memory: '512MiB' });
+  renderPdf: renderOfficialLetterPdf })(request), { memory: '512MiB' });
 exports.adminCreateMember = callable((request, dep) => createMemberService(dep)(request));
 exports.accountSecurity = callable((request, dep) => createAccountSecurityService(dep)(request));
 exports.checkDomainAvailability = callable((request, dep) => createAdminSecurityService(dep).checkDomain(request));

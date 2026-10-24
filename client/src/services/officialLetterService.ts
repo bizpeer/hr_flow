@@ -102,50 +102,6 @@ export interface LetterBootstrap {
   templateStatus?: { configured: boolean; missingFields: string[] };
 }
 export interface LetterSettingsSaved { success: true; version: number; assets: { logoRegistered: boolean; sealRegistered: boolean } }
-export interface PrinterDetails { name: string; model: string; location: string; active: boolean }
-export interface PrinterProfile extends PrinterDetails {
-  id: string;
-  companyId: string;
-  version: number;
-  createdAt: string;
-  createdBy: string;
-  updatedAt: string;
-  updatedBy: string;
-}
-export interface PrinterInspectionInput {
-  inspectedOn: string;
-  measuredSealWidthMm: number;
-  measuredSealHeightMm: number;
-  horizontal100Mm: number;
-  vertical100Mm: number;
-  toleranceMm: number;
-  note: string;
-  printSettings: string;
-  actualSizeConfirmed: true;
-}
-export interface PrinterInspection extends PrinterInspectionInput {
-  id: string;
-  companyId: string;
-  printerId: string;
-  paperSize: 'A4';
-  scalePercent: 100;
-  result: 'PASS' | 'RECHECK';
-  deviations: { sealWidthMm: number; sealHeightMm: number; horizontal100Mm: number; vertical100Mm: number };
-  printerSnapshot: Pick<PrinterProfile, 'name' | 'model' | 'location' | 'version'>;
-  templateSnapshot: { version: number; companyName: string; sealWidthMm: number; sealHeightMm: number; sealAssetId: string };
-  recordedAt: string;
-  recordedBy: string;
-  recordedByName: string;
-}
-export interface PrinterInspectionRequest {
-  printerId: string;
-  expectedPrinterVersion: number;
-  expectedSettingsVersion: number;
-  requestId: string;
-  inspection: PrinterInspectionInput;
-}
-interface PageOptions { after?: string; pageSize?: number }
-
 const callable = httpsCallable<Record<string, unknown>, unknown>(functions, 'manageOfficialLetters');
 async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const response = await callable({ action, ...payload });
@@ -158,13 +114,6 @@ export const officialLetters = {
   mine: () => call<{ letters: LetterSummary[] }>('mine'),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
   saveSettings: (settings: LetterSettings) => call<LetterSettingsSaved>('saveSettings', { settings, expectedVersion: settings.version }),
-  sealPrintTest: (expectedVersion: number) => call<{ base64: string; filename: string }>('sealPrintTest', { expectedVersion }),
-  listPrinters: (options: PageOptions = {}) => call<{ printers: PrinterProfile[]; nextCursor: string | null }>('listPrinters', { ...options }),
-  savePrinter: (printer: PrinterDetails, existing?: PrinterProfile) => call<{ printer: PrinterProfile }>('savePrinter', {
-    printer, expectedVersion: existing?.version ?? 0, ...(existing ? { printerId: existing.id } : {}),
-  }),
-  listPrinterInspections: (printerId: string, options: PageOptions = {}) => call<{ inspections: PrinterInspection[]; nextCursor: string | null }>('listPrinterInspections', { printerId, ...options }),
-  recordPrinterInspection: (request: PrinterInspectionRequest) => call<{ inspection: PrinterInspection }>('recordPrinterInspection', { ...request }),
   save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {
     content, documentType, ...(letter ? { id: letter.id, revision: letter.revision } : {}),
   }),

@@ -3,8 +3,6 @@ import type { FormEvent } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Settings, Download, History, CheckCircle, Send, RefreshCw, X, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
-import { PrinterInspections } from '../components/PrinterInspections';
-import type { PrinterNavigationGuard } from '../components/PrinterInspections';
 import { officialLetters, seoulDate, koreanDate, previewNumber, readLetterImage } from '../services/officialLetterService';
 import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import './OfficialLetters.css';
@@ -73,7 +71,6 @@ export function OfficialLetters() {
   const settingsDirtyRef = useRef(false);
   const settingsEditRef = useRef(0);
   const settingsSavingRef = useRef(false);
-  const printerGuardRef = useRef<PrinterNavigationGuard | null>(null);
   const pendingImageReads = useRef(new Set<Promise<void>>());
   const imageReadTokens = useRef({ logoData: 0, sealData: 0 });
   const imageErrorsRef = useRef<Partial<Record<TemplateImageKey, string>>>({});
@@ -120,18 +117,6 @@ export function OfficialLetters() {
     settingsEditRef.current++; imageErrorsRef.current = {}; setImageErrors({});
     return true;
   }, []);
-  const registerPrinterGuard = useCallback((guard: PrinterNavigationGuard | null) => { printerGuardRef.current = guard; }, []);
-  const confirmLeaveWorkspace = useCallback(() => {
-    const guard = printerGuardRef.current;
-    const printerPending = !!guard?.hasPending();
-    if (printerPending) {
-      if (guard?.isSaving()) { setError('프린터 등록 정보 또는 점검을 저장하고 있습니다. 완료된 뒤 이동해 주세요.'); return false; }
-      if (!window.confirm('저장하지 않은 프린터 등록 정보 또는 점검 입력이 있습니다. 내용을 버리고 이동할까요?')) return false;
-    }
-    if (!confirmLeaveSettings()) return false;
-    if (printerPending) guard?.discard();
-    return true;
-  }, [confirmLeaveSettings]);
 
   function changeSettings(updater: (previous: LetterSettings) => LetterSettings, imageCompletion = false) {
     if (settingsSavingRef.current && !imageCompletion) return;
@@ -183,7 +168,7 @@ export function OfficialLetters() {
   }, []);
   useEffect(() => { navigationUrlRef.current = window.location.href; }, [routerLocation.key, routerLocation.pathname, routerLocation.search, routerLocation.hash]);
   useEffect(() => {
-    const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0 || !!printerGuardRef.current?.hasPending();
+    const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0;
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (hasPendingSettings() || dirtyRef.current) { event.preventDefault(); event.returnValue = ''; }
     };
@@ -191,14 +176,14 @@ export function OfficialLetters() {
       if (!hasPendingSettings() || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
       if (!(anchor instanceof HTMLAnchorElement) || anchor.target === '_blank' || anchor.hasAttribute('download') || anchor.href === window.location.href) return;
-      if (!confirmLeaveWorkspace()) { event.preventDefault(); event.stopImmediatePropagation(); }
+      if (!confirmLeaveSettings()) { event.preventDefault(); event.stopImmediatePropagation(); }
     };
     const beforeProgrammaticNavigation = (event: Event) => {
-      if (hasPendingSettings() && !confirmLeaveWorkspace()) event.preventDefault();
+      if (hasPendingSettings() && !confirmLeaveSettings()) event.preventDefault();
     };
     const beforeHistory = (event: Event) => {
       if (window.location.href === navigationUrlRef.current) return;
-      if (hasPendingSettings() && !confirmLeaveWorkspace()) {
+      if (hasPendingSettings() && !confirmLeaveSettings()) {
         event.stopImmediatePropagation();
         const previous = new URL(navigationUrlRef.current);
         window.history.replaceState(window.history.state, '', previous.href);
@@ -215,14 +200,14 @@ export function OfficialLetters() {
       window.removeEventListener('hr-flow:before-navigation', beforeProgrammaticNavigation);
       if (activeTemplateHistoryGuard === beforeHistory) activeTemplateHistoryGuard = null;
     };
-  }, [confirmLeaveWorkspace]);
+  }, [confirmLeaveSettings]);
   useEffect(() => { dirtyRef.current = dirty; }, [dirty]);
   useEffect(() => {
     if (!linkedLetterId || handledLink.current === linkedKey || !currentUserId || currentRole === 'SUPER_ADMIN') return;
     let active = true;
     Promise.resolve().then(async () => {
       if (!active) return;
-      if (!confirmLeaveWorkspace()) { handledLink.current = linkedKey; setSettledLink(linkedKey); return; }
+      if (!confirmLeaveSettings()) { handledLink.current = linkedKey; setSettledLink(linkedKey); return; }
       if (dirtyRef.current && !window.confirm('저장하지 않은 입력을 닫고 알림의 서류를 열까요?')) {
         handledLink.current = linkedKey; setSettledLink(linkedKey); return;
       }
@@ -233,7 +218,7 @@ export function OfficialLetters() {
       setApprovalOpen(false); setReassignmentOpen(false); setTab('documents'); setError('');
     }).catch(e => { if (active) { handledLink.current = linkedKey; setSettledLink(linkedKey); setError(errorMessage(e)); } });
     return () => { active = false; };
-  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveWorkspace]);
+  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings]);
 
   function setLetterLink(id?: string) {
     const key = letterLinkKey(id || '');
@@ -253,7 +238,7 @@ export function OfficialLetters() {
     try { await action(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
   }
   async function open(id: string) {
-    if (!confirmLeaveWorkspace()) return;
+    if (!confirmLeaveSettings()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 선택한 서류를 열까요?')) return;
     setLetterLink(id);
     await run(async () => {
@@ -284,7 +269,7 @@ export function OfficialLetters() {
     });
   }
   function begin(type: DocumentType) {
-    if (!confirmLeaveWorkspace()) return;
+    if (!confirmLeaveSettings()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새 서류를 작성할까요?')) return;
     setLetterLink(); setTab('documents'); setSelected(null); setDocumentType(type);
     setContent(type === 'OFFICIAL' ? emptyContent() : certificateContent(type, emptyCertificate(employeeDefaults)));
@@ -343,43 +328,18 @@ export function OfficialLetters() {
       return next;
     });
   }
-  async function download(openViewer: boolean) {
+  async function download() {
     if (!selected) return;
-    const viewer = openViewer ? window.open('about:blank', '_blank') : null;
     await run(async () => {
-      try {
-        const result = await officialLetters.pdf(selected);
-        const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-        if (viewer) viewer.location.replace(url);
-        else {
-          const anchor = document.createElement('a'); anchor.href = url; anchor.download = result.filename;
-          anchor.click();
-          if (openViewer) setNotice('새 창이 차단되어 PDF를 다운로드했습니다. 파일을 열어 인쇄해 주세요.');
-        }
-        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-        if (selected.pdfReady === false) await reloadSelected();
-      } catch (e) { viewer?.close(); throw e; }
-    });
-  }
-  async function downloadSealPrintTest(openViewer: boolean) {
-    const stored = savedSettingsRef.current;
-    if (!isAdmin || !stored || !canSealPrintTest || settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size) {
-      setError('저장된 인감과 mm 규격으로 시험인쇄하려면 회사 템플릿 저장을 먼저 완료해 주세요.'); return;
-    }
-    const viewer = openViewer ? window.open('about:blank', '_blank') : null;
-    await run(async () => {
-      try {
-        const result = await officialLetters.sealPrintTest(stored.version);
-        const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
-        const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-        if (viewer) viewer.location.replace(url);
-        else {
-          const anchor = document.createElement('a'); anchor.href = url; anchor.download = result.filename; anchor.click();
-        }
-        window.setTimeout(() => URL.revokeObjectURL(url), 60000);
-        setNotice(`${openViewer && !viewer ? '새 창이 차단되어 시험인쇄 PDF를 다운로드했습니다. ' : ''}저장된 인감과 mm 눈금이 포함된 시험용 PDF입니다. A4 · 실제 크기(100%)로 인쇄하고 자로 크기를 확인해 주세요. 문서번호와 발급 이력은 변경되지 않습니다.`);
-      } catch (failure) { viewer?.close(); throw failure; }
+      const result = await officialLetters.pdf(selected);
+      const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+      const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = result.filename;
+      document.body.appendChild(anchor); anchor.click(); anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (selected.pdfReady === false) await reloadSelected();
+      setNotice('서버에 보관된 PDF를 다운로드했습니다. 파일을 열어 외부 PDF 프로그램에서 인쇄해 주세요. 인감 크기를 유지하려면 실제 크기(100%)로 인쇄합니다.');
     });
   }
 
@@ -400,18 +360,15 @@ export function OfficialLetters() {
     setContent(previous => certificateContent(documentType, { ...emptyCertificate(previous.certificate), [key]: value })); setDirty(true);
   };
   const hasUnavailableApprover = approverIds.some(uid => !candidates.some(candidate => candidate.uid === uid));
-  const savedSealMmKnown = [savedSettings?.sealWidthMm, savedSettings?.sealHeightMm].every(value => typeof value === 'number' && Number.isFinite(value) && value >= 5 && value <= 50 && Math.abs(value * 10 - Math.round(value * 10)) < 0.000001);
-  const storedTemplateComplete = templateStatus?.configured ?? Boolean(savedSettings?.companyName && savedSettings.address && savedSettings.representative && savedSettings.logoPath && savedSettings.sealPath);
-  const canSealPrintTest = isAdmin && !busy && !settingsDirty && storedTemplateComplete && savedSealMmKnown && Boolean(savedSettings?.sealPath && savedSettings.version > 0);
 
   return <div className="official-letters-screen p-4 md:p-8 space-y-6">
     <header className="flex flex-wrap items-center justify-between gap-4">
       <div><h1 className="text-2xl font-black flex gap-2 items-center"><FileText className="text-indigo-600" />서류 발급</h1>
-        <p className="text-slate-500 mt-2 text-sm">공문·재직증명서·경력증명서를 작성하고 결재와 PDF 발급을 관리합니다.</p></div>
+        <p className="text-slate-500 mt-2 text-sm">공문·재직증명서·경력증명서를 작성·결재하고, 승인된 PDF를 다운로드해 외부에서 인쇄합니다.</p></div>
       <div className="flex flex-wrap gap-2">{(Object.keys(documentLabels) as DocumentType[]).map(type => <button key={type} className="ol-primary" disabled={busy} onClick={() => begin(type)}><Plus size={17} />{documentLabels[type]} 작성</button>)}</div>
     </header>
     <div className="flex flex-wrap gap-2">
-      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveWorkspace()) setTab('documents'); }}><FileText size={16} />서류함</button>
+      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveSettings()) setTab('documents'); }}><FileText size={16} />서류함</button>
       {isAdmin && <button className={tab === 'settings' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
       <button className="ol-button" disabled={busy} onClick={() => { if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새로고침할까요?')) return; void run(async () => { await reloadSelected(); setNotice('최신 내용을 불러왔습니다.'); }); }}><RefreshCw size={16} />새로고침</button>
       {busy && <span role="status" className="text-sm self-center text-indigo-600">처리 중…</span>}
@@ -447,14 +404,6 @@ export function OfficialLetters() {
         <div className="grid md:grid-cols-2 gap-4">{([['sealWidthMm', '인감 가로 (mm)'], ['sealHeightMm', '인감 세로 (mm)']] as const).map(([key, label]) => <label key={key} className="ol-label">{label}<input className="ol-input" type="number" required min={5} max={50} step={0.1} value={settings[key] ?? 23.3} onChange={event => changeSettings(previous => ({ ...previous, [key]: Number(event.target.value) }))} /></label>)}</div>
         <p className="text-sm text-slate-600">A4 PDF에서 이미지 전체의 가로·세로가 입력한 mm로 출력됩니다. 이미지 안의 흰색·투명 여백도 크기에 포함되므로 인감 테두리에 맞게 잘라낸 PNG를 권장합니다. 가로·세로를 원본 비율과 다르게 지정하면 인감 모양도 해당 비율로 늘어나거나 줄어듭니다.</p>
         <p className="text-sm font-semibold text-indigo-900">정확한 크기로 출력하려면 PDF 인쇄 설정을 ‘실제 크기 / 100%’로 선택하고 ‘페이지에 맞추기’ 등 확대·축소를 사용하지 마세요. 화면 미리보기의 실제 길이는 모니터 배율에 따라 다를 수 있습니다.</p>
-        <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-3"><h4 className="font-semibold">저장된 인감 시험인쇄</h4>
-          <p className="text-sm text-slate-600">서버에 저장된 인감과 가로·세로 mm 규격으로 A4 시험용 PDF를 만듭니다. PDF의 눈금을 실제 자와 비교해 인쇄 배율을 확인할 수 있으며 문서번호나 발급 이력은 변경하지 않습니다.</p>
-          {savedSealMmKnown && <p className="text-sm">저장된 인감 크기: <strong>{savedSettings?.sealWidthMm?.toFixed(1)} × {savedSettings?.sealHeightMm?.toFixed(1)} mm</strong></p>}
-          {(!storedTemplateComplete || !savedSealMmKnown) && <p className="text-sm font-semibold text-amber-800">회사정보·로고·인감과 mm 규격을 등록한 뒤 템플릿을 먼저 저장해 주세요. 예전 설정에 mm 규격이 없으면 현재 가로·세로 값을 저장해야 합니다.</p>}
-          {settingsDirty && <p className="text-sm font-semibold text-amber-800">미저장 변경이 있습니다. ‘템플릿 저장’을 완료한 뒤 시험인쇄할 수 있습니다.</p>}
-          {(settingsSaving || imageReadCount > 0) && <p className="text-sm text-indigo-700">이미지 처리와 템플릿 저장이 완료된 뒤 시험인쇄할 수 있습니다.</p>}
-          <div className="flex flex-wrap gap-2"><button type="button" className="ol-button" disabled={!canSealPrintTest} onClick={() => { void downloadSealPrintTest(false); }}><Download size={16} />인감 시험인쇄 PDF 다운로드</button><button type="button" className="ol-button" disabled={!canSealPrintTest} onClick={() => { void downloadSealPrintTest(true); }}>인감 시험인쇄 PDF 열기·인쇄</button></div>
-        </div>
       </div>
       <div className="bg-slate-50 rounded-xl p-4 space-y-3">
         <h3 className="font-bold">문서번호 시작점</h3>
@@ -470,7 +419,7 @@ export function OfficialLetters() {
       </fieldset>
       <div className="flex flex-wrap gap-2"><button className="ol-primary" disabled={busy || Object.values(imageErrors).some(Boolean)}>템플릿 저장</button><button type="button" className="ol-button" disabled={busy || !settingsDirty} onClick={() => { confirmLeaveSettings(); }}>저장 전 변경 취소</button></div>
       </fieldset>
-    </form><PrinterInspections savedSettings={savedSettings} templateReady={storedTemplateComplete && savedSealMmKnown && Boolean(savedSettings?.version)} templatePending={settingsDirty || settingsSaving || imageReadCount > 0} registerGuard={registerPrinterGuard} /></> : <>
+    </form></> : <>
       <section className="ol-card">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
           <div className="flex flex-wrap gap-2"><select aria-label="서류 종류 필터" className="ol-input max-w-48" value={typeFilter} onChange={event => setTypeFilter(event.target.value as DocumentType | 'ALL')}><option value="ALL">모든 서류</option>{(Object.keys(documentLabels) as DocumentType[]).map(type => <option key={type} value={type}>{documentLabels[type]}</option>)}</select><input aria-label="서류 검색" placeholder="문서번호, 제목, 대상자, 작성자 검색" className="ol-input max-w-sm" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
@@ -519,7 +468,7 @@ export function OfficialLetters() {
         {selected && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           {['DRAFT', 'REJECTED'].includes(selected.status) && <button className="ol-primary" disabled={busy || dirty} onClick={() => { void run(async () => {
             await officialLetters.submit(selected); const refreshed = await reloadSelected();
-            setNotice(refreshed?.status === 'ISSUED' ? refreshed.pdfReady === false ? '제출 즉시 승인·발급되었습니다. PDF 다운로드를 눌러 파일 생성을 다시 시도해 주세요.' : '제출 즉시 승인·발급되었습니다. PDF를 다운로드하거나 열어 인쇄할 수 있습니다.' : '결재를 요청했습니다.');
+            setNotice(refreshed?.status === 'ISSUED' ? refreshed.pdfReady === false ? '제출 즉시 승인·발급되었습니다. PDF 다운로드를 눌러 파일 생성을 다시 시도해 주세요.' : '제출 즉시 승인·발급되었습니다. 서버에 저장된 PDF를 다운로드해 외부에서 인쇄할 수 있습니다.' : '결재를 요청했습니다.');
           }); }}><Send size={16} />{autoIssueOnSubmit ? '제출 즉시 승인·발급' : '결재 요청'}</button>}
           {canReview && <>
             <button className="ol-primary" disabled={busy || dirty || (!canFinalApprove && !canApproveCurrentStep)} onClick={() => {
@@ -528,8 +477,8 @@ export function OfficialLetters() {
             }}><CheckCircle size={16} />{canFinalApprove ? '최종 승인·발급' : '중간 결재 승인'}</button>
             <button className="ol-button" disabled={busy || dirty} onClick={() => { const reason = window.prompt('반려 사유를 입력해 주세요.'); if (reason?.trim()) { void run(async () => { await officialLetters.review(selected, 'reject', { reason }); await reloadSelected(); }); } }}>반려</button>
           </>}
-          {selected.status === 'ISSUED' && <><button className="ol-primary" disabled={busy || dirty} onClick={() => { void download(false); }}><Download size={16} />PDF 다운로드</button><button className="ol-button" disabled={busy || dirty} onClick={() => { void download(true); }}>PDF 열기·인쇄</button></>}
-          {selected.status === 'ISSUED' && selected.pdfReady === false && <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-900">발급 승인은 완료되었으나 PDF 파일 저장을 다시 시도해야 합니다. PDF 다운로드 또는 열기·인쇄를 누르면 다시 생성합니다.</p>}
+          {selected.status === 'ISSUED' && <><button className="ol-primary" disabled={busy || dirty} onClick={() => { void download(); }}><Download size={16} />PDF 다운로드</button></>}
+          {selected.status === 'ISSUED' && selected.pdfReady === false && <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-900">발급 승인은 완료되었으나 PDF 파일의 서버 저장을 다시 시도해야 합니다. PDF 다운로드를 누르면 승인본을 서버에 저장한 뒤 내려받습니다.</p>}
           {isAdmin && <><button className="ol-button" disabled={busy || dirty} onClick={() => { void beginReassignment(); }}><Users size={16} />결재자 재배정</button><button className="ol-button" disabled={busy || dirty} onClick={() => { void run(async () => { setHistory((await officialLetters.history(selected)).history); }); }}><History size={16} />수정 전 보관 이력</button></>}
           {dirty && <p className="w-full text-sm text-amber-700">변경 내용을 먼저 저장해 주세요. 저장하면 결재를 다시 요청해야 합니다.</p>}
         </div>}
@@ -577,7 +526,7 @@ export function OfficialLetters() {
         {approvalOpen && selected && canFinalApprove && <form className="rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
           event.preventDefault(); void run(async () => {
             await officialLetters.review(selected, 'approve', isAdmin && overrideNumber ? { front } : {}); setApprovalOpen(false);
-            const refreshed = await reloadSelected(); setNotice(refreshed?.pdfReady === false ? '최종 승인하고 발급번호를 부여했습니다. PDF 다운로드를 눌러 파일 저장을 다시 시도해 주세요.' : '현재 개정본을 최종 승인하고 발급번호를 부여했습니다. PDF를 다운로드하거나 열어 인쇄할 수 있습니다.');
+            const refreshed = await reloadSelected(); setNotice(refreshed?.pdfReady === false ? '최종 승인하고 발급번호를 부여했습니다. PDF 다운로드를 눌러 파일 저장을 다시 시도해 주세요.' : '현재 개정본을 최종 승인하고 발급번호를 부여했습니다. 서버에 저장된 PDF를 다운로드해 외부에서 인쇄할 수 있습니다.');
           });
         }}><h3 className="font-bold">서류 최종 승인</h3>
           <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-2">

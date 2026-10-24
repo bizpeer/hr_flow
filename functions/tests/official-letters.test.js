@@ -3,11 +3,10 @@ const assert = require('node:assert/strict');
 const { initializeApp, deleteApp } = require('firebase-admin/app');
 const { getFirestore, Timestamp } = require('firebase-admin/firestore');
 const { createOfficialLetterService, koreaDate, numberLabel } = require('../official-letter-service');
-const { renderOfficialLetterPdf, renderSealPrintTestPdf } = require('../official-letter-pdf');
+const { renderOfficialLetterPdf } = require('../official-letter-pdf');
 const fs = require('node:fs');
 const path = require('node:path');
 const { inflateSync, deflateSync, crc32 } = require('node:zlib');
-const { randomUUID } = require('node:crypto');
 
 if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATOR_HOST || '')) {
   throw new Error('A loopback FIRESTORE_EMULATOR_HOST is required; production tests are prohibited.');
@@ -15,8 +14,12 @@ if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(process.env.FIRESTORE_EMULATO
 const app = initializeApp({ projectId: 'demo-hr-flow-letters' }, 'official-letters-test');
 const db = getFirestore(app);
 const files = new Map();
+const storageWrites = [];
 const bucket = { file: name => ({
-  save: async bytes => { files.set(name, bytes); },
+  save: async (bytes, options) => {
+    files.set(name, Buffer.from(bytes));
+    storageWrites.push({ path: name, options: structuredClone(options || {}) });
+  },
   download: async () => { if (!files.has(name)) throw new Error('missing asset'); return [files.get(name)]; },
   delete: async () => { files.delete(name); },
 }) };
@@ -62,10 +65,8 @@ function imageMatrices(pdf) {
 }
 const now = () => new Date('2026-10-22T15:10:00.000Z');
 let renderCount = 0;
-const printJobs = [];
 const manage = createOfficialLetterService({ db, bucket, now,
   renderPdf: async () => { renderCount++; return Buffer.from('%PDF approved'); },
-  renderPrintTestPdf: async (settings, images) => { printJobs.push({ settings, images }); return Buffer.from('%PDF print calibration'); },
 });
 const call = (uid, action, data = {}) => manage({ ...(uid ? { auth: { uid, token: { role: 'SUPER_ADMIN' } } } : {}), data: { action, ...data } });
 const denied = (promise, code) => assert.rejects(promise, error => error.code === code);
@@ -89,16 +90,6 @@ const setDocumentApprovers = async documentApproverIds => {
   const settings = (await call('admin', 'bootstrap')).settings;
   return call('admin', 'saveSettings', { settings: { ...settings, documentApproverIds }, expectedVersion: settings.version });
 };
-const createPrinter = async (values = {}, uid = 'admin') => (await call(uid, 'savePrinter', {
-  printer: { name: '총무팀 프린터', model: 'Office Laser 500', location: '서울 본사 3층', active: true, ...values }, expectedVersion: 0,
-})).printer;
-const printerInspection = settings => ({ inspectedOn: '2026-10-23', measuredSealWidthMm: settings.sealWidthMm,
-  measuredSealHeightMm: settings.sealHeightMm, horizontal100Mm: 100, vertical100Mm: 100,
-  toleranceMm: 0.5, note: '실제 크기 출력 후 자로 확인', printSettings: 'A4 / 실제 크기 100%', actualSizeConfirmed: true });
-const recordInspection = async (printer, settings, values = {}, extras = {}, uid = 'admin') => call(uid, 'recordPrinterInspection', {
-  printerId: printer.id, expectedPrinterVersion: printer.version, expectedSettingsVersion: settings.version,
-  requestId: randomUUID(), inspection: { ...printerInspection(settings), ...values }, ...extras,
-});
 const records = snapshot => snapshot.docs.map(document => ({ path: document.ref.path, ...document.data() })).sort((a, b) => a.path.localeCompare(b.path));
 async function officialState() {
   const [settings, letters, numbers, notifications] = await Promise.all([
@@ -266,120 +257,28 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal((await call('admin', 'bootstrap')).settings.version, settings.version);
       await call('admin', 'saveSettings', { settings: { ...settings, ...before }, expectedVersion: settings.version });
     });
-    await t.test('printer administration requires active company ADMIN and ignores spoofed ownership fields', async () => {
-      await denied(call(null, 'listPrinters'), 'unauthenticated');
-      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned']) {
-        await denied(call(uid, 'listPrinters'), 'permission-denied');
-        await denied(createPrinter({}, uid), 'permission-denied');
-      }
+
+    await t.test('retired printer and seal-print actions are rejected without changing historical data or stored files', async () => {
+      const printerRef = db.doc('officialLetterPrinters/a/printers/old-device');
+      const historyRef = printerRef.collection('inspections').doc('old-inspection');
+      const legacy = { companyId: 'a', name: '보관된 장비', version: 1, active: true };
+      const inspection = { companyId: 'a', printerId: 'old-device', result: 'PASS', recordedBy: 'admin' };
+      await printerRef.set(legacy); await historyRef.set(inspection);
       const before = await officialState();
-      const printer = await createPrinter({ companyId: 'b', id: 'spoofed-id', version: 999, createdBy: 'outsider', createdAt: '2000-01-01' });
-      assert.equal(printer.companyId, 'a'); assert.notEqual(printer.id, 'spoofed-id');
-      assert.equal(printer.createdBy, 'admin'); assert.equal(printer.version, 1); assert.equal(printer.createdAt, now().toISOString());
-      const edited = (await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: printer.version,
-        printer: { name: '변경 프린터', model: 'Laser 600', location: '4층', active: true, companyId: 'b', createdBy: 'outsider' } })).printer;
-      assert.equal(edited.version, 2); assert.equal(edited.companyId, 'a'); assert.equal(edited.createdBy, 'admin');
-      await denied(call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: 1, printer: edited }), 'aborted');
-      await assert.rejects(call('outsider', 'savePrinter', { printerId: printer.id, expectedVersion: 2, printer: edited }), error => ['permission-denied', 'not-found'].includes(error.code));
-      assert.ok(!(await call('outsider', 'listPrinters', { companyId: 'a' })).printers.some(item => item.id === printer.id));
-      assert.deepEqual(await officialState(), before, 'printer settings must not change official letters, templates, counters or inboxes');
-      for (const values of [{ name: '' }, { name: 'x'.repeat(101) }, { model: 'x'.repeat(101) }, { location: 'x'.repeat(201) }, { active: 'true' }]) {
-        await denied(createPrinter(values), 'invalid-argument');
-      }
-      await denied(call('admin', 'savePrinter', { printerId: '../bad', expectedVersion: 1, printer: edited }), 'invalid-argument');
-    });
-    await t.test('printer inspections are append-only, compute results on the server and freeze printer and template snapshots', async () => {
-      const settings = (await call('admin', 'bootstrap')).settings;
-      const printer = await createPrinter({ name: '점검 대상' });
-      const before = await officialState();
-      const requestId = randomUUID();
-      const payload = { requestId, companyId: 'b', recordedBy: 'outsider', recordedAt: '2000-01-01', result: 'RECHECK' };
-      const result = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
-        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5,
-        companyId: 'b', result: 'RECHECK', recordedBy: 'outsider', recordedAt: '2000-01-01', paperSize: 'A3', scalePercent: 75 }, payload);
-      const entry = result.inspection;
-      assert.equal(entry.id, requestId.toLowerCase());
-      assert.equal(entry.companyId, 'a'); assert.equal(entry.printerId, printer.id); assert.equal(entry.recordedBy, 'admin');
-      assert.equal(entry.recordedAt, now().toISOString()); assert.equal(entry.paperSize, 'A4'); assert.equal(entry.scalePercent, 100);
-      assert.equal(entry.result, 'PASS');
-      assert.deepEqual(entry.deviations, { sealWidthMm: 0.5, sealHeightMm: -0.5, horizontal100Mm: 0.5, vertical100Mm: -0.5 });
-      assert.equal(entry.printerSnapshot.name, printer.name); assert.equal(entry.printerSnapshot.version, printer.version);
-      assert.equal(entry.templateSnapshot.companyName, settings.companyName); assert.equal(entry.templateSnapshot.version, settings.version);
-      assert.equal(entry.templateSnapshot.sealWidthMm, settings.sealWidthMm); assert.equal(entry.templateSnapshot.sealHeightMm, settings.sealHeightMm);
-      assert.equal(typeof entry.templateSnapshot.sealAssetId, 'string'); assert.ok(entry.templateSnapshot.sealAssetId.length > 0);
-      assert.equal(entry.templateSnapshot.sealData, undefined);
-      const duplicate = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
-        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5,
-        companyId: 'b', result: 'RECHECK', recordedBy: 'outsider', recordedAt: '2000-01-01', paperSize: 'A3', scalePercent: 75 }, payload);
-      assert.equal(duplicate.inspection.id, entry.id);
-      const upperCaseRetry = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
-        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId: requestId.toUpperCase() });
-      assert.equal(upperCaseRetry.inspection.id, entry.id);
-      await denied(recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
-        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId }, 'admin2'), 'already-exists');
-      await denied(recordInspection(printer, settings, { note: '같은 요청 ID의 다른 내용' }, { requestId }), 'already-exists');
-      const recheck = (await recordInspection(printer, settings, { horizontal100Mm: 100.6 })).inspection;
-      assert.equal(recheck.result, 'RECHECK'); assert.equal(recheck.deviations.horizontal100Mm, 0.6);
-      assert.deepEqual(await officialState(), before, 'recording inspection results must leave template versions, issuance and letters unchanged');
-      await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: 1, printer: { ...printer, name: '변경된 장비', active: false } });
-      await call('admin', 'saveSettings', { expectedVersion: settings.version, settings: { ...settings, sealWidthMm: 25, sealHeightMm: 25 } });
-      const archivedEntries = (await call('admin', 'listPrinterInspections', { printerId: printer.id })).inspections;
-      assert.equal(archivedEntries.length, 2); assert.deepEqual(archivedEntries.find(item => item.id === entry.id), entry);
-      const retryAfterChanges = await recordInspection(printer, settings, { measuredSealWidthMm: settings.sealWidthMm + 0.5,
-        measuredSealHeightMm: settings.sealHeightMm - 0.5, horizontal100Mm: 100.5, vertical100Mm: 99.5 }, { requestId });
-      assert.deepEqual(retryAfterChanges.inspection, entry, 'a committed request remains idempotent after archive or template changes');
-      const currentSettings = (await call('admin', 'bootstrap')).settings;
-      await call('admin', 'saveSettings', { expectedVersion: currentSettings.version, settings: { ...currentSettings, ...settings } });
-      const after = await officialState();
-      assert.deepEqual(after.letters, before.letters); assert.deepEqual(after.numbers, before.numbers); assert.deepEqual(after.histories, before.histories);
-      assert.deepEqual(after.notifications, before.notifications); assert.equal(after.settings.find(item => item.companyId === 'a').lastFront, settings.lastFront);
-      await denied(call('admin', 'updatePrinterInspection', { printerId: printer.id, inspectionId: entry.id, inspection: { result: 'PASS' } }), 'invalid-argument');
-      await denied(call('admin', 'deletePrinterInspection', { printerId: printer.id, inspectionId: entry.id }), 'invalid-argument');
-    });
-    await t.test('printer inspection input, archived printers and stale versions cannot create records', async () => {
-      const settings = (await call('admin', 'bootstrap')).settings;
-      const printer = await createPrinter();
-      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned']) {
-        await denied(recordInspection(printer, settings, {}, {}, uid), 'permission-denied');
-        await denied(call(uid, 'listPrinterInspections', { printerId: printer.id }), 'permission-denied');
-      }
-      await assert.rejects(recordInspection(printer, settings, {}, {}, 'outsider'), error => ['permission-denied', 'not-found'].includes(error.code));
-      for (const values of [
-        { inspectedOn: '2026-10-24' }, { inspectedOn: '2026-02-30' }, { inspectedOn: '2026-1-1' }, { inspectedOn: '1899-12-31' }, { actualSizeConfirmed: false },
-        { measuredSealWidthMm: 0 }, { measuredSealHeightMm: 200.1 }, { horizontal100Mm: '100' }, { vertical100Mm: 99.95 },
-        { toleranceMm: 0 }, { toleranceMm: 5.1 }, { note: 'x'.repeat(1001) }, { printSettings: 'x'.repeat(201) },
-      ]) await denied(recordInspection(printer, settings, values), 'invalid-argument');
-      await denied(recordInspection(printer, settings, {}, { requestId: 'not-a-uuid' }), 'invalid-argument');
-      await denied(recordInspection(printer, settings, {}, { expectedPrinterVersion: 0 }), 'aborted');
-      await denied(recordInspection(printer, settings, {}, { expectedSettingsVersion: settings.version - 1 }), 'aborted');
-      const archived = (await call('admin', 'savePrinter', { printerId: printer.id, expectedVersion: printer.version, printer: { ...printer, active: false } })).printer;
-      await denied(recordInspection(archived, settings), 'failed-precondition');
-      assert.deepEqual((await call('admin', 'listPrinterInspections', { printerId: printer.id })).inspections, []);
-    });
-    await t.test('printer and inspection pagination uses opaque scoped cursors without duplicate entries', async () => {
-      const settings = (await call('admin', 'bootstrap')).settings;
-      const printer = await createPrinter({ name: '페이지 확인' });
-      for (let index = 0; index < 5; index++) await recordInspection(printer, settings, { note: `점검 ${index}` });
-      const walk = async (action, key, payload = {}) => {
-        const all = []; let after;
-        for (let pages = 0; pages < 20; pages++) {
-          const response = await call('admin', action, { ...payload, pageSize: 2, ...(after ? { after } : {}) });
-          assert.ok(response[key].length <= 2); all.push(...response[key]);
-          if (!response.nextCursor) return all;
-          assert.notDeepEqual(response.nextCursor, after); after = response.nextCursor;
+      const filesBefore = [...files.entries()]; const writesBefore = storageWrites.length;
+      for (const uid of ['admin', 'member', 'outsider', 'platform', null]) {
+        for (const action of ['listPrinters', 'savePrinter', 'listPrinterInspections', 'recordPrinterInspection',
+          'updatePrinterInspection', 'deletePrinterInspection', 'sealPrintTest']) {
+          await denied(call(uid, action, { printerId: printerRef.id, inspectionId: historyRef.id,
+            expectedVersion: before.settings[0].version, expectedPrinterVersion: 1,
+            printer: { name: '새 장비', model: '', location: '', active: true } }), 'invalid-argument');
         }
-        assert.fail('pagination must finish');
-      };
-      const inspections = await walk('listPrinterInspections', 'inspections', { printerId: printer.id });
-      assert.equal(inspections.length, 5); assert.equal(new Set(inspections.map(item => item.id)).size, 5);
-      const printers = await walk('listPrinters', 'printers');
-      assert.equal(new Set(printers.map(item => item.id)).size, printers.length);
-      assert.deepEqual(printers.map(item => item.id).sort(), (await call('admin', 'listPrinters', { pageSize: 50 })).printers.map(item => item.id).sort());
-      for (const pageSize of [0, 51, 1.5, '2']) await denied(call('admin', 'listPrinters', { pageSize }), 'invalid-argument');
-      await denied(call('admin', 'listPrinterInspections', { printerId: '../bad' }), 'invalid-argument');
-      const foreign = await createPrinter({ name: '다른 회사 장비' }, 'outsider');
-      await assert.rejects(call('admin', 'listPrinterInspections', { printerId: foreign.id }), error => ['not-found', 'permission-denied'].includes(error.code));
-      await denied(call('admin', 'listPrinters', { after: foreign.id }), 'invalid-argument');
+      }
+      assert.deepEqual(await officialState(), before);
+      assert.deepEqual((await printerRef.get()).data(), legacy);
+      assert.deepEqual((await historyRef.get()).data(), inspection);
+      assert.deepEqual([...files.entries()], filesBefore);
+      assert.equal(storageWrites.length, writesBefore);
     });
 
     let letterId;
@@ -443,78 +342,7 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal((await load(id)).status, 'REJECTED');
       await submit(id); assert.equal((await load(id)).status, 'PENDING');
     });
-    await t.test('seal print calibration requires the current company ADMIN, a saved template and a current settings version', async () => {
-      const { settings } = await call('admin', 'bootstrap');
-      const jobsBefore = printJobs.length;
-      await denied(call(null, 'sealPrintTest', { expectedVersion: settings.version }), 'unauthenticated');
-      for (const uid of ['member', 'head', 'delegate', 'platform', 'resigned', 'retired-admin']) {
-        await denied(call(uid, 'sealPrintTest', { expectedVersion: settings.version }), 'permission-denied');
-      }
-      await denied(call('outsider', 'sealPrintTest', { expectedVersion: settings.version, companyId: 'a', settings }), 'failed-precondition');
-      await denied(call('fresh-admin', 'sealPrintTest', { expectedVersion: 0 }), 'failed-precondition');
-      for (const expectedVersion of [undefined, '1', -1, 1.5]) {
-        await denied(call('admin', 'sealPrintTest', { expectedVersion }), 'invalid-argument');
-      }
-      await denied(call('admin', 'sealPrintTest', { expectedVersion: settings.version - 1 }), 'aborted');
-      assert.equal(printJobs.length, jobsBefore, 'unauthorized or stale requests must never render a seal');
-    });
-    await t.test('legacy or partially missing seal dimensions must be saved before print calibration', async () => {
-      const { settings } = await call('admin', 'bootstrap');
-      const jobsBefore = printJobs.length;
-      for (const [sealWidthMm, sealHeightMm] of [[undefined, undefined], [20, undefined], [undefined, 30]]) {
-        const legacy = { ...settings, companyId: 'c' };
-        delete legacy.logoData; delete legacy.sealData; delete legacy.sealWidthMm; delete legacy.sealHeightMm;
-        if (sealWidthMm !== undefined) legacy.sealWidthMm = sealWidthMm;
-        if (sealHeightMm !== undefined) legacy.sealHeightMm = sealHeightMm;
-        await db.doc('officialLetterSettings/c').set(legacy);
-        await denied(call('fresh-admin', 'sealPrintTest', { expectedVersion: legacy.version }), 'failed-precondition');
-      }
-      await db.doc('officialLetterSettings/c').delete();
-      assert.equal(printJobs.length, jobsBefore);
-    });
-    await t.test('print calibration returns only the PDF and leaves document history, numbering, inboxes and storage unchanged', async () => {
-      const { settings } = await call('admin', 'bootstrap');
-      const before = await officialState();
-      const storedBefore = [...files.entries()].map(([name, bytes]) => [name, Buffer.from(bytes)]);
-      const result = await call('admin', 'sealPrintTest', { expectedVersion: settings.version });
-      assert.equal(Buffer.from(result.base64, 'base64').toString(), '%PDF print calibration');
-      assert.match(result.filename, /\.pdf$/i);
-      assert.deepEqual(Object.keys(result).sort(), ['base64', 'filename']);
-      const job = printJobs.at(-1);
-      assert.equal(job.settings.companyId, 'a');
-      assert.equal(job.settings.sealWidthMm, settings.sealWidthMm);
-      assert.equal(job.settings.sealHeightMm, settings.sealHeightMm);
-      assert.deepEqual(job.images.seal, files.get(settings.sealPath));
-      assert.deepEqual(await officialState(), before);
-      assert.deepEqual([...files.entries()], storedBefore);
-    });
-    await t.test('print calibration rechecks ADMIN role, active membership, company and template version after rendering', async () => {
-      const profileRef = db.doc('UserProfile/admin2');
-      const settingsRef = db.doc('officialLetterSettings/a');
-      const companyRef = db.doc('companies/a');
-      const profile = (await profileRef.get()).data();
-      const settings = (await settingsRef.get()).data();
-      const company = (await companyRef.get()).data();
-      for (const [change, accepted] of [
-        [() => profileRef.update({ role: 'MEMBER' }), ['permission-denied']],
-        [() => profileRef.update({ status: 'RESIGNED' }), ['permission-denied']],
-        [() => profileRef.update({ mustChangePassword: true }), ['failed-precondition']],
-        [() => profileRef.update({ sessionValidAfter: 200 }), ['unauthenticated']],
-        [() => profileRef.update({ companyId: 'b' }), ['permission-denied', 'aborted']],
-        [() => companyRef.update({ status: 'SUSPENDED' }), ['permission-denied']],
-        [() => companyRef.update({ accessUntil: Timestamp.fromMillis(now().getTime()) }), ['permission-denied']],
-        [() => settingsRef.update({ version: settings.version + 1 }), ['aborted']],
-      ]) {
-        const service = createOfficialLetterService({ db, bucket, now, renderPdf: async () => Buffer.from('%PDF'),
-          renderPrintTestPdf: async () => { await change(); return Buffer.from('%PDF stale seal'); },
-        });
-        try {
-          await assert.rejects(service({ auth: { uid: 'admin2' }, data: { action: 'sealPrintTest', expectedVersion: settings.version } }), error => accepted.includes(error.code));
-        } finally {
-          await Promise.all([profileRef.set(profile), settingsRef.set(settings), companyRef.set(company)]);
-        }
-      }
-    });
+
     await t.test('submitted branding is frozen and only admins can retrieve its raw seal', async () => {
       const id = await create(); await submit(id);
       const before = (await call('admin', 'bootstrap')).settings;
@@ -787,6 +615,103 @@ test('official-letter server authorization, numbering and revisions', async t =>
       assert.equal((await load(waitingId)).status, 'PENDING');
       assert.notEqual((await load(waitingId)).automaticApproval, true);
     });
+    await t.test('approved real PDFs are stored privately, downloaded from cache and preserved when revision changes during a download', async () => {
+      for (const [uid, role] of [['pdf-member', 'MEMBER'], ['pdf-lead', 'MEMBER'], ['pdf-head', 'SUB_ADMIN'], ['pdf-peer', 'MEMBER']]) {
+        await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId: 'c', status: 'ACTIVE',
+          mustChangePassword: false, teamId: 'pdf-team', divisionId: 'pdf-division' });
+      }
+      await db.doc('teams/pdf-team').set({ companyId: 'c', divisionId: 'pdf-division', leaderId: 'pdf-lead' });
+      await db.doc('divisions/pdf-division').set({ companyId: 'c', headId: 'pdf-head' });
+      let renders = 0;
+      const service = createOfficialLetterService({ db, bucket, now, renderPdf: async (letter, images) => {
+        renders++; return renderOfficialLetterPdf(letter, images);
+      } });
+      const invoke = (uid, action, values = {}) => service({ auth: { uid }, data: { action, ...values } });
+      await invoke('fresh-admin', 'saveSettings', { expectedVersion: 0, settings: {
+        companyName: 'PDF 검증 주식회사', address: '서울특별시 검증로 10', representative: '검증 대표',
+        logoData: png, sealData: rectangularPng, sealWidthMm: 20, sealHeightMm: 30, lastFront: 0,
+      } });
+      const stored = async (id, result) => {
+        const letter = (await invoke('fresh-admin', 'get', { id })).letter;
+        assert.equal(result.success, true); assert.equal(result.pdfReady, true);
+        assert.equal(result.base64, undefined, 'issuing stores the PDF; bytes are returned only by an authorized download');
+        assert.equal(letter.pdfReady, true); assert.equal(letter.approvedRevision, letter.revision);
+        assert.equal(letter.pdf.path, `companies/c/official-pdfs/${id}/${letter.revision}-${letter.number}.pdf`);
+        assert.equal(letter.pdf.revision, letter.revision); assert.equal(letter.pdf.number, letter.number);
+        const bytes = files.get(letter.pdf.path);
+        assert.ok(bytes?.length > 1000); assert.equal(bytes.subarray(0, 8).toString(), '%PDF-1.7');
+        assert.match(bytes.toString('latin1'), /\/MediaBox\s*\[0 0 595\.28 841\.89\]/);
+        const write = storageWrites.findLast(item => item.path === letter.pdf.path);
+        assert.equal(write.options.resumable, false);
+        assert.deepEqual(write.options.metadata, { contentType: 'application/pdf', cacheControl: 'private, no-store' });
+        assert.equal(letter.pdf.url, undefined); assert.equal(letter.pdf.downloadURL, undefined);
+        return letter;
+      };
+      for (const documentType of ['OFFICIAL', 'EMPLOYMENT', 'CAREER']) {
+        const values = documentType === 'OFFICIAL' ? content : { certificate: { ...certificate, endDate: documentType === 'CAREER' ? '2026-09-30' : '' } };
+        const { id } = await invoke('fresh-admin', 'save', { documentType, content: values });
+        await denied(invoke('fresh-admin', 'pdf', { id, revision: 1 }), 'failed-precondition');
+        assert.ok(![...files.keys()].some(name => name.startsWith(`companies/c/official-pdfs/${id}/`)));
+        const issued = await stored(id, await invoke('fresh-admin', 'submit', { id, revision: 1 }));
+        assert.equal(issued.automaticApproval, true); assert.equal(issued.approvedBy, 'fresh-admin');
+      }
+      const { id } = await invoke('pdf-member', 'save', { content });
+      await invoke('pdf-member', 'submit', { id, revision: 1 });
+      await denied(invoke('fresh-admin', 'review', { id, revision: 1, decision: 'approve' }), 'failed-precondition');
+      for (const uid of ['pdf-lead', 'pdf-head']) {
+        await invoke(uid, 'review', { id, revision: 1, decision: 'approve' });
+        assert.ok(![...files.keys()].some(name => name.startsWith(`companies/c/official-pdfs/${id}/`)));
+      }
+      const issued = await stored(id, await invoke('fresh-admin', 'review', { id, revision: 1, decision: 'approve' }));
+      assert.notEqual(issued.automaticApproval, true); assert.equal(renders, 4);
+      const approvedBytes = Buffer.from(files.get(issued.pdf.path));
+      const writesBeforeDownload = storageWrites.length;
+      for (const uid of ['fresh-admin', 'pdf-member', 'pdf-lead', 'pdf-head']) {
+        const downloaded = await invoke(uid, 'pdf', { id, revision: 1 });
+        assert.equal(downloaded.filename, `${issued.number}.pdf`);
+        assert.deepEqual(Buffer.from(downloaded.base64, 'base64'), approvedBytes);
+        assert.equal(downloaded.url, undefined);
+      }
+      for (const uid of ['pdf-peer', 'admin', 'outsider', 'platform']) await denied(invoke(uid, 'pdf', { id, revision: 1 }), 'permission-denied');
+      assert.equal(renders, 4); assert.equal(storageWrites.length, writesBeforeDownload);
+
+      let releaseDownload, signalDownload;
+      const readGate = new Promise(resolve => { releaseDownload = resolve; });
+      const readStarted = new Promise(resolve => { signalDownload = resolve; });
+      const racingBucket = { file: name => ({
+        save: (...args) => bucket.file(name).save(...args), delete: (...args) => bucket.file(name).delete(...args),
+        download: async () => {
+          const bytes = await bucket.file(name).download();
+          if (name === issued.pdf.path) { signalDownload(); await readGate; }
+          return bytes;
+        },
+      }) };
+      const racingService = createOfficialLetterService({ db, bucket: racingBucket, now, renderPdf: async () => { throw new Error('a cached PDF must not render'); } });
+      const pendingDownload = racingService({ auth: { uid: 'pdf-member' }, data: { action: 'pdf', id, revision: 1 } })
+        .then(result => ({ result }), error => ({ error }));
+      try {
+        const first = await Promise.race([readStarted.then(() => ({ started: true })), pendingDownload]);
+        assert.equal(first.started, true, 'the saved PDF must be in flight before the ADMIN edits it');
+        await invoke('fresh-admin', 'save', { id, revision: 1, content: { ...content, body: '승인 이후 수정된 본문' } });
+      } finally { releaseDownload(); }
+      assert.equal((await pendingDownload).error?.code, 'aborted');
+      const draft = (await invoke('fresh-admin', 'get', { id })).letter;
+      assert.equal(draft.revision, 2); assert.equal(draft.status, 'DRAFT');
+      assert.equal(draft.pdfReady, false); assert.equal(draft.pdf, null); assert.equal(draft.approvedRevision, null);
+      const archived = (await invoke('fresh-admin', 'history', { id })).history.find(item => item.revision === 1);
+      assert.equal(archived.pdf.path, issued.pdf.path);
+      assert.deepEqual(files.get(archived.pdf.path), approvedBytes, 'aborting an obsolete download must preserve the archived approved PDF');
+      await denied(invoke('pdf-member', 'pdf', { id, revision: 1 }), 'aborted');
+      await denied(invoke('pdf-member', 'pdf', { id, revision: 2 }), 'failed-precondition');
+      await denied(invoke('pdf-member', 'history', { id }), 'permission-denied');
+      await invoke('pdf-member', 'submit', { id, revision: 2 });
+      for (const uid of ['pdf-lead', 'pdf-head']) await invoke(uid, 'review', { id, revision: 2, decision: 'approve' });
+      const reissued = await stored(id, await invoke('fresh-admin', 'review', { id, revision: 2, decision: 'approve' }));
+      assert.notEqual(reissued.number, issued.number); assert.notEqual(reissued.pdf.path, issued.pdf.path);
+      assert.deepEqual(files.get(issued.pdf.path), approvedBytes); assert.equal(renders, 5);
+      assert.deepEqual(Buffer.from((await invoke('pdf-member', 'pdf', { id, revision: 2 })).base64, 'base64'), files.get(reissued.pdf.path));
+      assert.equal(renders, 5);
+    });
     await t.test('delegation is scoped to the submitted creator division and sequential approvals still apply', async () => {
       const draftId = await create();
       await setDocumentApprovers(['delegate', 'delegate2']);
@@ -1015,37 +940,6 @@ test('official-letter server authorization, numbering and revisions', async t =>
         assert.equal(seal.width, legacyWidth); assert.equal(seal.height, legacyWidth / 2);
       }
     });
-    await t.test('seal print calibration PDF uses one A4 sheet, exact seal size and physical reference vectors', async () => {
-      const { settings } = await call('admin', 'bootstrap');
-      const output = path.resolve(__dirname, '../../tmp/pdfs');
-      const sealBytes = Buffer.from(rectangularPng.split(',')[1], 'base64');
-      const near = (value, points) => Math.abs(value - points) < 0.002;
-      for (const [sealWidthMm, sealHeightMm] of [[20, 30], [50, 50]]) {
-        const pdf = await renderSealPrintTestPdf({ ...settings, sealWidthMm, sealHeightMm }, { seal: sealBytes });
-        assert.equal(pdf.subarray(0, 8).toString(), '%PDF-1.7');
-        assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 1);
-        assert.match(pdf.toString('latin1'), /\/MediaBox\s*\[0 0 595\.28 841\.89\]/);
-        assert.match(pdf.toString('latin1'), /\/PrintScaling\s*\/None\b/);
-        const seal = imageMatrices(pdf).at(-1);
-        assert.ok(seal); assert.ok(near(seal.width, sealWidthMm * 72 / 25.4)); assert.ok(near(seal.height, sealHeightMm * 72 / 25.4));
-        const commands = decodedPdfStreams(pdf).join('\n');
-        const lines = [...commands.matchAll(/([-\d.]+) ([-\d.]+) m\s+([-\d.]+) ([-\d.]+) l/g)].map(match => ({
-          x: Number(match[1]), y: Number(match[2]),
-          width: Math.abs(Number(match[3]) - Number(match[1])), height: Math.abs(Number(match[4]) - Number(match[2])),
-        }));
-        assert.ok(lines.some(line => near(line.width, 100 * 72 / 25.4) && line.height === 0), 'horizontal 100 mm ruler must be an actual vector of that length');
-        assert.ok(lines.some(line => near(line.height, 100 * 72 / 25.4) && line.width === 0), 'vertical 100 mm ruler must be an actual vector of that length');
-        for (let millimeters = 0; millimeters <= 100; millimeters++) {
-          const tick = millimeters % 10 === 0 ? 3 : millimeters % 5 === 0 ? 2 : 1;
-          assert.ok(lines.some(line => near(line.x, (40 + millimeters) * 72 / 25.4) && near(line.y, 176 * 72 / 25.4) &&
-            line.width === 0 && near(line.height, tick * 72 / 25.4)), `horizontal ruler tick ${millimeters} must be at its exact 1 mm position`);
-          assert.ok(lines.some(line => near(line.x, 40 * 72 / 25.4) && near(line.y, (176 + millimeters) * 72 / 25.4) &&
-            line.height === 0 && near(line.width, tick * 72 / 25.4)), `vertical ruler tick ${millimeters} must be at its exact 1 mm position`);
-        }
-        const squares = [...commands.matchAll(/[-\d.]+ [-\d.]+ ([-\d.]+) ([-\d.]+) re/g)];
-        assert.ok(squares.some(square => near(Math.abs(Number(square[1])), 50 * 72 / 25.4) && near(Math.abs(Number(square[2])), 50 * 72 / 25.4)), 'the physical reference square must measure 50 mm on both sides');
-        fs.writeFileSync(path.join(output, `seal-print-test-${sealWidthMm}x${sealHeightMm}.pdf`), pdf);
-      }
-    });
+
   } finally { await deleteApp(app); }
 });
