@@ -69,6 +69,14 @@
       ]
     },
     {
+      "collectionGroup": "officialLetters",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "officialLetterNumbers",
       "queryScope": "COLLECTION",
       "fields": [

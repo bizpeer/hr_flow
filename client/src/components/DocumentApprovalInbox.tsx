@@ -18,7 +18,7 @@ export function DocumentApprovalInbox({ inbox }: { inbox: DocumentApprovalInboxS
   if (!inbox.canAccess) return <p role="status" className="rounded-2xl bg-white p-6 text-sm text-slate-500">서류 결재 권한이 있는 회사 계정으로 로그인해 주세요.</p>;
 
   const filtered = state.letters.filter(letter => filter === 'ALL' || letter.status === filter);
-  const statusLabels = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료' };
+  const statusLabels = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료', DELETING: '삭제 처리 중' };
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7" aria-label="서류 결재함">

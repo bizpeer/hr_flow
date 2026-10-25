@@ -1,6 +1,6 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
-const { authorizeContext } = require('./security-context');
+const { authorizeContext, recentAuthentication } = require('./security-context');
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -115,7 +115,9 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     if (user.role !== 'ADMIN') fail('permission-denied', '회사 최고관리자(ADMIN) 권한이 필요합니다.');
   }
   function access(user, letter) {
-    if (!letter || letter.companyId !== user.companyId ||
+    if (!letter || letter.companyId !== user.companyId) fail('permission-denied', '작성자와 해당 공문의 결재라인만 접근할 수 있습니다.');
+    if (letter.status === 'DELETED') fail('not-found', '삭제된 서류입니다.');
+    if ((letter.status === 'DELETING' && user.role !== 'ADMIN') ||
         (user.role !== 'ADMIN' && !letter.participantIds.includes(user.uid) && !delegated(user, letter))) {
       fail('permission-denied', '작성자와 해당 공문의 결재라인만 접근할 수 있습니다.');
     }
@@ -142,6 +144,13 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     if (!Number.isInteger(revision) || letter.revision !== revision) {
       fail('aborted', '다른 사용자가 변경했습니다. 최신 내용을 다시 열어 주세요.');
     }
+  }
+  function editable(letter) {
+    if (['DELETING', 'DELETED'].includes(letter.status)) fail('failed-precondition', '삭제 처리 중인 서류는 변경할 수 없습니다.');
+  }
+  function deletionAuthentication(request) {
+    recentAuthentication(request, now);
+    if (request.auth?.token?.firebase?.sign_in_provider !== 'password') fail('failed-precondition', '비밀번호를 다시 확인한 후 삭제해 주세요.');
   }
   async function imageData(path) {
     if (!path) return '';
@@ -296,7 +305,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     // A cached or newly rendered file is never returned after access/approval revocation.
     // A concurrent revision may archive this same path. Keep the private file;
     // only explicit ADMIN history deletion may remove an archived PDF.
-    await db.runTransaction(async tx => {
+    try { await db.runTransaction(async tx => {
       const currentUser = await actor(request, tx);
       const current = (await tx.get(ref)).data(); access(currentUser, current); expected(current, revision);
       if (current.status !== 'ISSUED' || current.approvedRevision !== revision || current.number !== letter.number) {
@@ -305,13 +314,70 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       if (!current.pdfReady || current.pdf?.path !== path) {
         tx.update(ref, { pdfReady: true, pdf: { path, revision, number: letter.number, readyAt: now().toISOString() } });
       }
-    });
+    }); } catch (error) {
+      // Only deletion permits cleanup here: ordinary revisions may archive this PDF.
+      const current = (await ref.get()).data();
+      if (['DELETING', 'DELETED'].includes(current?.status)) {
+        try { await bucket.file(path).delete({ ignoreNotFound: true }); } catch { /* A confirmed deletion can retry prefix cleanup. */ }
+      }
+      throw error;
+    }
     return bytes;
   }
 
   return async function manage(request) {
     const input = request.data || {};
     const action = input.action;
+    if (action === 'deleteIssued') {
+      const ref = letterRef(input.id);
+      const user = await actor(request); admin(user); deletionAuthentication(request);
+      if (input.confirm !== true) fail('invalid-argument', '문서 영구 삭제 경고를 확인해 주세요.');
+      const locked = async (tx, initial = false) => {
+        const currentUser = await actor(request, tx); admin(currentUser); deletionAuthentication(request);
+        if (currentUser.companyId !== user.companyId) fail('permission-denied', '소속 회사가 변경되었습니다.');
+        const current = (await tx.get(ref)).data();
+        if (!current || current.companyId !== user.companyId) fail('permission-denied', '소속 회사의 서류만 삭제할 수 있습니다.');
+        expected(current, input.revision);
+        if (!initial && !['DELETING', 'DELETED'].includes(current.status)) fail('aborted', '서류의 삭제 상태가 변경되었습니다.');
+        return current;
+      };
+      await db.runTransaction(async tx => {
+        const current = await locked(tx, true);
+        if (['DELETING', 'DELETED'].includes(current.status)) return;
+        if (current.status !== 'ISSUED' || current.approvedRevision !== current.revision) fail('failed-precondition', '최종 승인·발행된 서류만 삭제할 수 있습니다.');
+        tx.update(ref, { status: 'DELETING', deletion: { startedAt: now().toISOString(), startedBy: user.uid } });
+      });
+      try {
+        const current = await db.runTransaction(locked);
+        const histories = await ref.collection('history').get();
+        const uids = new Set([current, ...histories.docs.map(d => d.data())].flatMap(d =>
+          [...(d.notificationRecipientIds || []), ...(d.participantIds || []), d.creatorId]).filter(uid =>
+          typeof uid === 'string' && uid.length > 0 && uid.length <= 128 && !uid.includes('/') && !['.', '..'].includes(uid)));
+        await bucket.deleteFiles({ prefix: `companies/${user.companyId}/official-pdfs/${ref.id}/`, force: false });
+        const recipients = [...uids];
+        // History remains until every inbox is cleaned, preserving historical
+        // recipient IDs for an authorized retry after a partial failure.
+        for (let offset = 0; offset < recipients.length; offset += 200) {
+          await db.runTransaction(async tx => {
+            await locked(tx);
+            const items = await tx.getAll(...recipients.slice(offset, offset + 200).map(uid => notificationRef(uid, ref.id)));
+            for (const item of items) if (item.exists && item.data().companyId === user.companyId && item.data().letterId === ref.id) tx.delete(item.ref);
+          });
+        }
+        await db.runTransaction(locked);
+        await db.recursiveDelete(ref.collection('history'));
+        await db.runTransaction(async tx => {
+          const current = await locked(tx);
+          if (current.status === 'DELETED') return;
+          tx.set(ref, { companyId: user.companyId, status: 'DELETED', revision: current.revision, number: current.number,
+            deletion: { ...current.deletion, completedAt: now().toISOString(), completedBy: user.uid } });
+        });
+        return { success: true };
+      } catch (error) {
+        if (error instanceof HttpsError) throw error;
+        return { success: false, cleanupPending: true };
+      }
+    }
     if (action === 'ackNotification') {
       return db.runTransaction(async tx => {
         const user = await actor(request, tx);
@@ -374,10 +440,15 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         // Date and owner restrictions are applied in Firestore, before reading documents.
         query = query.where('creatorId', '==', user.uid).where('status', '==', 'ISSUED')
           .where('issueDate', '>=', range.startDate).where('issueDate', '<=', range.endDate).orderBy('issueDate', 'desc');
+      } else if (action === 'list' && user.role === 'ADMIN') {
+        const range = issuedDateRange(input, koreaDate(now()));
+        query = query.where('updatedAt', '>=', new Date(`${range.startDate}T00:00:00+09:00`).toISOString())
+          .where('updatedAt', '<=', new Date(`${range.endDate}T23:59:59.999+09:00`).toISOString()).orderBy('updatedAt', 'desc');
       } else if (user.role !== 'ADMIN' && !user.documentApprovalGranted) query = query.where('participantIds', 'array-contains', user.uid);
       const snapshots = await query.get();
       return { letters: snapshots.docs.filter(snapshot => {
         const d = snapshot.data();
+        if (d.status === 'DELETED' || (d.status === 'DELETING' && (action !== 'list' || user.role !== 'ADMIN'))) return false;
         const visible = user.role === 'ADMIN' || d.participantIds.includes(user.uid) || delegated(user, d);
         if (action === 'mine') return visible && d.creatorId === user.uid && d.status === 'ISSUED' && d.approvedRevision === d.revision;
         if (action === 'approvals') return visible && d.status !== 'DRAFT';
@@ -471,7 +542,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         const user = await actor(request, tx);
         const timestamp = now().toISOString();
         const current = input.id ? (await tx.get(ref)).data() : null;
-        if (input.id) { access(user, current); expected(current, input.revision); }
+        if (input.id) { access(user, current); expected(current, input.revision); editable(current); }
         const documentType = documentTypeInput(input.documentType ?? current?.documentType ?? 'OFFICIAL');
         if (current && documentType !== (current.documentType || 'OFFICIAL')) fail('invalid-argument', '저장한 서류의 종류는 변경할 수 없습니다. 새로 신청해 주세요.');
         const content = contentInput(input.content || {}, documentType, koreaDate(now()));
@@ -501,7 +572,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       const ref = letterRef(input.id);
       if (action === 'deleteHistory') {
         const user = await actor(request); admin(user);
-        const current = (await ref.get()).data(); access(user, current); expected(current, input.revision);
+        const current = (await ref.get()).data(); access(user, current); expected(current, input.revision); editable(current);
         const history = (await ref.collection('history').doc(id(input.historyId)).get()).data();
         if (!history) fail('not-found', '보관 이력이 없습니다.');
         // Delete content before removing its retryable archive entry. The number
@@ -514,7 +585,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       }
       const result = await db.runTransaction(async tx => {
         const user = await actor(request, tx);
-        const current = (await tx.get(ref)).data(); access(user, current); expected(current, input.revision);
+        const current = (await tx.get(ref)).data(); access(user, current); expected(current, input.revision); editable(current);
         const timestamp = now().toISOString();
         if (action === 'reassign') {
           admin(user);

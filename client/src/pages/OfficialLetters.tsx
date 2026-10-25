@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Settings, Download, History, CheckCircle, Send, RefreshCw, X, Users, ArrowUp, ArrowDown } from 'lucide-react';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import { auth } from '../firebase';
 import { useAuthStore } from '../store/authStore';
+import type { UserData } from '../store/authStore';
 import { officialLetters, seoulDate, koreanDate, previewNumber, readLetterImage } from '../services/officialLetterService';
-import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
+import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterDateRange, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import './OfficialLetters.css';
 
 const emptyContent = (): LetterContent => ({ recipient: '', reference: '', title: '',
@@ -22,7 +25,7 @@ function certificateContent(type: DocumentType, certificate: CertificateContent)
 }
 const blankSettings = (companyName = ''): LetterSettings => ({ companyName, address: '', representative: '',
   phone: '', email: '', logoData: '', sealData: '', sealWidthMm: 23.3, sealHeightMm: 23.3, lastFront: 0, version: 0 });
-const statuses = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료' };
+const statuses = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료', DELETING: '삭제 처리 중' };
 const templateFieldLabels: Record<string, string> = { companyName: '회사명', address: '회사 주소', representative: '대표자 이름', logoPath: '회사 로고', logoData: '회사 로고', sealPath: '대표자 인감', sealData: '대표자 인감', sealWidthMm: '인감 가로 크기', sealHeightMm: '인감 세로 크기' };
 const missingTemplateMessage = (fields: string[]) => `회사 서류 템플릿의 ${fields.map(field => templateFieldLabels[field] || field).join(', ')} 등록이 필요합니다. 회사 관리자가 템플릿을 저장한 뒤 다시 제출해 주세요.`;
 const errorMessage = (error: unknown) => {
@@ -34,6 +37,73 @@ const errorMessage = (error: unknown) => {
   return error instanceof Error ? error.message : '처리 중 오류가 발생했습니다.';
 };
 const letterLinkKey = (id: string, notification = '') => id ? JSON.stringify([id, notification]) : '';
+const accountScope = (profile: UserData | null) => profile ? JSON.stringify([profile.uid, profile.companyId, profile.role,
+  profile.divisionId || '', profile.teamId || '', profile.status || 'ACTIVE', !!profile.mustChangePassword]) : '';
+function recentDocumentRange(): LetterDateRange {
+  const endDate = seoulDate();
+  const start = new Date(`${endDate}T00:00:00.000Z`);
+  start.setUTCDate(start.getUTCDate() - 29);
+  return { startDate: start.toISOString().slice(0, 10), endDate };
+}
+
+function DeleteIssuedDialog({ letter, stillCurrent, onClose, onResult }: {
+  letter: OfficialLetter;
+  stillCurrent: () => boolean;
+  onClose: () => void;
+  onResult: (result: { success: boolean; cleanupPending?: boolean }) => Promise<void>;
+}) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const alive = useRef(true);
+  const submitting = useRef(false);
+  const [password, setPassword] = useState('');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => {
+    alive.current = true; dialog.current?.showModal();
+    return () => { alive.current = false; };
+  }, []);
+  const active = () => alive.current && stillCurrent();
+  const remove = async (event: FormEvent) => {
+    event.preventDefault();
+    if (submitting.current || !password || !active()) return;
+    const administrator = auth.currentUser;
+    if (!administrator?.email) { setPassword(''); setError('관리자 인증 상태를 확인해 주세요.'); return; }
+    submitting.current = true; setPending(true); setError('');
+    const credential = EmailAuthProvider.credential(administrator.email, password);
+    setPassword('');
+    try {
+      await reauthenticateWithCredential(administrator, credential);
+      if (!active() || auth.currentUser?.uid !== administrator.uid) return;
+      await administrator.getIdToken(true);
+      if (!active() || auth.currentUser?.uid !== administrator.uid) return;
+      const result = await officialLetters.deleteIssued(letter);
+      if (!active()) return;
+      await onResult(result);
+    } catch (failure) {
+      if (active()) {
+        const code = typeof failure === 'object' && failure !== null && 'code' in failure ? String(failure.code) : '';
+        setError(code === 'auth/invalid-credential' || code === 'auth/wrong-password'
+          ? '관리자 비밀번호가 일치하지 않습니다. 다시 입력해 주세요.' : errorMessage(failure));
+      }
+    } finally {
+      submitting.current = false;
+      if (alive.current) { setPassword(''); setPending(false); }
+    }
+  };
+  return <dialog ref={dialog} aria-labelledby="delete-issued-title" className="m-auto w-11/12 max-w-lg rounded-2xl p-6 shadow-xl backdrop:bg-slate-900/50"
+    onCancel={event => { event.preventDefault(); if (!pending) { setPassword(''); onClose(); } }}>
+    <form onSubmit={event => { void remove(event); }} className="space-y-4">
+      <div className="flex items-center justify-between gap-3"><h2 id="delete-issued-title" className="font-bold text-lg">발급 서류 삭제 확인</h2><button type="button" aria-label="삭제 확인 닫기" className="ol-button" disabled={pending} onClick={() => { setPassword(''); onClose(); }}><X size={16} /></button></div>
+      <p className="break-words text-sm font-semibold">{letter.number} · {letter.content.title}</p>
+      <p className="rounded-xl bg-red-50 p-4 text-sm text-red-800">현재 서류 내용과 수정 전 이력, 연결된 모든 PDF 및 관련 알림을 영구 삭제합니다. 삭제한 내용은 복구할 수 없으며 발급번호는 다시 사용하지 않습니다. 회사 공용 로고·인감은 유지됩니다.</p>
+      {letter.status === 'DELETING' && <p className="text-sm text-amber-800">일부 삭제가 완료되지 않았습니다. 비밀번호를 확인한 뒤 남은 삭제 처리를 다시 시도합니다.</p>}
+      <label className="ol-label">관리자 비밀번호<input type="password" autoComplete="current-password" required autoFocus value={password} disabled={pending} className="ol-input" onChange={event => { setPassword(event.target.value); setError(''); }} /></label>
+      {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+      {pending && <p role="status" className="text-sm text-indigo-700">관리자 인증 및 삭제 처리를 확인하고 있습니다.</p>}
+      <div className="flex gap-2"><button type="submit" className="ol-primary" disabled={pending || !password}>{letter.status === 'DELETING' ? '삭제 다시 시도' : '영구 삭제'}</button><button type="button" className="ol-button" disabled={pending} onClick={() => { setPassword(''); onClose(); }}>취소</button></div>
+    </form>
+  </dialog>;
+}
 type TemplateImageKey = 'logoData' | 'sealData';
 let activeTemplateHistoryGuard: ((event: Event) => void) | null = null;
 const dispatchTemplateHistory = (event: Event) => activeTemplateHistoryGuard?.(event);
@@ -61,8 +131,20 @@ export function OfficialLetters() {
   const currentUserId = userData?.uid;
   const currentRole = userData?.role;
   const isAdmin = userData?.role === 'ADMIN';
+  const scope = accountScope(userData);
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const liveRef = useRef(true);
+  const listRequestRef = useRef(0);
   const [tab, setTab] = useState<'documents' | 'settings'>('documents');
   const [letters, setLetters] = useState<LetterSummary[]>([]);
+  const [initialRange] = useState(recentDocumentRange);
+  const [draftRange, setDraftRange] = useState<LetterDateRange>(initialRange);
+  const [appliedRange, setAppliedRange] = useState<LetterDateRange>(initialRange);
+  const appliedRangeRef = useRef(initialRange);
+  const [rangeError, setRangeError] = useState('');
+  const [listLoading, setListLoading] = useState(false);
+  const [listError, setListError] = useState('');
   const [settings, setSettings] = useState<LetterSettings>(blankSettings());
   const [savedSettings, setSavedSettings] = useState<LetterSettings | null>(null);
   const settingsRef = useRef<LetterSettings>(blankSettings());
@@ -87,6 +169,9 @@ export function OfficialLetters() {
   const [documentType, setDocumentType] = useState<DocumentType>('OFFICIAL');
   const [typeFilter, setTypeFilter] = useState<DocumentType | 'ALL'>('ALL');
   const [selected, setSelected] = useState<OfficialLetter | null>(null);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const [deleteTarget, setDeleteTarget] = useState<{ letter: OfficialLetter; scope: string } | null>(null);
   const [editing, setEditing] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [content, setContent] = useState<LetterContent>(emptyContent());
@@ -105,6 +190,30 @@ export function OfficialLetters() {
   const [reassignmentReason, setReassignmentReason] = useState('');
   const [candidateToAdd, setCandidateToAdd] = useState('');
   const busy = working || settingsSaving || imageReadCount > 0 || Boolean(linkedKey && settledLink !== linkedKey);
+  const scopeIsCurrent = useCallback((expectedScope: string) => {
+    const current = useAuthStore.getState();
+    return liveRef.current && scopeRef.current === expectedScope && accountScope(current.userData) === expectedScope &&
+      !current.userData?.mustChangePassword && (!current.userData?.status || current.userData.status === 'ACTIVE') &&
+      current.companyData?.status === 'ACTIVE' && current.companyData.id === current.userData?.companyId &&
+      current.user?.uid === current.userData?.uid && auth.currentUser?.uid === current.userData?.uid;
+  }, []);
+  useEffect(() => {
+    liveRef.current = true;
+    return () => { liveRef.current = false; };
+  }, []);
+
+  const fetchLetters = useCallback(async (range: LetterDateRange) => {
+    const request = ++listRequestRef.current;
+    setListLoading(true); setListError('');
+    try {
+      const result = await officialLetters.list(isAdmin ? range : undefined);
+      if (scopeIsCurrent(scope) && request === listRequestRef.current) setLetters(result.letters);
+    } catch (failure) {
+      if (scopeIsCurrent(scope) && request === listRequestRef.current) { setListError(errorMessage(failure)); throw failure; }
+    } finally {
+      if (scopeIsCurrent(scope) && request === listRequestRef.current) setListLoading(false);
+    }
+  }, [isAdmin, scope, scopeIsCurrent]);
 
   const confirmLeaveSettings = useCallback(() => {
     if (settingsSavingRef.current || pendingImageReads.current.size) {
@@ -141,7 +250,8 @@ export function OfficialLetters() {
 
   async function refresh() {
     const edit = settingsEditRef.current;
-    const [bootstrap, list] = await Promise.all([officialLetters.bootstrap(), officialLetters.list()]);
+    const [bootstrap] = await Promise.all([officialLetters.bootstrap(), fetchLetters(appliedRangeRef.current)]);
+    if (!scopeIsCurrent(scope)) return;
     savedSettingsRef.current = bootstrap.settings; setSavedSettings(bootstrap.settings);
     companyNameRef.current = bootstrap.companyName; setTemplateStatus(bootstrap.templateStatus);
     if (!settingsDirtyRef.current && !pendingImageReads.current.size && !settingsSavingRef.current && edit === settingsEditRef.current) {
@@ -150,22 +260,21 @@ export function OfficialLetters() {
     setDefaultLine(bootstrap.approvalLine);
     setEmployeeDefaults(bootstrap.employeeDefaults || {}); setCanApproveDocuments(!!bootstrap.canApproveDocuments);
     setDocumentApprovers(bootstrap.documentApprovers || []);
-    setLetters(list.letters);
   }
   useEffect(() => {
     let active = true;
-    Promise.all([officialLetters.bootstrap(), officialLetters.list()]).then(([bootstrap, list]) => {
-      if (!active) return;
+    Promise.all([officialLetters.bootstrap(), fetchLetters(appliedRangeRef.current)]).then(([bootstrap]) => {
+      if (!active || !scopeIsCurrent(scope)) return;
       if (!settingsDirtyRef.current && !pendingImageReads.current.size && !settingsSavingRef.current) {
         const stored = bootstrap.settings || blankSettings(bootstrap.companyName); settingsRef.current = stored; setSettings(stored);
       }
       savedSettingsRef.current = bootstrap.settings; setSavedSettings(bootstrap.settings); companyNameRef.current = bootstrap.companyName;
-      setTemplateStatus(bootstrap.templateStatus); setDefaultLine(bootstrap.approvalLine); setLetters(list.letters);
+      setTemplateStatus(bootstrap.templateStatus); setDefaultLine(bootstrap.approvalLine);
       setEmployeeDefaults(bootstrap.employeeDefaults || {}); setCanApproveDocuments(!!bootstrap.canApproveDocuments);
       setDocumentApprovers(bootstrap.documentApprovers || []);
-    }).catch(e => { if (active) setError(errorMessage(e)); }).finally(() => { if (active) setBusy(false); });
+    }).catch(e => { if (active && scopeIsCurrent(scope)) setError(errorMessage(e)); }).finally(() => { if (active && scopeIsCurrent(scope)) setBusy(false); });
     return () => { active = false; };
-  }, []);
+  }, [fetchLetters, scope, scopeIsCurrent]);
   useEffect(() => { navigationUrlRef.current = window.location.href; }, [routerLocation.key, routerLocation.pathname, routerLocation.search, routerLocation.hash]);
   useEffect(() => {
     const hasPendingSettings = () => settingsDirtyRef.current || settingsSavingRef.current || pendingImageReads.current.size > 0;
@@ -212,13 +321,13 @@ export function OfficialLetters() {
         handledLink.current = linkedKey; setSettledLink(linkedKey); return;
       }
       const { letter } = await officialLetters.get(linkedLetterId);
-      if (!active) return;
+      if (!active || !scopeIsCurrent(scope)) return;
       handledLink.current = linkedKey; setSettledLink(linkedKey);
       setSelected(letter); setDocumentType(letter.documentType || 'OFFICIAL'); setContent(letter.content); setEditing(true); setDirty(false); setHistory(null);
       setApprovalOpen(false); setReassignmentOpen(false); setTab('documents'); setError('');
     }).catch(e => { if (active) { handledLink.current = linkedKey; setSettledLink(linkedKey); setError(errorMessage(e)); } });
     return () => { active = false; };
-  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings]);
+  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings, scope, scopeIsCurrent]);
 
   function setLetterLink(id?: string) {
     const key = letterLinkKey(id || '');
@@ -233,9 +342,19 @@ export function OfficialLetters() {
   }
 
   async function run(action: () => Promise<void>) {
+    if (!scopeIsCurrent(scope)) return;
     if (!confirmLeaveSettings()) return;
     setBusy(true); setError(''); setNotice('');
-    try { await action(); } catch (e) { setError(errorMessage(e)); } finally { setBusy(false); }
+    try { await action(); } catch (e) { if (scopeIsCurrent(scope)) setError(errorMessage(e)); } finally { if (scopeIsCurrent(scope)) setBusy(false); }
+  }
+  function applyListRange(range: LetterDateRange) {
+    if (!isAdmin || !scopeIsCurrent(scope)) return;
+    if (!range.startDate || !range.endDate) { setRangeError('시작일과 종료일을 모두 입력해 주세요.'); return; }
+    if (range.startDate < '1900-01-01' || range.endDate < '1900-01-01') { setRangeError('1900년 1월 1일 이후의 날짜를 입력해 주세요.'); return; }
+    if (range.startDate > range.endDate) { setRangeError('시작일은 종료일보다 늦을 수 없습니다.'); return; }
+    const next = { ...range };
+    appliedRangeRef.current = next; setAppliedRange(next); setRangeError('');
+    void fetchLetters(next).catch(() => {});
   }
   async function open(id: string) {
     if (!confirmLeaveSettings()) return;
@@ -243,6 +362,7 @@ export function OfficialLetters() {
     setLetterLink(id);
     await run(async () => {
       const { letter } = await officialLetters.get(id);
+      if (!scopeIsCurrent(scope)) return;
       setSelected(letter); setDocumentType(letter.documentType || 'OFFICIAL'); setContent(letter.content); setEditing(true); setDirty(false); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false);
     });
   }
@@ -250,6 +370,7 @@ export function OfficialLetters() {
     let refreshedLetter: OfficialLetter | null = null;
     if (selected) {
       const { letter } = await officialLetters.get(selected.id);
+      if (!scopeIsCurrent(scope)) return null;
       setSelected(letter); setDocumentType(letter.documentType || 'OFFICIAL'); setContent(letter.content); setDirty(false);
       refreshedLetter = letter;
     }
@@ -258,6 +379,7 @@ export function OfficialLetters() {
   }
   async function save(event: FormEvent) {
     event.preventDefault();
+    if (selected?.status === 'DELETING') return;
     if (!confirmLeaveSettings()) return;
     await run(async () => {
       const savedContent = documentType === 'OFFICIAL' ? content : certificateContent(documentType, emptyCertificate(content.certificate));
@@ -314,7 +436,7 @@ export function OfficialLetters() {
     } finally { settingsSavingRef.current = false; setSettingsSaving(false); }
   }
   async function beginReassignment() {
-    if (!selected || !isAdmin) return;
+    if (!selected || !isAdmin || selected.status === 'DELETING') return;
     await run(async () => {
       const result = await officialLetters.approverCandidates(selected);
       setCandidates(result.candidates); setApproverIds(selected.approvalLine.map(step => step.uid));
@@ -329,9 +451,10 @@ export function OfficialLetters() {
     });
   }
   async function download() {
-    if (!selected) return;
+    if (!selected || selected.status !== 'ISSUED' || !scopeIsCurrent(scope)) return;
     await run(async () => {
       const result = await officialLetters.pdf(selected);
+      if (!scopeIsCurrent(scope)) return;
       const bytes = Uint8Array.from(atob(result.base64), character => character.charCodeAt(0));
       const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
       const anchor = document.createElement('a');
@@ -342,14 +465,38 @@ export function OfficialLetters() {
       setNotice('서버에 보관된 PDF를 다운로드했습니다. 파일을 열어 외부 PDF 프로그램에서 인쇄해 주세요. 인감 크기를 유지하려면 실제 크기(100%)로 인쇄합니다.');
     });
   }
+  const deletionIsCurrent = (target: { letter: OfficialLetter; scope: string }) => {
+    const current = selectedRef.current;
+    return scopeIsCurrent(target.scope) && useAuthStore.getState().userData?.role === 'ADMIN' && !dirtyRef.current &&
+      current?.id === target.letter.id && current.revision === target.letter.revision &&
+      (current.status === 'ISSUED' || current.status === 'DELETING');
+  };
+  async function deletionResult(target: { letter: OfficialLetter; scope: string }, result: { success: boolean; cleanupPending?: boolean }) {
+    if (!deletionIsCurrent(target)) return;
+    setDeleteTarget(null); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false);
+    if (result.cleanupPending) {
+      const pending: OfficialLetter = { ...target.letter, status: 'DELETING', pdfReady: false, permissions: { canReview: false, canFinalApprove: false } };
+      setSelected(pending); selectedRef.current = pending;
+      setLetters(previous => previous.map(letter => letter.id === pending.id ? { ...letter, status: 'DELETING', pdfReady: false } : letter));
+      try { await reloadSelected(); } catch { /* Keep the known read-only deletion state if refresh fails. */ }
+      if (scopeIsCurrent(target.scope)) setError('일부 파일 또는 이력의 삭제가 완료되지 않았습니다. 삭제 처리 중인 서류에서 ‘삭제 다시 시도’를 눌러 남은 처리를 완료해 주세요.');
+      return;
+    }
+    if (!result.success) { setError('삭제 결과를 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요.'); return; }
+    setLetters(previous => previous.filter(letter => letter.id !== target.letter.id));
+    setSelected(null); selectedRef.current = null; setEditing(false); setDirty(false); setContent(emptyContent()); setLetterLink();
+    setNotice('서류와 연결된 PDF·이력·알림을 삭제했습니다. 기존 발급번호는 다시 사용하지 않습니다.');
+    try { await refresh(); } catch (failure) { if (scopeIsCurrent(target.scope)) setError(`삭제는 완료되었으나 목록을 새로고침하지 못했습니다. ${errorMessage(failure)}`); }
+  }
 
   if (!userData || userData.role === 'SUPER_ADMIN') return <div className="p-8">가입 회사 계정으로 접근해 주세요.</div>;
-  const canEdit = !selected || isAdmin || (!selected.everIssued && selected.participantIds.includes(userData.uid));
+  const deleting = selected?.status === 'DELETING';
+  const canEdit = !deleting && (!selected || isAdmin || (!selected.everIssued && selected.participantIds.includes(userData.uid)));
   const autoIssueOnSubmit = isAdmin && selected?.creatorId === userData.uid;
   const line = selected?.approvalLine || defaultLine;
   const nextStep = line.find(step => !step.approvedAt);
   const canReview = selected?.status === 'PENDING' && (selected.permissions?.canReview ?? (isAdmin || nextStep?.uid === userData.uid));
-  const canFinalApprove = selected?.permissions?.canFinalApprove ?? (isAdmin && !nextStep && selected?.status === 'PENDING');
+  const canFinalApprove = selected?.status === 'PENDING' && (selected.permissions?.canFinalApprove ?? (isAdmin && !nextStep));
   const canApproveCurrentStep = nextStep?.uid === userData.uid;
   const branding = selected?.branding || savedSettings || settings;
   const filtered = letters.filter(letter => (typeFilter === 'ALL' || (letter.documentType || 'OFFICIAL') === typeFilter) && `${letter.number} ${letter.title} ${letter.recipient} ${letter.creatorName}`.toLowerCase().includes(search.toLowerCase()));
@@ -423,14 +570,25 @@ export function OfficialLetters() {
       <section className="ol-card">
         <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
           <div className="flex flex-wrap gap-2"><select aria-label="서류 종류 필터" className="ol-input max-w-48" value={typeFilter} onChange={event => setTypeFilter(event.target.value as DocumentType | 'ALL')}><option value="ALL">모든 서류</option>{(Object.keys(documentLabels) as DocumentType[]).map(type => <option key={type} value={type}>{documentLabels[type]}</option>)}</select><input aria-label="서류 검색" placeholder="문서번호, 제목, 대상자, 작성자 검색" className="ol-input max-w-sm" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
+        {isAdmin && <form className="mb-4 space-y-3" aria-label="관리자 서류함 기간 조회" noValidate onSubmit={event => { event.preventDefault(); applyListRange(draftRange); }}>
+          <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+            <label className="ol-label col-span-2 sm:col-span-1">시작일<input className="ol-input w-full sm:w-auto" type="date" min="1900-01-01" required value={draftRange.startDate} disabled={busy} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} /></label>
+            <label className="ol-label col-span-2 sm:col-span-1">종료일<input className="ol-input w-full sm:w-auto" type="date" min="1900-01-01" required value={draftRange.endDate} disabled={busy} onChange={event => { setDraftRange(previous => ({ ...previous, endDate: event.target.value })); setRangeError(''); }} /></label>
+            <button className="ol-primary" disabled={busy}>조회</button><button type="button" className="ol-button" disabled={busy} onClick={() => { const recent = recentDocumentRange(); setDraftRange(recent); applyListRange(recent); }}>최근 30일</button>
+          </div>
+          <p className="text-xs text-slate-500">최종 수정일 기준 (한국 시간) · {appliedRange.startDate} ~ {appliedRange.endDate} · 작성 중·결재 대기 서류도 포함됩니다.</p>
+          {rangeError && <p role="alert" className="text-sm text-red-700">{rangeError}</p>}
+        </form>}
+        {listError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{listError}<button type="button" className="ol-button ml-2" disabled={busy} onClick={() => { void fetchLetters(appliedRangeRef.current).catch(() => {}); }}>목록 다시 시도</button></div>}
+        {listLoading && <p role="status" className="py-4 text-sm text-indigo-700">서류 목록을 불러오는 중입니다.</p>}
         <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500"><tr>{['문서번호 / 개정', '종류 / 제목 / 대상자', '작성자', '상태', '수정일'].map(label => <th key={label} className="p-3 whitespace-nowrap">{label}</th>)}</tr></thead>
-          <tbody>{filtered.map(letter => <tr key={letter.id} className="border-t border-slate-100 hover:bg-indigo-50">
+          <tbody>{!listLoading && !listError && filtered.map(letter => <tr key={letter.id} className="border-t border-slate-100 hover:bg-indigo-50">
             <td className="p-3 whitespace-nowrap">{letter.number || '미발행'}<div className="text-xs text-slate-400">개정 {letter.revision}</div></td>
             <td className="p-3"><div className="text-xs text-slate-500 mb-1">{documentLabels[letter.documentType || 'OFFICIAL']}</div><button className="text-indigo-700 font-bold text-left underline underline-offset-4" disabled={busy} onClick={() => { void open(letter.id); }}>{letter.title}</button><div className="text-xs text-slate-500 mt-1">{letter.recipient}</div></td>
             <td className="p-3 whitespace-nowrap">{letter.creatorName}</td><td className="p-3 whitespace-nowrap"><span className={`ol-status ol-status-${letter.status}`}>{statuses[letter.status]}</span></td>
             <td className="p-3 whitespace-nowrap text-slate-500">{new Date(letter.updatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
           </tr>)}</tbody></table>
-          {!filtered.length && <p className="text-center p-8 text-slate-500">{busy ? '서류를 불러오는 중입니다.' : '표시할 서류가 없습니다. 서류 종류를 선택하여 새로 작성해 주세요.'}</p>}
+          {!filtered.length && !listLoading && !listError && <p className="text-center p-8 text-slate-500">{busy ? '서류를 불러오는 중입니다.' : '표시할 서류가 없습니다. 기간을 변경하거나 새 서류를 작성해 주세요.'}</p>}
         </div>
       </section>
       {editing && <section className="ol-card space-y-5">
@@ -463,7 +621,7 @@ export function OfficialLetters() {
               </fieldset>
             </>}
           </fieldset>
-          {canEdit ? <button className="ol-primary" disabled={busy || (!!selected && !dirty)}>{selected?.everIssued ? '새 개정본 저장 (재승인 필요)' : '초안 저장'}</button> : <p className="text-sm text-slate-500">내용 수정은 작성자와 지정 결재자에게 허용하며, 발행 후에는 회사 관리자만 가능합니다.</p>}
+          {canEdit ? <button className="ol-primary" disabled={busy || (!!selected && !dirty)}>{selected?.everIssued ? '새 개정본 저장 (재승인 필요)' : '초안 저장'}</button> : <p className="text-sm text-slate-500">{deleting ? '삭제 처리 중인 서류는 읽기만 가능합니다.' : '내용 수정은 작성자와 지정 결재자에게 허용하며, 발행 후에는 회사 관리자만 가능합니다.'}</p>}
         </form>
         {selected && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           {['DRAFT', 'REJECTED'].includes(selected.status) && <button className="ol-primary" disabled={busy || dirty} onClick={() => { void run(async () => {
@@ -479,10 +637,12 @@ export function OfficialLetters() {
           </>}
           {selected.status === 'ISSUED' && <><button className="ol-primary" disabled={busy || dirty} onClick={() => { void download(); }}><Download size={16} />PDF 다운로드</button></>}
           {selected.status === 'ISSUED' && selected.pdfReady === false && <p className="w-full rounded-lg bg-amber-50 p-3 text-sm text-amber-900">발급 승인은 완료되었으나 PDF 파일의 서버 저장을 다시 시도해야 합니다. PDF 다운로드를 누르면 승인본을 서버에 저장한 뒤 내려받습니다.</p>}
-          {isAdmin && <><button className="ol-button" disabled={busy || dirty} onClick={() => { void beginReassignment(); }}><Users size={16} />결재자 재배정</button><button className="ol-button" disabled={busy || dirty} onClick={() => { void run(async () => { setHistory((await officialLetters.history(selected)).history); }); }}><History size={16} />수정 전 보관 이력</button></>}
+          {isAdmin && !deleting && <><button className="ol-button" disabled={busy || dirty} onClick={() => { void beginReassignment(); }}><Users size={16} />결재자 재배정</button><button className="ol-button" disabled={busy || dirty} onClick={() => { void run(async () => { setHistory((await officialLetters.history(selected)).history); }); }}><History size={16} />수정 전 보관 이력</button></>}
+          {isAdmin && (selected.status === 'ISSUED' || deleting) && <button type="button" className="ol-button text-red-700" disabled={busy || dirty} onClick={() => { if (scopeIsCurrent(scope) && confirmLeaveSettings()) setDeleteTarget({ letter: selected, scope }); }}>{deleting ? '삭제 다시 시도' : '발급 서류 삭제'}</button>}
+          {deleting && <p className="w-full rounded-xl bg-amber-50 p-3 text-sm text-amber-900">삭제 처리 중인 서류입니다. 내용 변경·결재·PDF 다운로드는 중단되며 회사 관리자가 남은 삭제를 다시 시도할 수 있습니다.</p>}
           {dirty && <p className="w-full text-sm text-amber-700">변경 내용을 먼저 저장해 주세요. 저장하면 결재를 다시 요청해야 합니다.</p>}
         </div>}
-        {reassignmentOpen && selected && isAdmin && <form className="rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
+        {reassignmentOpen && selected && isAdmin && !deleting && <form className="rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
           event.preventDefault();
           if (!reassignmentReason.trim() || hasUnavailableApprover || dirty) return;
           if (!approverIds.length && !window.confirm('중간 결재자 없이 최종 승인권자가 직접 승인하는 결재라인으로 변경할까요? 이전 승인은 모두 초기화됩니다.')) return;
@@ -575,7 +735,7 @@ export function OfficialLetters() {
             <div className="ol-certificate-footer"><p>{branding.address}</p><p>담당부서 / Department: {certificate.department || '—'}</p><p>담당자 / Contact: {certificate.contactName || '—'} · 연락처 / Telephone: {certificate.contactPhone || branding.phone || '—'}</p></div>
           </article>}
         </details>
-        {history && <div className="space-y-3 border-t pt-5"><h3 className="font-bold">수정 전 내용 보관함 · 관리자 전용</h3>{!history.length && <p className="text-sm text-slate-500">보관된 이전 개정본이 없습니다.</p>}
+        {history && !deleting && <div className="space-y-3 border-t pt-5"><h3 className="font-bold">수정 전 내용 보관함 · 관리자 전용</h3>{!history.length && <p className="text-sm text-slate-500">보관된 이전 개정본이 없습니다.</p>}
           {history.map(version => <details key={version.historyId} className="border rounded-xl p-4"><summary className="cursor-pointer">개정 {version.revision} · {version.number || '미발행'} · {statuses[version.status]} · {version.content.title}</summary>
             <div className="text-sm space-y-3 mt-4"><p>보관: {new Date(version.archivedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p><p>수신 / 대상자: {version.content.recipient} / 참조: {version.content.reference}</p><p className="whitespace-pre-wrap leading-7">{version.content.body}</p><p className="whitespace-pre-wrap">붙임: {version.content.attachments}</p>
               {version.content.certificate && <dl className="grid md:grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3">{(Object.keys(certificateFieldLabels) as (keyof CertificateContent)[]).map(key => <div key={key}><dt className="font-semibold">{certificateFieldLabels[key]}</dt><dd className="whitespace-pre-wrap break-words">{version.content.certificate?.[key] || '—'}</dd></div>)}</dl>}
@@ -586,5 +746,8 @@ export function OfficialLetters() {
           </details>)}</div>}
       </section>}
     </>}
+    {deleteTarget && isAdmin && deleteTarget.scope === scope && selected?.id === deleteTarget.letter.id && selected.revision === deleteTarget.letter.revision &&
+      (selected.status === 'ISSUED' || selected.status === 'DELETING') && <DeleteIssuedDialog key={`${deleteTarget.scope}:${selected.id}:${selected.revision}`} letter={selected}
+        stillCurrent={() => deletionIsCurrent(deleteTarget)} onClose={() => setDeleteTarget(null)} onResult={result => deletionResult(deleteTarget, result)} />}
   </div>;
 }

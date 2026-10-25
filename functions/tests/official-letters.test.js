@@ -15,7 +15,11 @@ const app = initializeApp({ projectId: 'demo-hr-flow-letters' }, 'official-lette
 const db = getFirestore(app);
 const files = new Map();
 const storageWrites = [];
-const bucket = { file: name => ({
+const storagePrefixDeletes = [];
+const bucket = { deleteFiles: async options => {
+  storagePrefixDeletes.push(structuredClone(options));
+  for (const name of files.keys()) if (name.startsWith(options.prefix)) files.delete(name);
+}, file: name => ({
   save: async (bytes, options) => {
     files.set(name, Buffer.from(bytes));
     storageWrites.push({ path: name, options: structuredClone(options || {}) });
@@ -69,6 +73,24 @@ const manage = createOfficialLetterService({ db, bucket, now,
   renderPdf: async () => { renderCount++; return Buffer.from('%PDF approved'); },
 });
 const call = (uid, action, data = {}) => manage({ ...(uid ? { auth: { uid, token: { role: 'SUPER_ADMIN' } } } : {}), data: { action, ...data } });
+const deletionToken = () => ({ auth_time: now().getTime() / 1000, firebase: { sign_in_provider: 'password' } });
+const invoke = (service, uid, action, data = {}, token = deletionToken()) => service({
+  ...(uid ? { auth: { uid, token } } : {}), data: { action, ...data },
+});
+const removeIssued = (uid, id, revision, extras = {}, service = manage, token = deletionToken()) =>
+  invoke(service, uid, 'deleteIssued', { id, revision, confirm: true, ...extras }, token);
+const interceptDatabase = ({ beforeDelete, recursiveDelete } = {}) => new Proxy(db, {
+  get(target, key) {
+    if (key === 'recursiveDelete' && recursiveDelete) return recursiveDelete;
+    if (key === 'runTransaction' && beforeDelete) return callback => target.runTransaction(tx => callback(new Proxy(tx, {
+      get(transaction, method) {
+        if (method === 'delete') return ref => { beforeDelete(ref); return transaction.delete(ref); };
+        const value = transaction[method]; return typeof value === 'function' ? value.bind(transaction) : value;
+      },
+    })));
+    const value = target[key]; return typeof value === 'function' ? value.bind(target) : value;
+  },
+});
 const denied = (promise, code) => assert.rejects(promise, error => error.code === code);
 const content = { recipient: '거래처 주식회사', reference: '사업 담당자', title: '참여의향서 제출의 건', body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n끝.', attachments: '회사 소개서 1부' };
 const load = async id => (await call('admin', 'get', { id })).letter;
@@ -852,6 +874,210 @@ test('official-letter server authorization, numbering and revisions', async t =>
           .flatMap(value => [{ startDate: value, endDate: '2026-10-23' }, { startDate: '1900-01-01', endDate: value }]),
       ];
       for (const range of invalid) await denied(call('range-owner', 'mine', range), 'invalid-argument');
+    });
+    await t.test('ADMIN lists default to thirty Seoul update dates and preserve exact midnight boundaries', async () => {
+      await db.doc('companies/list-scope').set({ nameKo: '서류함 기간 검증 회사', status: 'ACTIVE', ...entitlement });
+      for (const [uid, role] of [['list-admin', 'ADMIN'], ['list-member', 'MEMBER']]) {
+        await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId: 'list-scope', status: 'ACTIVE', mustChangePassword: false });
+      }
+      const source = (await db.doc(`officialLetters/${letterId}`).get()).data();
+      const dates = [
+        ['before', '2026-09-23T14:59:59.999Z'], ['start', '2026-09-23T15:00:00.000Z'],
+        ['today-start', '2026-10-22T15:00:00.000Z'], ['today-end', '2026-10-23T14:59:59.999Z'],
+        ['tomorrow', '2026-10-23T15:00:00.000Z'], ['historic-start', '2026-02-28T15:00:00.000Z'],
+        ['historic-end', '2026-03-31T14:59:59.999Z'], ['historic-after', '2026-03-31T15:00:00.000Z'],
+      ];
+      const batch = db.batch();
+      for (const [suffix, updatedAt] of dates) batch.set(db.doc(`officialLetters/admin-range-${suffix}`), {
+        ...source, companyId: 'list-scope', creatorId: 'list-member', participantIds: ['list-member'], approvalLine: [],
+        // List filtering follows update time, independently of old creation and issuance dates.
+        createdAt: '2000-01-01T00:00:00.000Z', issueDate: '2000-01-01', updatedAt,
+      });
+      batch.set(db.doc('officialLetters/admin-range-foreign'), { ...source, companyId: 'b', updatedAt: now().toISOString() });
+      await batch.commit();
+      const listed = (await call('list-admin', 'list', { companyId: 'b', creatorId: 'outsider' })).letters;
+      assert.deepEqual(listed.map(letter => letter.id), ['today-end', 'today-start', 'start'].map(suffix => `admin-range-${suffix}`));
+      const today = await call('list-admin', 'list', { startDate: '2026-10-23', endDate: '2026-10-23' });
+      assert.deepEqual(today.letters.map(letter => letter.id), ['admin-range-today-end', 'admin-range-today-start']);
+      const historic = await call('list-admin', 'list', { startDate: '2026-03-01', endDate: '2026-03-31' });
+      assert.deepEqual(historic.letters.map(letter => letter.id), ['admin-range-historic-end', 'admin-range-historic-start']);
+      const future = await call('list-admin', 'list', { startDate: '2026-10-24', endDate: '2026-10-24' });
+      assert.deepEqual(future.letters.map(letter => letter.id), ['admin-range-tomorrow']);
+      const own = await call('list-member', 'list', { startDate: '2026-10-23', endDate: '2026-10-23' });
+      assert.deepEqual(own.letters.map(letter => letter.id).sort(), dates.map(([suffix]) => `admin-range-${suffix}`).sort(),
+        'ordinary participants retain their full existing document list');
+      for (const range of [{ startDate: '2026-10-01' }, { endDate: '2026-10-23' },
+        { startDate: '2026-10-23', endDate: '2026-10-01' }, { startDate: '2026-02-29', endDate: '2026-03-01' },
+        { startDate: '1899-12-31', endDate: '2026-10-23' }, { startDate: '', endDate: '' }]) {
+        await denied(call('list-admin', 'list', range), 'invalid-argument');
+      }
+    });
+
+    const issueForDeletion = async (uid = 'delete-admin') => {
+      const id = (await call(uid, 'save', { content })).id;
+      await call(uid, 'submit', { id, revision: 1 });
+      if (uid !== 'delete-admin') await call('delete-admin', 'review', { id, revision: 1, decision: 'approve' });
+      return { id, ...(await db.doc(`officialLetters/${id}`).get()).data() };
+    };
+    await t.test('issued deletion requires current company ADMIN, explicit confirmation, revision and recent password authentication', async () => {
+      await db.doc('companies/delete-scope').set({ nameKo: '삭제 검증 회사', status: 'ACTIVE', ...entitlement });
+      for (const [uid, role] of [['delete-admin', 'ADMIN'], ['delete-admin2', 'ADMIN'], ['delete-member', 'MEMBER'], ['delete-former', 'SUB_ADMIN']]) {
+        await db.doc(`UserProfile/${uid}`).set({ uid, name: uid, role, companyId: 'delete-scope', status: 'ACTIVE', mustChangePassword: false });
+      }
+      await call('delete-admin', 'saveSettings', { expectedVersion: 0, settings: { companyName: '삭제 검증 회사',
+        address: '서울특별시 검증로 10', representative: '검증 대표', logoData: png, sealData: png, lastFront: 0 } });
+      const issued = await issueForDeletion('delete-member');
+      const draft = (await call('delete-member', 'save', { content })).id;
+      const before = await officialState(); const stored = [...files.entries()]; const deleteCount = storagePrefixDeletes.length;
+      const invalidRequests = [
+        [null, {}, deletionToken(), 'unauthenticated'], ['delete-member', {}, deletionToken(), 'permission-denied'],
+        ['outsider', {}, deletionToken(), 'permission-denied'], ['platform', {}, deletionToken(), 'permission-denied'],
+        ['delete-admin', { confirm: false }, deletionToken(), 'invalid-argument'],
+        ['delete-admin', { revision: 0 }, deletionToken(), 'aborted'], ['delete-admin', { revision: '1' }, deletionToken(), 'aborted'],
+        ['delete-admin', {}, {}, 'failed-precondition'],
+        ['delete-admin', {}, { ...deletionToken(), auth_time: now().getTime() / 1000 - 301 }, 'failed-precondition'],
+        ['delete-admin', {}, { ...deletionToken(), auth_time: now().getTime() / 1000 + 31 }, 'failed-precondition'],
+        ['delete-admin', {}, { auth_time: now().getTime() / 1000 }, 'failed-precondition'],
+        ['delete-admin', {}, { ...deletionToken(), firebase: { sign_in_provider: 'google.com' } }, 'failed-precondition'],
+      ];
+      for (const [uid, extras, token, code] of invalidRequests) await denied(removeIssued(uid, issued.id, 1, extras, manage, token), code);
+      await denied(removeIssued('delete-admin', draft, 1), 'failed-precondition');
+      await denied(removeIssued('delete-admin', issued.id, 1, { id: `${issued.id}/history/spoof` }), 'invalid-argument');
+      assert.deepEqual(await officialState(), before); assert.deepEqual([...files.entries()], stored);
+      assert.equal(storagePrefixDeletes.length, deleteCount);
+    });
+    await t.test('issued deletion removes every revision, historical inbox and private PDF while preserving permanent numbers and shared assets', async () => {
+      const first = await issueForDeletion('delete-member');
+      await call('delete-admin', 'save', { id: first.id, revision: 1, content: { ...content, title: '영구 삭제할 개정 문서' } });
+      await call('delete-member', 'submit', { id: first.id, revision: 2 });
+      await call('delete-admin', 'review', { id: first.id, revision: 2, decision: 'approve' });
+      const ref = db.doc(`officialLetters/${first.id}`); const current = (await ref.get()).data();
+      const historyRef = (await ref.collection('history').get()).docs[0].ref;
+      await historyRef.update({ notificationRecipientIds: ['delete-former', 'outsider'], participantIds: ['delete-former'] });
+      await inboxRef('delete-former', first.id).set({ companyId: 'delete-scope', letterId: first.id, title: 'old task' });
+      await inboxRef('outsider', first.id).set({ companyId: 'b', letterId: first.id, title: 'foreign task' });
+      const foreignFile = `companies/b/official-pdfs/${first.id}/foreign.pdf`;
+      const similarFile = `companies/delete-scope/official-pdfs/${first.id}-other/keep.pdf`;
+      const prefix = `companies/delete-scope/official-pdfs/${first.id}/`;
+      files.set(foreignFile, Buffer.from('foreign')); files.set(similarFile, Buffer.from('neighbor'));
+      files.set(`${prefix}unreferenced-old.pdf`, Buffer.from('old object'));
+      const settingsRef = db.doc('officialLetterSettings/delete-scope'); const settings = (await settingsRef.get()).data();
+      const logo = Buffer.from(files.get(settings.logoPath)); const seal = Buffer.from(files.get(settings.sealPath));
+      const numbersBefore = records(await db.collection('officialLetterNumbers').get());
+      const deleted = await removeIssued('delete-admin', first.id, 2, { companyId: 'b', storagePath: foreignFile });
+      assert.deepEqual(deleted, { success: true });
+      const tombstone = (await ref.get()).data();
+      assert.deepEqual(Object.keys(tombstone).sort(), ['companyId', 'deletion', 'number', 'revision', 'status']);
+      assert.equal(tombstone.companyId, 'delete-scope'); assert.equal(tombstone.status, 'DELETED');
+      assert.equal(tombstone.revision, 2); assert.equal(tombstone.number, current.number);
+      assert.equal(tombstone.deletion.startedBy, 'delete-admin'); assert.equal(tombstone.deletion.completedBy, 'delete-admin');
+      assert.equal((await ref.collection('history').get()).empty, true);
+      assert.ok(![...files.keys()].some(name => name.startsWith(prefix)));
+      assert.deepEqual(storagePrefixDeletes.at(-1), { prefix, force: false });
+      assert.ok(files.has(foreignFile)); assert.ok(files.has(similarFile));
+      assert.deepEqual(files.get(settings.logoPath), logo); assert.deepEqual(files.get(settings.sealPath), seal);
+      assert.deepEqual((await settingsRef.get()).data(), settings);
+      assert.deepEqual(records(await db.collection('officialLetterNumbers').get()), numbersBefore);
+      for (const uid of ['delete-member', 'delete-admin', 'delete-former']) assert.equal((await inboxRef(uid, first.id).get()).exists, false);
+      assert.equal((await inboxRef('outsider', first.id).get()).exists, true);
+      for (const uid of ['delete-admin', 'delete-member']) {
+        for (const action of ['get', 'history', 'pdf']) await denied(call(uid, action, { id: first.id, revision: 2 }), 'not-found');
+        assert.ok(!(await call(uid, 'list')).letters.some(letter => letter.id === first.id));
+        assert.ok(!(await call(uid, 'mine')).letters.some(letter => letter.id === first.id));
+      }
+      assert.ok(!(await call('delete-admin', 'approvals')).letters.some(letter => letter.id === first.id));
+      assert.deepEqual(await removeIssued('delete-admin', first.id, 2), { success: true }, 'an authenticated repeat is idempotent');
+      assert.deepEqual((await ref.get()).data(), tombstone);
+      const next = await issueForDeletion();
+      assert.equal(Number(next.number.slice(0, 3)), settings.lastFront + 1);
+    });
+    await t.test('storage cleanup failure leaves a locked ADMIN-retryable document and blocks every workflow mutation', async () => {
+      const issued = await issueForDeletion('delete-member');
+      await db.doc(`officialLetters/${issued.id}/history/old`).set({ ...issued, revision: 0 });
+      const failing = createOfficialLetterService({ db, now, bucket: { ...bucket, deleteFiles: async () => { throw new Error('storage unavailable'); } }, renderPdf: async () => Buffer.from('%PDF') });
+      assert.deepEqual(await removeIssued('delete-admin', issued.id, 1, {}, failing), { success: false, cleanupPending: true });
+      const current = (await db.doc(`officialLetters/${issued.id}`).get()).data();
+      assert.equal(current.status, 'DELETING'); assert.equal(current.revision, 1); assert.ok(files.has(issued.pdf.path));
+      assert.equal((await call('delete-admin', 'get', { id: issued.id })).letter.status, 'DELETING');
+      assert.ok((await call('delete-admin', 'list')).letters.some(letter => letter.id === issued.id && letter.status === 'DELETING'));
+      assert.ok(!(await call('delete-admin', 'approvals')).letters.some(letter => letter.id === issued.id));
+      assert.ok(!(await call('delete-member', 'list')).letters.some(letter => letter.id === issued.id));
+      assert.ok(!(await call('delete-member', 'mine')).letters.some(letter => letter.id === issued.id));
+      await denied(call('delete-member', 'get', { id: issued.id }), 'permission-denied');
+      await denied(call('delete-member', 'pdf', { id: issued.id, revision: 1 }), 'permission-denied');
+      for (const [action, data] of [
+        ['save', { content }], ['reassign', { approverIds: [], reason: '우회 재배정' }], ['submit', {}],
+        ['review', { decision: 'approve' }], ['deleteHistory', { historyId: 'old' }], ['pdf', {}],
+      ]) await denied(call('delete-admin', action, { id: issued.id, revision: 1, ...data }), 'failed-precondition');
+      await denied(removeIssued('delete-admin', issued.id, 2), 'aborted');
+      assert.deepEqual(await removeIssued('delete-admin2', issued.id, 1), { success: true });
+      assert.equal((await db.doc(`officialLetters/${issued.id}`).get()).data().deletion.startedBy, 'delete-admin');
+      assert.equal((await db.doc(`officialLetters/${issued.id}`).get()).data().deletion.completedBy, 'delete-admin2');
+    });
+    await t.test('inbox failure preserves history-only recipients until an authorized retry can clean them', async () => {
+      const issued = await issueForDeletion(); const ref = db.doc(`officialLetters/${issued.id}`);
+      await ref.collection('history').doc('old').set({ ...issued, revision: 0, participantIds: ['delete-former'], notificationRecipientIds: ['delete-former'] });
+      await inboxRef('delete-former', issued.id).set({ companyId: 'delete-scope', letterId: issued.id });
+      const failingDb = interceptDatabase({ beforeDelete: document => {
+        if (document.path === inboxRef('delete-former', issued.id).path) throw new Error('inbox write unavailable');
+      } });
+      const failing = createOfficialLetterService({ db: failingDb, bucket, now, renderPdf: async () => Buffer.from('%PDF') });
+      assert.deepEqual(await removeIssued('delete-admin', issued.id, 1, {}, failing), { success: false, cleanupPending: true });
+      assert.equal((await ref.get()).data().status, 'DELETING');
+      assert.equal((await ref.collection('history').doc('old').get()).exists, true);
+      assert.equal((await inboxRef('delete-former', issued.id).get()).exists, true);
+      assert.deepEqual(await removeIssued('delete-admin', issued.id, 1), { success: true });
+      assert.equal((await inboxRef('delete-former', issued.id).get()).exists, false);
+      assert.equal((await ref.collection('history').get()).empty, true);
+    });
+    await t.test('partial history cleanup keeps the deletion lock and remains safely retryable', async () => {
+      const issued = await issueForDeletion(); const ref = db.doc(`officialLetters/${issued.id}`);
+      for (const id of ['first', 'second']) await ref.collection('history').doc(id).set({ ...issued, revision: 0 });
+      const failingDb = interceptDatabase({ recursiveDelete: async collection => {
+        await collection.doc('first').delete(); throw new Error('history cleanup interrupted');
+      } });
+      const failing = createOfficialLetterService({ db: failingDb, bucket, now, renderPdf: async () => Buffer.from('%PDF') });
+      assert.deepEqual(await removeIssued('delete-admin', issued.id, 1, {}, failing), { success: false, cleanupPending: true });
+      assert.equal((await ref.get()).data().status, 'DELETING');
+      assert.equal((await ref.collection('history').get()).size, 1);
+      assert.equal((await inboxRef('delete-admin', issued.id).get()).exists, false);
+      assert.deepEqual(await removeIssued('delete-admin', issued.id, 1), { success: true });
+      assert.equal((await ref.collection('history').get()).empty, true);
+    });
+    await t.test('a company change during cleanup cannot finish deletion or touch another company storage', async () => {
+      const issued = await issueForDeletion(); const profileRef = db.doc('UserProfile/delete-admin'); const profile = (await profileRef.get()).data();
+      const foreignPath = `companies/b/official-pdfs/${issued.id}/keep.pdf`; files.set(foreignPath, Buffer.from('foreign'));
+      const changingBucket = { ...bucket, deleteFiles: async options => {
+        await bucket.deleteFiles(options); await profileRef.update({ companyId: 'b' });
+      } };
+      const changing = createOfficialLetterService({ db, bucket: changingBucket, now, renderPdf: async () => Buffer.from('%PDF') });
+      try { await denied(removeIssued('delete-admin', issued.id, 1, {}, changing), 'permission-denied'); }
+      finally { await profileRef.set(profile); }
+      assert.equal((await db.doc(`officialLetters/${issued.id}`).get()).data().status, 'DELETING'); assert.ok(files.has(foreignPath));
+      assert.deepEqual(await removeIssued('delete-admin2', issued.id, 1), { success: true }); assert.ok(files.has(foreignPath));
+    });
+    await t.test('PDF reads and late PDF writes cannot return or resurrect a document deleted while storage is in flight', async () => {
+      for (const useCache of [true, false]) {
+        const issued = await issueForDeletion(); const ref = db.doc(`officialLetters/${issued.id}`);
+        if (!useCache) { files.delete(issued.pdf.path); await ref.update({ pdf: null, pdfReady: false }); }
+        let started; let resume;
+        const start = new Promise(resolve => { started = resolve; }); const resumeIo = new Promise(resolve => { resume = resolve; });
+        const racingBucket = { ...bucket, file: name => {
+          const original = bucket.file(name);
+          if (name !== issued.pdf.path) return original;
+          return { ...original, download: async () => { const bytes = await original.download(); started(); await resumeIo; return bytes; },
+            save: async (bytes, options) => { started(); await resumeIo; return original.save(bytes, options); } };
+        } };
+        const racing = createOfficialLetterService({ db, bucket: racingBucket, now, renderPdf: async () => Buffer.from('%PDF late write') });
+        const pending = invoke(racing, 'delete-admin', 'pdf', { id: issued.id, revision: 1 });
+        const rejected = denied(pending, 'not-found');
+        await start;
+        try { assert.deepEqual(await removeIssued('delete-admin', issued.id, 1), { success: true }); }
+        finally { resume(); }
+        await rejected;
+        assert.equal((await ref.get()).data().status, 'DELETED'); assert.equal(files.has(issued.pdf.path), false);
+        assert.equal((await ref.get()).data().pdf, undefined);
+      }
     });
     await t.test('PDF generation failure preserves issuance and retries without assigning another number', async () => {
       const id = await create('admin');

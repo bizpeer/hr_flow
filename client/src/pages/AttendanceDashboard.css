@@ -1,0 +1,29 @@
+.attendance-dashboard .attendance-summary-card {
+  min-height: 236px;
+  padding-block: 12px;
+}
+
+.attendance-dashboard .attendance-timeline-card {
+  height: 236px;
+}
+
+.attendance-dashboard .attendance-timeline-feed {
+  min-height: 0;
+}
+
+.attendance-dashboard .attendance-calendar-card {
+  padding-block: 8px;
+}
+
+.attendance-dashboard .attendance-calendar-day {
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 2 / 1;
+  min-height: 28px;
+}
+
+@media (min-width: 768px) {
+  .attendance-dashboard .attendance-calendar-card {
+    padding-block: 16px;
+  }
+}

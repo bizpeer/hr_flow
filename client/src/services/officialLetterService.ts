@@ -62,7 +62,7 @@ export interface OfficialLetter {
   approvalLine: ApprovalStep[];
   participantIds: string[];
   revision: number;
-  status: 'DRAFT' | 'PENDING' | 'REJECTED' | 'ISSUED';
+  status: 'DRAFT' | 'PENDING' | 'REJECTED' | 'ISSUED' | 'DELETING';
   everIssued: boolean;
   number?: string;
   issueDate?: string;
@@ -110,7 +110,7 @@ async function call<T>(action: string, payload: Record<string, unknown> = {}): P
 }
 export const officialLetters = {
   bootstrap: () => call<LetterBootstrap>('bootstrap'),
-  list: () => call<{ letters: LetterSummary[] }>('list'),
+  list: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('list', range ? { ...range } : {}),
   approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
   mine: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('mine', range ? { ...range } : {}),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
@@ -127,6 +127,7 @@ export const officialLetters = {
   pdf: (letter: OfficialLetter) => call<{ base64: string; filename: string }>('pdf', { id: letter.id, revision: letter.revision }),
   history: (letter: OfficialLetter) => call<{ history: LetterHistory[] }>('history', { id: letter.id }),
   deleteHistory: (letter: OfficialLetter, historyId: string) => call('deleteHistory', { id: letter.id, revision: letter.revision, historyId }),
+  deleteIssued: (letter: OfficialLetter) => call<{ success: true } | { success: false; cleanupPending: true }>('deleteIssued', { id: letter.id, revision: letter.revision, confirm: true }),
 };
 
 export function seoulDate(): string {

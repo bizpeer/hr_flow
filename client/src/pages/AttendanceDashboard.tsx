@@ -11,6 +11,7 @@ import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 import { MyIssuedDocuments } from '../components/MyIssuedDocuments';
 import { accountSecurity } from '../services/accountSecurityService';
 import type { DirectoryUser } from '../services/accountSecurityService';
+import './AttendanceDashboard.css';
 
 interface AttendanceRecord {
   id: string;
@@ -238,11 +239,11 @@ export const AttendanceDashboard: React.FC = () => {
   const remainingLeave = totalLeave - usedLeave;
 
   return (
-    <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen page-transition">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="attendance-dashboard flex-1 p-4 md:p-8 bg-slate-50 min-h-screen page-transition">
+      <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header Section: Profile & Global Action */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-200/60">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200/60">
           <div className="flex items-center gap-5">
             <div className="w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-100 ring-4 ring-white">
               <span className="text-2xl font-black">{userData?.name?.slice(0, 1) || 'H'}</span>
@@ -287,13 +288,13 @@ export const AttendanceDashboard: React.FC = () => {
         {directoryError && <div role="alert" className="rounded-xl bg-amber-50 text-amber-900 p-4 text-sm">{directoryError}<button type="button" className="ml-3 underline font-semibold" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
 
         {/* Bento Grid Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-12 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
           
           {/* Main Attendance Action Card (L: Spans 5) */}
-          <div className="lg:col-span-5 h-[340px]">
-             <div className="premium-card bento-inner bg-gradient-to-br from-white to-indigo-50/30 group">
-                <div className="flex items-center justify-between mb-8">
-                  <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
+          <div className="lg:col-span-5">
+             <div className="attendance-summary-card premium-card bento-inner bg-gradient-to-br from-white to-indigo-50/30 group">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-indigo-600 rounded-2xl text-white shadow-lg shadow-indigo-200">
                     <Clock className="w-6 h-6" />
                   </div>
                   {lastStatus?.type === 'IN' ? (
@@ -308,13 +309,13 @@ export const AttendanceDashboard: React.FC = () => {
 
                 <div className="flex-1">
                   <h2 className="text-xl font-black text-slate-900 mb-1">근태 기록</h2>
-                  <p className="text-xs font-bold text-slate-400 mb-8 leading-relaxed">오늘의 업무 시작과 종료를 기록하세요.<br/>데이터는 실시간으로 클라우드에 연동됩니다.</p>
+                  <p className="text-xs font-bold text-slate-400 mb-4 leading-relaxed">오늘의 업무 시작과 종료를 기록하세요.<br/>데이터는 실시간으로 클라우드에 연동됩니다.</p>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <button 
                       onClick={() => handleAttendance('IN')}
                       disabled={isSubmitting || hasCheckedInToday}
-                      className="group relative h-24 overflow-hidden rounded-[1.5rem] bg-indigo-600 shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-40 disabled:grayscale"
+                      className="group relative h-16 overflow-hidden rounded-[1.5rem] bg-indigo-600 shadow-xl shadow-indigo-100 transition-all hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-40 disabled:grayscale"
                     >
                       <div className="relative z-10 flex flex-col items-center gap-2 text-white">
                         <LogIn className="w-6 h-6" />
@@ -326,7 +327,7 @@ export const AttendanceDashboard: React.FC = () => {
                     <button 
                       onClick={() => handleAttendance('OUT')}
                       disabled={isSubmitting || !hasCheckedInToday || hasCheckedOutToday}
-                      className="group relative h-24 overflow-hidden rounded-[1.5rem] bg-white border-2 border-rose-100 shadow-lg transition-all hover:bg-rose-50 active:scale-[0.98] disabled:opacity-40"
+                      className="group relative h-16 overflow-hidden rounded-[1.5rem] bg-white border-2 border-rose-100 shadow-lg transition-all hover:bg-rose-50 active:scale-[0.98] disabled:opacity-40"
                     >
                       <div className="relative z-10 flex flex-col items-center gap-2 text-rose-600">
                         <LogOut className="w-6 h-6" />
@@ -339,9 +340,9 @@ export const AttendanceDashboard: React.FC = () => {
           </div>
 
           {/* Timeline Feed (Narrow - Spans 4) */}
-          <div className="lg:col-span-4 h-[340px]">
-            <div className="premium-card bento-inner border-slate-50">
-              <div className="flex items-center justify-between mb-6">
+          <div className="lg:col-span-4">
+            <div className="attendance-summary-card attendance-timeline-card premium-card bento-inner border-slate-50">
+              <div className="flex items-center justify-between mb-3">
                  <h2 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                     <History className="w-4 h-4 text-indigo-500" />
                     Timeline
@@ -349,7 +350,7 @@ export const AttendanceDashboard: React.FC = () => {
                  <span className="text-[10px] font-bold text-slate-400">Live</span>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-1 space-y-4 custom-scrollbar">
+              <div className="attendance-timeline-feed flex-1 overflow-y-auto px-1 space-y-2 custom-scrollbar">
                 {loading ? (
                   <div className="h-full flex items-center justify-center"><Loader2 className="w-5 h-5 animate-spin text-slate-300" /></div>
                 ) : records.length > 0 ? (
@@ -359,7 +360,7 @@ export const AttendanceDashboard: React.FC = () => {
                         <div className={`w-3 h-3 rounded-full border-2 border-white shadow-sm ring-2 ${record.type === 'IN' ? 'bg-indigo-500 ring-indigo-100' : 'bg-rose-500 ring-rose-100'}`}></div>
                         {idx !== records.length - 1 && <div className="w-0.5 h-full bg-slate-100 mt-1"></div>}
                       </div>
-                      <div className="flex-1 pb-4">
+                      <div className="flex-1 pb-2">
                         <div className="flex items-baseline justify-between mb-1">
                            <span className="text-xs font-black text-slate-900">{format(new Date(record.timestamp), 'HH:mm:ss')}</span>
                            <span className={`text-[8px] font-black uppercase ${record.type === 'IN' ? 'text-indigo-400' : 'text-rose-400'}`}>{record.type === 'IN' ? 'Check In' : 'Check Out'}</span>
@@ -382,33 +383,33 @@ export const AttendanceDashboard: React.FC = () => {
           </div>
 
           {/* Leave Entitlement Summary (Spans 3) */}
-          <div className="lg:col-span-3 h-[340px]">
-            <div className="premium-card bento-inner bg-slate-900 text-white border-none shadow-indigo-900/10">
-               <div className="flex items-center justify-between mb-8">
-                  <div className="p-3 bg-white/10 rounded-2xl">
+          <div className="lg:col-span-3">
+            <div className="attendance-summary-card premium-card bento-inner bg-slate-900 text-white border-none shadow-indigo-900/10">
+               <div className="flex items-center justify-between mb-4">
+                  <div className="p-2 bg-white/10 rounded-2xl">
                     <CalendarIcon className="w-6 h-6 text-indigo-400" />
                   </div>
                   <div className="px-3 py-1 bg-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest">Leaves</div>
                </div>
 
-               <div className="flex-1 space-y-6">
+               <div className="flex-1 space-y-3">
                  <div>
                    <h3 className="text-3xl font-black tracking-tight mb-1">{remainingLeave}<span className="text-base text-slate-500 ml-1">Days</span></h3>
                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Remaining Balance</p>
                  </div>
 
                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="px-4 py-2 bg-white/5 rounded-2xl border border-white/5">
                        <div className="text-[18px] font-black mb-1">{totalLeave}</div>
                        <div className="text-[8px] font-black text-slate-500 uppercase">Total</div>
                     </div>
-                    <div className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                    <div className="px-4 py-2 bg-white/5 rounded-2xl border border-white/5">
                        <div className="text-[18px] font-black mb-1 text-rose-400">{usedLeave}</div>
                        <div className="text-[8px] font-black text-slate-500 uppercase">Used</div>
                     </div>
                  </div>
 
-                 <div className="pt-4">
+                 <div className="pt-2">
                     <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                        <div 
                          className="h-full bg-gradient-to-r from-indigo-500 to-violet-400 rounded-full transition-all duration-1000" 
@@ -422,16 +423,17 @@ export const AttendanceDashboard: React.FC = () => {
 
           {/* Monthly Attendance Calendar (Full Width: Spans 12) */}
           <div className="lg:col-span-12">
-            <div className="premium-card p-4 md:p-8">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 md:mb-10 gap-6">
+            <div className="attendance-calendar-card premium-card p-4 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 md:mb-5 gap-3">
                   <div>
                     <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight mb-1">월별 근태 분석</h2>
                     <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-widest">Monthly Performance Analytics</p>
                   </div>
 
-                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     {isManagement && (
                       <select
+                        aria-label="근태 조회 직원"
                         value={selectedUserId}
                         onChange={(e) => setSelectedUserId(e.target.value)}
                         className="w-full sm:w-auto px-6 py-3 bg-slate-50 border border-slate-100 rounded-[1.25rem] text-xs font-black text-slate-700 outline-none focus:ring-4 focus:ring-indigo-100 transition-all cursor-pointer"
@@ -443,31 +445,31 @@ export const AttendanceDashboard: React.FC = () => {
                     )}
 
                     <div className="flex items-center justify-between bg-slate-50 rounded-[1.25rem] p-1.5 border border-slate-100 shadow-inner">
-                      <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                      <button aria-label="이전 달 조회" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
                         <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-500 rotate-180" />
                       </button>
                       <span className="px-3 md:px-6 text-xs md:text-sm font-black text-slate-800 min-w-[100px] md:min-w-[120px] text-center">
                         {format(currentMonth, 'yyyy. MM')}
                       </span>
-                      <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
+                      <button aria-label="다음 달 조회" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 md:p-2.5 hover:bg-white hover:shadow-md rounded-xl transition-all">
                         <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-500" />
                       </button>
                     </div>
                  </div>
                </div>
 
-               <div className="grid grid-cols-1 xl:grid-cols-12 gap-10">
+               <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
                   {/* Calendar Grid */}
                   <div className="xl:col-span-8">
-                    <div className="grid grid-cols-7 mb-4 border-b border-slate-100 pb-4">
+                    <div className="grid grid-cols-7 mb-2 border-b border-slate-100 pb-2">
                       {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
                         <div key={day} className="text-center text-[10px] font-black text-slate-300 tracking-widest">{day}</div>
                       ))}
                     </div>
                     
-                    <div className="grid grid-cols-7 gap-1 md:gap-3">
+                    <div className="grid grid-cols-7 gap-1 md:gap-1.5">
                       {Array.from({ length: startOfWeek(startOfMonth(currentMonth)).getDay() }).map((_, i) => (
-                        <div key={`empty-${i}`} className="aspect-square"></div>
+                        <div key={`empty-${i}`} className="attendance-calendar-day"></div>
                       ))}
                       
                       {eachDayOfInterval({
@@ -483,7 +485,7 @@ export const AttendanceDashboard: React.FC = () => {
                         return (
                           <div 
                             key={day.toString()}
-                            className={`aspect-square relative flex flex-col items-center justify-center rounded-xl md:rounded-2xl transition-all border ${
+                            className={`attendance-calendar-day relative flex flex-col items-center justify-center rounded-xl md:rounded-2xl transition-all border ${
                               isTodayLocal ? 'border-indigo-500 bg-indigo-50/50 shadow-lg shadow-indigo-100' : 'border-transparent hover:bg-slate-50 hover:border-slate-100'
                             } ${!isCurrentMonth ? 'opacity-20' : ''} group cursor-default`}
                           >
@@ -491,7 +493,7 @@ export const AttendanceDashboard: React.FC = () => {
                               {format(day, 'd')}
                             </span>
                             
-                            <div className="flex gap-1 mt-1.5 mt-2">
+                            <div className="flex gap-1 mt-0.5">
                                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasCheckIn ? 'bg-indigo-500 scale-100' : 'bg-slate-100 scale-75'}`}></div>
                                <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${hasCheckOut ? 'bg-rose-400 scale-100' : 'bg-slate-100 scale-75'}`}></div>
                             </div>
@@ -509,8 +511,8 @@ export const AttendanceDashboard: React.FC = () => {
                   </div>
 
                   {/* Summary Stats */}
-                  <div className="xl:col-span-4 flex flex-col justify-center space-y-4">
-                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-200 transition-colors">
+                  <div className="xl:col-span-4 flex flex-col justify-center space-y-2">
+                    <div className="px-6 py-3 bg-slate-50 rounded-3xl border border-slate-100 group hover:border-indigo-200 transition-colors">
                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">근무 요약</p>
                        <div className="flex items-end gap-3">
                           <span className="text-4xl font-black text-slate-900">{new Set(monthlyRecords.filter(r => r.type === 'IN').map(r => format(new Date(r.timestamp), 'yyyy-MM-dd'))).size}</span>
@@ -518,12 +520,12 @@ export const AttendanceDashboard: React.FC = () => {
                        </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                       <div className="p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
+                    <div className="grid grid-cols-2 gap-2">
+                       <div className="px-6 py-3 bg-indigo-50/50 rounded-3xl border border-indigo-100/50">
                           <div className="text-xl font-black text-indigo-600 mb-1">{monthlyRecords.filter(r => r.type === 'OUT').length}</div>
                           <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">정시 퇴근</div>
                        </div>
-                       <div className="p-6 bg-rose-50/50 rounded-3xl border border-rose-100/50">
+                       <div className="px-6 py-3 bg-rose-50/50 rounded-3xl border border-rose-100/50">
                           <div className="text-xl font-black text-rose-600 mb-1">0</div>
                           <div className="text-[9px] font-black text-rose-400 uppercase tracking-widest">지각/조퇴</div>
                        </div>
