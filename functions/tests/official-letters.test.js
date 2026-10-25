@@ -776,6 +776,83 @@ test('official-letter server authorization, numbering and revisions', async t =>
       await denied(call('outsider', 'get', { id: issued }), 'permission-denied');
       await setDocumentApprovers([]);
     });
+    await t.test('mine defaults to the last thirty Seoul issuance dates with inclusive start and today boundaries', async () => {
+      await db.doc('UserProfile/range-owner').set({ uid: 'range-owner', name: '기간 검증 작성자', role: 'MEMBER', companyId: 'a',
+        status: 'ACTIVE', mustChangePassword: false });
+      const source = (await db.doc(`officialLetters/${letterId}`).get()).data();
+      const fixtures = [
+        ['today', '2026-10-23', { createdAt: '2000-01-01T00:00:00.000Z', updatedAt: '2000-01-01T00:00:00.000Z' }],
+        ['start', '2026-09-24', {}], ['too-old', '2026-09-23', {}], ['future', '2026-10-24', {}],
+        ['legacy', '2026-10-14', { number: '024-261014-024', numberFormatVersion: 1 }],
+        ['custom-start', '2026-03-01', {}], ['custom-middle', '2026-03-15', {}], ['custom-end', '2026-03-31', {}],
+        ['custom-before', '2026-02-28', {}], ['custom-after', '2026-04-01', {}], ['leap', '2024-02-29', {}],
+        ['pending', '2026-10-23', { status: 'PENDING' }], ['draft', '2026-10-23', { status: 'DRAFT' }],
+        ['rejected', '2026-10-23', { status: 'REJECTED' }],
+        ['unapproved-revision', '2026-10-23', { revision: 2, approvedRevision: 1 }],
+        ['unapproved', '2026-10-23', { approvedRevision: null }],
+        ['other-author', '2026-10-23', { creatorId: 'peer', participantIds: ['peer', 'range-owner'] }],
+        ['foreign-company', '2026-10-23', { companyId: 'b' }],
+        ['foreign-author', '2026-10-23', { companyId: 'b', creatorId: 'outsider', participantIds: ['outsider'] }],
+      ];
+      const batch = db.batch();
+      for (const [suffix, issueDate, values] of fixtures) batch.set(db.doc(`officialLetters/mine-range-${suffix}`), {
+        ...source, companyId: 'a', creatorId: 'range-owner', creatorName: '기간 검증 작성자',
+        participantIds: ['range-owner'], approvalLine: [], revision: 1, approvedRevision: 1, status: 'ISSUED',
+        number: numberLabel(900, issueDate), pdfReady: false, pdf: null,
+        createdAt: '2026-10-23T00:00:00.000Z', updatedAt: '2026-10-23T00:00:00.000Z', issueDate, ...values,
+      });
+      const noDate = { ...source, creatorId: 'range-owner', participantIds: ['range-owner'], revision: 1, approvedRevision: 1, status: 'ISSUED' };
+      delete noDate.issueDate;
+      batch.set(db.doc('officialLetters/mine-range-no-issue-date'), noDate);
+      await batch.commit();
+      const result = await call('range-owner', 'mine');
+      assert.deepEqual(result.letters.map(letter => letter.id).sort(), ['legacy', 'start', 'today'].map(suffix => `mine-range-${suffix}`).sort());
+      assert.deepEqual(result.letters.map(letter => letter.issueDate), ['2026-10-23', '2026-10-14', '2026-09-24']);
+      assert.equal(result.letters.find(letter => letter.id === 'mine-range-start').issueDate, '2026-09-24');
+      assert.equal(result.letters.find(letter => letter.id === 'mine-range-today').issueDate, '2026-10-23');
+      assert.ok(!result.letters.some(letter => ['mine-range-too-old', 'mine-range-future', 'mine-range-no-issue-date'].includes(letter.id)));
+    });
+    await t.test('mine accepts explicit inclusive issuance ranges, legacy document numbers and valid historical or future dates', async () => {
+      const march = await call('range-owner', 'mine', { startDate: '2026-03-01', endDate: '2026-03-31' });
+      assert.deepEqual(march.letters.map(letter => letter.id).sort(), ['custom-start', 'custom-middle', 'custom-end'].map(suffix => `mine-range-${suffix}`).sort());
+      const oldBoundary = await call('range-owner', 'mine', { startDate: '2026-09-23', endDate: '2026-09-23' });
+      assert.deepEqual(oldBoundary.letters.map(letter => letter.id), ['mine-range-too-old']);
+      const legacy = await call('range-owner', 'mine', { startDate: '2026-10-14', endDate: '2026-10-14' });
+      assert.deepEqual(legacy.letters.map(letter => [letter.id, letter.number, letter.issueDate]), [['mine-range-legacy', '024-261014-024', '2026-10-14']]);
+      const leap = await call('range-owner', 'mine', { startDate: '2024-02-29', endDate: '2024-02-29' });
+      assert.deepEqual(leap.letters.map(letter => letter.id), ['mine-range-leap']);
+      const future = await call('range-owner', 'mine', { startDate: '2026-10-24', endDate: '2026-10-24' });
+      assert.deepEqual(future.letters.map(letter => letter.id), ['mine-range-future']);
+      for (const range of [{ startDate: '1900-01-01', endDate: '1900-01-01' }, { startDate: '2099-01-01', endDate: '9999-12-31' }]) {
+        assert.deepEqual((await call('range-owner', 'mine', range)).letters, []);
+      }
+    });
+    await t.test('mine ignores forged company and creator inputs and excludes other authors, workflow states and unapproved revisions', async () => {
+      const range = { startDate: '2026-09-01', endDate: '2026-10-31' };
+      const expected = ['today', 'start', 'too-old', 'future', 'legacy'].map(suffix => `mine-range-${suffix}`).sort();
+      const own = await call('range-owner', 'mine', { ...range, companyId: 'b', creatorId: 'outsider', userId: 'peer', status: 'PENDING', approvedRevision: 2 });
+      assert.deepEqual(own.letters.map(letter => letter.id).sort(), expected);
+      assert.ok(own.letters.every(letter => letter.creatorId === 'range-owner' && letter.status === 'ISSUED'));
+      for (const uid of ['admin', 'peer', 'outsider']) {
+        const result = await call(uid, 'mine', { ...range, companyId: 'a', creatorId: 'range-owner' });
+        assert.ok(result.letters.every(letter => letter.creatorId === uid));
+        assert.ok(!result.letters.some(letter => expected.includes(letter.id)));
+      }
+      const peer = await call('peer', 'mine', range);
+      assert.ok(peer.letters.some(letter => letter.id === 'mine-range-other-author'));
+      assert.ok(!(await call('outsider', 'mine', range)).letters.some(letter => letter.id === 'mine-range-foreign-company'));
+    });
+    await t.test('mine rejects partial, reversed, malformed and impossible date ranges', async () => {
+      const invalid = [
+        { startDate: '2026-10-01' }, { endDate: '2026-10-23' },
+        { startDate: '2026-10-23', endDate: '2026-10-01' },
+        { startDate: '', endDate: '' }, { startDate: null, endDate: null },
+        ...['2026-02-29', '1900-02-29', '2026-04-31', '2026-13-01', '2026-00-10', '2026-10-00',
+          '2026-2-03', '2026-10-23T00:00:00Z', ' 2026-10-23', '1899-12-31', 20261023, {}, []]
+          .flatMap(value => [{ startDate: value, endDate: '2026-10-23' }, { startDate: '1900-01-01', endDate: value }]),
+      ];
+      for (const range of invalid) await denied(call('range-owner', 'mine', range), 'invalid-argument');
+    });
     await t.test('PDF generation failure preserves issuance and retries without assigning another number', async () => {
       const id = await create('admin');
       const failing = createOfficialLetterService({ db, bucket, now, renderPdf: async () => { throw new Error('renderer unavailable'); } });

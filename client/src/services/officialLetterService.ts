@@ -102,6 +102,7 @@ export interface LetterBootstrap {
   templateStatus?: { configured: boolean; missingFields: string[] };
 }
 export interface LetterSettingsSaved { success: true; version: number; assets: { logoRegistered: boolean; sealRegistered: boolean } }
+export interface LetterDateRange { startDate: string; endDate: string }
 const callable = httpsCallable<Record<string, unknown>, unknown>(functions, 'manageOfficialLetters');
 async function call<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   const response = await callable({ action, ...payload });
@@ -111,7 +112,7 @@ export const officialLetters = {
   bootstrap: () => call<LetterBootstrap>('bootstrap'),
   list: () => call<{ letters: LetterSummary[] }>('list'),
   approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
-  mine: () => call<{ letters: LetterSummary[] }>('mine'),
+  mine: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('mine', range ? { ...range } : {}),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),
   saveSettings: (settings: LetterSettings) => call<LetterSettingsSaved>('saveSettings', { settings, expectedVersion: settings.version }),
   save: (content: LetterContent, letter: OfficialLetter | null, documentType: DocumentType = letter?.documentType || 'OFFICIAL') => call<{ id: string }>('save', {

@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, FileCheck2, Loader2, RefreshCw } from 'lucide-react';
-import { officialLetters } from '../services/officialLetterService';
-import type { LetterSummary } from '../services/officialLetterService';
-import { useAuthStore } from '../store/authStore';
+import type { DocumentApprovalInboxState } from '../hooks/useDocumentApprovalInbox';
 
 type ApprovalFilter = 'PENDING' | 'ISSUED' | 'REJECTED' | 'ALL';
 
@@ -14,39 +12,10 @@ function displayDate(value: string): string {
   }).format(date);
 }
 
-function inboxError(error: unknown): string {
-  const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
-  if (code.endsWith('permission-denied')) return '서류 결재 권한이 없습니다. 회사 관리자에게 결재 권한과 소속 본부를 확인해 주세요.';
-  if (code.endsWith('unauthenticated')) return '로그인 상태를 확인한 후 다시 시도해 주세요.';
-  return '서류 결재함을 불러오지 못했습니다. 네트워크 연결을 확인하고 다시 시도해 주세요.';
-}
-
-function ApprovalInbox({ role }: { role: 'ADMIN' | 'SUB_ADMIN' }) {
-  const alive = useRef(true);
-  const requestId = useRef(0);
-  const [state, setState] = useState<{ letters: LetterSummary[]; loading: boolean; error: string }>({ letters: [], loading: true, error: '' });
+export function DocumentApprovalInbox({ inbox }: { inbox: DocumentApprovalInboxState }) {
   const [filter, setFilter] = useState<ApprovalFilter>('PENDING');
-
-  const load = useCallback(() => {
-    const request = ++requestId.current;
-    void officialLetters.approvals().then(result => {
-      if (alive.current && request === requestId.current) setState({ letters: result.letters, loading: false, error: '' });
-    }).catch((error: unknown) => {
-      if (alive.current && request === requestId.current) setState({ letters: [], loading: false, error: inboxError(error) });
-    });
-  }, []);
-
-  const refresh = useCallback(() => {
-    setState({ letters: [], loading: true, error: '' });
-    void load();
-  }, [load]);
-
-  useEffect(() => {
-    alive.current = true;
-    void load();
-    window.addEventListener('focus', refresh);
-    return () => { alive.current = false; requestId.current += 1; window.removeEventListener('focus', refresh); };
-  }, [load, refresh]);
+  const { role, refresh, ...state } = inbox;
+  if (!inbox.canAccess) return <p role="status" className="rounded-2xl bg-white p-6 text-sm text-slate-500">서류 결재 권한이 있는 회사 계정으로 로그인해 주세요.</p>;
 
   const filtered = state.letters.filter(letter => filter === 'ALL' || letter.status === filter);
   const statusLabels = { DRAFT: '작성 중', PENDING: '결재 대기', REJECTED: '반려', ISSUED: '발행 완료' };
@@ -83,12 +52,4 @@ function ApprovalInbox({ role }: { role: 'ADMIN' | 'SUB_ADMIN' }) {
       )}
     </section>
   );
-}
-
-export function DocumentApprovalInbox() {
-  const { user, userData } = useAuthStore();
-  if (!user || !userData || user.uid !== userData.uid || userData.status === 'RESIGNED' || !['ADMIN', 'SUB_ADMIN'].includes(userData.role)) {
-    return <p role="status" className="rounded-2xl bg-white p-6 text-sm text-slate-500">서류 결재 권한이 있는 회사 계정으로 로그인해 주세요.</p>;
-  }
-  return <ApprovalInbox key={`${user.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} role={userData.role === 'ADMIN' ? 'ADMIN' : 'SUB_ADMIN'} />;
 }

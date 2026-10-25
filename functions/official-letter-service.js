@@ -48,16 +48,28 @@ const documentTypeInput = value => {
   if (!['OFFICIAL', 'EMPLOYMENT', 'CAREER'].includes(value)) fail('invalid-argument', '서류 종류를 확인해 주세요.');
   return value;
 };
-const certificateDate = (value, today, required = true) => {
+const certificateDate = (value, today, required = true, message = '날짜는 유효한 과거 또는 오늘 날짜(YYYY-MM-DD)로 입력해 주세요.') => {
   const result = text(value || '', 10, required);
   if (!result && !required) return '';
   const parsed = new Date(`${result}T00:00:00Z`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(result) || result < '1900-01-01' || result > today ||
       Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== result) {
-    fail('invalid-argument', '날짜는 유효한 과거 또는 오늘 날짜(YYYY-MM-DD)로 입력해 주세요.');
+    fail('invalid-argument', message);
   }
   return result;
 };
+function issuedDateRange(input, today) {
+  if (input.startDate === undefined && input.endDate === undefined) {
+    const start = new Date(`${today}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - 29);
+    return { startDate: start.toISOString().slice(0, 10), endDate: today };
+  }
+  const parse = value => certificateDate(value, '9999-12-31', true, '조회 기간은 유효한 날짜(YYYY-MM-DD)로 입력해 주세요.');
+  const startDate = parse(input.startDate);
+  const endDate = parse(input.endDate);
+  if (startDate > endDate) fail('invalid-argument', '조회 시작일은 종료일보다 늦을 수 없습니다.');
+  return { startDate, endDate };
+}
 function contentInput(data, type, today) {
   if (type !== 'OFFICIAL') {
     const c = data.certificate || {};
@@ -357,16 +369,21 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
       const user = await actor(request);
       if (action === 'approvals' && !['ADMIN', 'SUB_ADMIN'].includes(user.role)) fail('permission-denied', '결재함 접근 권한이 없습니다.');
       let query = db.collection('officialLetters').where('companyId', '==', user.companyId);
-      if (user.role !== 'ADMIN' && !user.documentApprovalGranted) query = query.where('participantIds', 'array-contains', user.uid);
-      // The membership query uses the dedicated officialLetters composite index.
+      if (action === 'mine') {
+        const range = issuedDateRange(input, koreaDate(now()));
+        // Date and owner restrictions are applied in Firestore, before reading documents.
+        query = query.where('creatorId', '==', user.uid).where('status', '==', 'ISSUED')
+          .where('issueDate', '>=', range.startDate).where('issueDate', '<=', range.endDate).orderBy('issueDate', 'desc');
+      } else if (user.role !== 'ADMIN' && !user.documentApprovalGranted) query = query.where('participantIds', 'array-contains', user.uid);
       const snapshots = await query.get();
       return { letters: snapshots.docs.filter(snapshot => {
         const d = snapshot.data();
         const visible = user.role === 'ADMIN' || d.participantIds.includes(user.uid) || delegated(user, d);
-        if (action === 'mine') return d.creatorId === user.uid && d.status === 'ISSUED' && d.approvedRevision === d.revision;
+        if (action === 'mine') return visible && d.creatorId === user.uid && d.status === 'ISSUED' && d.approvedRevision === d.revision;
         if (action === 'approvals') return visible && d.status !== 'DRAFT';
         return visible;
-      }).map(snapshot => summary(snapshot, user)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+      }).map(snapshot => summary(snapshot, user)).sort((a, b) =>
+        (action === 'mine' ? b.issueDate.localeCompare(a.issueDate) : 0) || b.updatedAt.localeCompare(a.updatedAt)) };
     }
     if (['get', 'history', 'pdf'].includes(action)) {
       const user = await actor(request);

@@ -11,6 +11,7 @@ import { DocumentApprovalInbox } from '../components/DocumentApprovalInbox';
 import { SecureAttachment } from '../components/SecureAttachment';
 import { accountSecurity } from '../services/accountSecurityService';
 import type { DirectoryUser } from '../services/accountSecurityService';
+import { useDocumentApprovalInbox } from '../hooks/useDocumentApprovalInbox';
 
 interface LeaveRequest {
   id: string;
@@ -52,6 +53,8 @@ interface OrganizationUnit { id: string; name: string; divisionId?: string }
 
 export const AdminApprovals: React.FC = () => {
   const { userData, loading: authLoading, sessionReady } = useAuthStore();
+  const documentInbox = useDocumentApprovalInbox();
+  const documentCount = documentInbox.loading ? '…' : documentInbox.pendingCount ?? '—';
   const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE' | 'DOCUMENT'>('LEAVE');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
@@ -307,11 +310,11 @@ export const AdminApprovals: React.FC = () => {
             className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'DOCUMENT' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <FileText className="w-4 h-4 md:w-5 md:h-5" />
-            서류 결재
+            서류 결재 ({documentCount})
           </button>
         </div>
 
-        {activeTab === 'DOCUMENT' ? <DocumentApprovalInbox /> : <>
+        {activeTab === 'DOCUMENT' ? <DocumentApprovalInbox key={`${userData?.uid}:${userData?.companyId}:${userData?.role}:${userData?.divisionId || ''}`} inbox={documentInbox} /> : <>
         {/* Desktop Table View */}
         <div className="hidden md:block bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[500px]">
            <div className="overflow-x-auto">

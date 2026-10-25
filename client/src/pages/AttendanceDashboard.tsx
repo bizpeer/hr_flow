@@ -529,13 +529,6 @@ export const AttendanceDashboard: React.FC = () => {
                        </div>
                     </div>
 
-                    <div className="p-6 bg-white rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
-                       <div className="flex items-center gap-3">
-                          <div className="p-2 bg-slate-100 rounded-xl"><History className="w-4 h-4 text-slate-500" /></div>
-                          <span className="text-xs font-black text-slate-700">근태 증명서 발급</span>
-                       </div>
-                       <button className="text-[10px] font-black text-indigo-600 hover:underline">Download</button>
-                    </div>
                   </div>
                </div>
             </div>
