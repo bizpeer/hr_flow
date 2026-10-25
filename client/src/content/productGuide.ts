@@ -31,16 +31,16 @@ export const guideQuickStart = [
 ];
 
 export const guideRoles: { key: GuideRole; label: string; appRole: string; currentPermission: string; description: string }[] = [
-  { key: 'platform', label: '플랫폼 운영자', appRole: 'SYSTEM_ADMIN', currentPermission: '현재 앱 권한: SUPER_ADMIN', description: '가입 회사와 회사 대표자, 구독 등 플랫폼 운영을 관리하는 운영자입니다.' },
-  { key: 'owner', label: '회사 대표 가입자', appRole: 'SUPER_ADMIN', currentPermission: '현재 앱 권한: ADMIN · 회사 소유자', description: '각 회사의 최초 가입자이며 직원과 추가 관리자를 등록해 회사 운영을 관리합니다.' },
-  { key: 'admin', label: '추가 회사 관리자', appRole: 'ADMIN', currentPermission: '현재 앱 권한: ADMIN', description: '회사 대표자가 관리자 권한을 부여한 계정으로 조직·인사·급여·결재와 설정을 함께 관리합니다.' },
-  { key: 'subadmin', label: '부관리자', appRole: 'SUB_ADMIN', currentPermission: '현재 앱 권한: SUB_ADMIN', description: '소속 본부의 근태와 신청 내역을 조회하고 휴가·지출의 1차 결재를 담당합니다.' },
-  { key: 'member', label: '직원', appRole: 'MEMBER', currentPermission: '현재 앱 권한: MEMBER', description: '본인의 근태·휴가·지출 신청, 공지 확인과 서류 발급을 사용합니다.' },
+  { key: 'platform', label: '플랫폼 운영자', appRole: 'SYSTEM_ADMIN', currentPermission: '관리 범위: 플랫폼 운영', description: '가입 회사와 회사 대표자, 구독 등 플랫폼 운영을 관리하는 운영자입니다.' },
+  { key: 'owner', label: '회사 대표 가입자', appRole: 'SUPER_ADMIN', currentPermission: '관리 범위: 소속 회사 · 회사 소유자', description: '각 회사의 최초 가입자이며 직원과 추가 관리자를 등록해 회사 운영을 관리합니다.' },
+  { key: 'admin', label: '추가 회사 관리자', appRole: 'ADMIN', currentPermission: '관리 범위: 소속 회사', description: '회사 대표자가 관리자 권한을 부여한 계정으로 조직·인사·급여·결재와 설정을 함께 관리합니다.' },
+  { key: 'subadmin', label: '부관리자', appRole: 'SUB_ADMIN', currentPermission: '관리 범위: 소속 본부', description: '소속 본부의 근태와 신청 내역을 조회하고 휴가·지출의 1차 결재를 담당합니다.' },
+  { key: 'member', label: '직원', appRole: 'MEMBER', currentPermission: '사용 범위: 본인 업무', description: '본인의 근태·휴가·지출 신청, 공지 확인과 서류 발급을 사용합니다.' },
 ];
 
 export const roleMappingNotes = [
-  '위 표는 운영상의 역할을 구분한 명칭입니다. 회사 대표 가입자와 추가 관리자는 같은 회사의 관리 기능을 함께 사용하며 플랫폼 운영자와 구분합니다.',
-  '현재 앱의 회사 관리 권한 표시는 ADMIN입니다. 회사 대표 가입자는 회사 소유자 정보로 별도 구분되며, 플랫폼 운영 권한 코드 SUPER_ADMIN과 혼동하지 마세요.',
+  '위 명칭은 앱 화면의 역할 표시입니다. 회사 대표 가입자와 추가 관리자는 같은 회사의 관리 기능을 함께 사용하며 플랫폼 운영자와 구분합니다.',
+  '플랫폼 운영자는 SYSTEM_ADMIN, 회사 최초 가입자는 SUPER_ADMIN, 추가 회사 관리자는 ADMIN으로 표시합니다. 회사 대표의 표시는 회사 소유자 정보를 기준으로 확인하며 소속 회사의 관리 범위를 유지합니다.',
   '팀장·본부장 임명과 계정의 관리자 권한 부여는 별도 설정입니다. 책임자로 지정했다는 이유만으로 모든 관리 메뉴가 열리지는 않습니다.',
 ];
 
@@ -66,17 +66,17 @@ export const guideSections: GuideSection[] = [
     steps: [
       '가입 화면에서 회사·조직의 한글 이름, 영문 이름과 가입자 정보를 입력합니다.',
       '가입 이메일의 인증을 완료하고 회사 등록을 마칩니다. 최초 가입자는 회사 소유자로 구분됩니다.',
-      '회사에서 사용할 로그인 주소를 정합니다. 예: 영문명 Biz Peer, 도메인 bizpeer.com. .com을 사용하려면 직원 등록 시 hong@bizpeer.com처럼 전체 주소를 입력합니다.',
+      '회사에서 사용할 로그인 주소를 정합니다. 예: 영문명 Biz Peer인 회사에서 hong을 입력하면 hong@bizpeer.com으로 자동완성됩니다. 생성 전에 화면에 표시된 최종 주소를 확인합니다.',
       '시스템 설정에서 회사 도메인을 변경하려면 관리자 비밀번호와 새 도메인의 이메일 인증을 확인합니다.',
       '기존 직원 계정을 동기화한 경우 변경된 로그인 주소를 직원에게 안내하고 실패한 항목은 다시 확인합니다.',
     ],
     details: [
       '직원 로그인 ID는 이메일 주소 형식입니다. 회사 도메인은 로그인 주소 체계이며 이 기능만으로 실제 메일함이 만들어지지는 않습니다.',
-      '원하는 .com 주소로 신규 직원을 등록하려면 hong@bizpeer.com처럼 전체 로그인 주소를 입력할 수 있습니다.',
+      '직원 ID만 입력하면 영문회사명 기반 .com 주소를 사용합니다. 다른 도메인을 사용하려면 hong@custom.example처럼 전체 로그인 주소를 입력할 수 있습니다.',
       '회사는 서버가 발급하는 고유 식별자로 구분됩니다. 회사 이름이나 로그인 도메인을 바꾸는 일과 다른 회사로 소속을 옮기는 일은 다릅니다.',
     ],
     notes: [
-      '현재 직원 등록 화면에서 아이디만 입력하면 영문회사명을 소문자로 바꾸고 공백을 제거한 .co.kr 주소가 자동완성됩니다. .com 운영 예시는 전체 주소 입력을 기준으로 합니다.',
+      '자동완성은 영문회사명을 소문자로 바꾸고 공백을 제거한 .com 주소입니다. 영문명에 도메인으로 쓸 수 없는 문자가 있으면 전체 로그인 주소를 입력하세요. 기존 직원의 로그인 주소는 자동 변경하지 않습니다.',
       '시스템 도메인 저장·기존 계정 동기화와 신규 ID 자동완성은 구분해 확인하세요. 도메인 변경 후 생성하는 계정도 최종 로그인 주소를 확인해야 합니다.',
     ],
   },
@@ -234,7 +234,7 @@ export const guideSourceLinks = [
 ];
 
 export const guideImportantNotes = [
-  '안내는 운영상 역할 명칭과 현재 제공되는 기능을 함께 설명합니다. 화면에서 보이는 회사 관리 권한과 플랫폼 운영 권한을 구분해 사용하세요.',
+  '화면의 역할 표시와 회사별 관리 범위를 함께 확인하세요. 회사 대표와 추가 관리자는 소속 회사를 관리하며 플랫폼 운영자와 구분됩니다.',
   '휴가·지출의 직접 최종 승인과 공문·증명서의 순차 결재는 서로 다른 절차입니다.',
   '급여는 예상 계산 결과입니다. 기본 세액표 적용일과 별개로 보험 기준·대상 연월을 확인해야 합니다.',
 ];

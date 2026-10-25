@@ -13,7 +13,7 @@ function templateStatus(settings) {
 function requireTemplate(settings) {
   const status = templateStatus(settings);
   if (!status.configured) fail('failed-precondition',
-    `회사 서류 템플릿에 ${status.missingFields.map(key => templateFields[key]).join('·')}이(가) 저장되지 않았습니다. ADMIN이 회사 서류 템플릿에서 필수 항목을 입력하고 템플릿 저장을 완료해 주세요.`, { ...status, code: 'MISSING_TEMPLATE_FIELDS' });
+    `회사 서류 템플릿에 ${status.missingFields.map(key => templateFields[key]).join('·')}이(가) 저장되지 않았습니다. 회사 관리자가 회사 서류 템플릿에서 필수 항목을 입력하고 템플릿 저장을 완료해 주세요.`, { ...status, code: 'MISSING_TEMPLATE_FIELDS' });
 }
 function sealDimension(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 5 || value > 50 || Math.abs(value * 10 - Math.round(value * 10)) > 1e-7) {
@@ -112,7 +112,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         (settings?.documentApproverIds || []).includes(request.auth.uid) };
   }
   function admin(user) {
-    if (user.role !== 'ADMIN') fail('permission-denied', '회사 최고관리자(ADMIN) 권한이 필요합니다.');
+    if (user.role !== 'ADMIN') fail('permission-denied', '회사 대표자(SUPER_ADMIN) 또는 관리자(ADMIN) 권한이 필요합니다.');
   }
   function access(user, letter) {
     if (!letter || letter.companyId !== user.companyId) fail('permission-denied', '작성자와 해당 공문의 결재라인만 접근할 수 있습니다.');
@@ -261,7 +261,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     const setting = settingsRef(user.companyId);
     const settings = (await tx.get(setting)).data();
     if (!settings) fail('failed-precondition', '문서번호 초기 설정이 필요합니다.');
-    if (input.front != null && user.role !== 'ADMIN') fail('permission-denied', '문서번호 변경은 ADMIN만 가능합니다.');
+    if (input.front != null && user.role !== 'ADMIN') fail('permission-denied', '문서번호는 회사 대표자 또는 관리자만 변경할 수 있습니다.');
     const front = input.front == null ? settings.lastFront + 1 : integer(input.front, 1);
     integer(front, 1);
     const issueDate = koreaDate(now());

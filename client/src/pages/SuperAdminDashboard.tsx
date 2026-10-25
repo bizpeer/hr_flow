@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
@@ -340,7 +341,7 @@ export const SuperAdminDashboard: React.FC = () => {
                 )}
               </div>
             </div>
-            <p className="text-slate-500 font-medium">전체 조직 및 테넌트를 관리합니다. • SUPER_ADMIN</p>
+            <p className="text-slate-500 font-medium">전체 조직 및 테넌트를 관리합니다. • {userData ? getRoleDisplayName(userData) : 'SYSTEM_ADMIN'}</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -603,7 +604,7 @@ export const SuperAdminDashboard: React.FC = () => {
                                       user.role === 'SUB_ADMIN' ? 'bg-indigo-50 text-indigo-600' :
                                       'bg-slate-100 text-slate-500'
                                     }`}>
-                                      {user.role}
+                                      {getRoleDisplayName(user, company)}
                                     </span>
                                     {user.role === 'ADMIN' && (
                                       <button 
@@ -663,7 +664,7 @@ export const SuperAdminDashboard: React.FC = () => {
                           {user.companyId || 'No Company'}
                         </span>
                         <span className="text-[10px] font-black text-slate-400 uppercase">
-                          {user.role}
+                          {getRoleDisplayName(user, companies.find(company => company.id === user.companyId))}
                         </span>
                       </div>
                     </div>
@@ -818,7 +819,7 @@ export const SuperAdminDashboard: React.FC = () => {
               <div>
                 <div className="flex items-center gap-2 mb-1.5 ml-1">
                   <Lock className="w-3 h-3 text-slate-400" />
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">본인 비밀번호 재확인 (SUPER_ADMIN)</label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">본인 비밀번호 재확인 ({userData ? getRoleDisplayName(userData) : 'SYSTEM_ADMIN'})</label>
                 </div>
                 <input 
                   type="password" 

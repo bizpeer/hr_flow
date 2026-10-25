@@ -63,7 +63,7 @@ export function ProductManual() {
         <section id="guide-roles" aria-labelledby="guide-roles-title" tabIndex={-1} className={sectionStyle}>
           <h3 id="guide-roles-title" className="flex items-center gap-2 text-xl font-bold tracking-tight text-slate-900"><Users className="h-5 w-5 shrink-0 text-indigo-600" />역할과 메뉴 권한</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            {guideRoles.map(role => <article key={role.key} className="rounded-xl bg-slate-50 p-4"><h4 className="font-bold text-slate-900">{role.label}</h4><p className="mt-2 text-xs font-semibold text-indigo-600"><span className="mr-2 text-slate-500">운영 명칭</span>{role.appRole}</p><p className="mt-2 text-xs leading-6 text-slate-500">{role.currentPermission}</p><p className="mt-2 text-sm leading-7 text-slate-600">{role.description}</p></article>)}
+            {guideRoles.map(role => <article key={role.key} className="rounded-xl bg-slate-50 p-4"><h4 className="font-bold text-slate-900">{role.label}</h4><p className="mt-2 text-xs font-semibold text-indigo-600"><span className="mr-2 text-slate-500">앱 표시명</span>{role.appRole}</p><p className="mt-2 text-xs leading-6 text-slate-500">{role.currentPermission}</p><p className="mt-2 text-sm leading-7 text-slate-600">{role.description}</p></article>)}
           </div>
           <ul className="mt-5 list-disc space-y-2 pl-5 text-sm leading-7 text-slate-600">{roleMappingNotes.map(note => <li key={note}>{note}</li>)}</ul>
           <p className="mt-6 text-xs leading-6 text-slate-500">권한표가 화면보다 넓으면 좌우로 스크롤해 각 역할의 범위를 확인하세요.</p>

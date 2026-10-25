@@ -12,6 +12,7 @@ import { auth, db, functions } from '../firebase';
 import { httpsCallable } from 'firebase/functions';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 
 interface Employee {
@@ -186,7 +187,7 @@ export const EmployeeManagement: React.FC = () => {
       return;
     }
     if (emp.uid === companyData?.adminUid && newStatus === 'RESIGNED') {
-      alert("사내 최고 관리자(Owner)의 계정은 정지할 수 없습니다.");
+      alert("회사 대표 가입자(SUPER_ADMIN)의 계정은 정지할 수 없습니다.");
       return;
     }
 
@@ -215,7 +216,7 @@ export const EmployeeManagement: React.FC = () => {
       return;
     }
     if (deleteConfirmEmp.uid === companyData?.adminUid) {
-      alert("사내 최고 관리자(Owner)의 데이터는 삭제할 수 없습니다.");
+      alert("회사 대표 가입자(SUPER_ADMIN)의 데이터는 삭제할 수 없습니다.");
       setDeleteConfirmEmp(null);
       return;
     }
@@ -402,7 +403,7 @@ export const EmployeeManagement: React.FC = () => {
                           </div>
                         </td>
                         <td className="px-8 py-6">
-                          <div className="text-sm font-black text-slate-700">{emp.role}</div>
+                          <div className="text-sm font-black text-slate-700">{getRoleDisplayName({ ...emp, companyId: userData?.companyId || '' }, companyData ?? undefined)}</div>
                           <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center gap-1">
                             <Calendar className="w-3 h-3" /> {emp.joinDate || '-'} 입사
                           </div>
@@ -484,7 +485,7 @@ export const EmployeeManagement: React.FC = () => {
                           <span className="font-mono truncate">{emp.email}</span>
                           {copiedEmail === emp.email && <Check className="w-3 h-3 text-emerald-500 shrink-0" />}
                         </div>
-                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">{emp.role}</p>
+                        <p className="text-[11px] font-bold text-slate-400 mt-0.5">{getRoleDisplayName({ ...emp, companyId: userData?.companyId || '' }, companyData ?? undefined)}</p>
                       </div>
                     </div>
                     <button 
@@ -675,7 +676,7 @@ export const EmployeeManagement: React.FC = () => {
                   {!isAdmin && (
                     <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
                       <ShieldAlert className="w-5 h-5 text-amber-500" />
-                        <p className="text-xs font-bold text-amber-600">이 정보는 최고 관리자(ADMIN)만 수정할 수 있습니다.</p>
+                        <p className="text-xs font-bold text-amber-600">이 정보는 회사 관리자(SUPER_ADMIN 또는 ADMIN)만 수정할 수 있습니다.</p>
                     </div>
                   )}
               </div>

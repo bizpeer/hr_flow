@@ -12,6 +12,8 @@ import { auth, db, functions } from '../firebase';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
+import { getEmployeeLoginDomain, getEmployeeLoginEmail } from '../utils/employeeLogin';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 
 interface Division {
   id: string;
@@ -69,6 +71,11 @@ export const OrganizationAdmin: React.FC = () => {
   const [newTeamDivId, setNewTeamDivId] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [newEmp, setNewEmp] = useState({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
+  const employeeLoginPreview = (() => {
+    try {
+      return newEmp.email.trim() ? getEmployeeLoginEmail(newEmp.email, companyData) : `직원ID@${getEmployeeLoginDomain(companyData)}`;
+    } catch { return ''; }
+  })();
   const [isSubmittingEmployee, setIsSubmittingEmployee] = useState(false);
 
   // 정보 수정용 (임명/이동)
@@ -200,14 +207,7 @@ export const OrganizationAdmin: React.FC = () => {
     e.preventDefault();
     try {
       setIsSubmittingEmployee(true);
-      const loginInput = newEmp.email.trim().toLowerCase();
-      
-      // 도메인 배정 로직:
-      // 1. 회사 영문명 기반 도메인 (id@회사영문.co.kr)을 최우선순위로 설정 (사용자 요청 3순위 반영)
-      // 2. 회사 영문명이 없는 경우에만 기존 설정된 domain 사용 (시스템 기본 도메인 .com 배제)
-      const nameEnDomain = companyData?.nameEn ? `${companyData.nameEn.toLowerCase().replace(/\s+/g, '')}.co.kr` : null;
-      const companyDomain = nameEnDomain || companyData?.domain || 'unconfigured.co.kr';
-      const finalEmail = loginInput.includes('@') ? loginInput : `${loginInput}@${companyDomain}`;
+      const finalEmail = getEmployeeLoginEmail(newEmp.email, companyData);
 
       // 1. 중복 아이디 체크 (UX 차원)
       const q = query(collection(db, 'UserProfile'), where('email', '==', finalEmail), where('companyId', '==', userData?.companyId || ''));
@@ -262,9 +262,9 @@ export const OrganizationAdmin: React.FC = () => {
     try {
       const originalEmp = employees.find(e => e.uid === emp.uid);
       
-      // 최초 회사를 생성한 최고 관리자(Owner) 권한 강등 보호
+      // 회사 대표 가입자(SUPER_ADMIN) 권한 강등 보호
       if (emp.uid === companyData?.adminUid && newRole !== 'ADMIN') {
-        alert("최초 회사를 생성한 최고 관리자(Owner)의 권한은 변경할 수 없습니다.");
+        alert("회사 대표 가입자(SUPER_ADMIN)의 권한은 변경할 수 없습니다.");
         return;
       }
 
@@ -290,8 +290,9 @@ export const OrganizationAdmin: React.FC = () => {
         teamHistory: newHistory
       });
       
-      await logAction('UPDATE_MEMBER', emp.uid, emp.name, `${teamName} 로 이동 / 역할: ${newRole}`);
-      alert(`${emp.name}님의 소속/역할이 ${newRole} 등급으로 변경되었습니다.`);
+      const displayedRole = getRoleDisplayName({ ...emp, role: newRole, companyId: userData?.companyId || '' }, companyData);
+      await logAction('UPDATE_MEMBER', emp.uid, emp.name, `${teamName} 로 이동 / 역할: ${displayedRole}`);
+      alert(`${emp.name}님의 소속/역할이 ${displayedRole} 등급으로 변경되었습니다.`);
       setShowEditModal(false);
       setEditingEmployee(null);
     } catch (err) {
@@ -695,7 +696,7 @@ export const OrganizationAdmin: React.FC = () => {
                                  >
                                    <div className="flex items-center gap-2 relative z-10">
                                       <div className={`w-1.5 h-1.5 rounded-full ${emp.role === 'ADMIN' ? 'bg-indigo-500' : emp.role === 'SUB_ADMIN' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                                      <span className="text-[11px] font-black text-slate-700">{emp.name}</span>
+                                      <div className="min-w-0"><span className="text-[11px] font-black text-slate-700">{emp.name}</span><p className="text-[9px] font-bold text-slate-400">{getRoleDisplayName({ ...emp, companyId: userData?.companyId || '' }, companyData ?? undefined)}</p></div>
                                    </div>
                                    <div className="flex items-center gap-1 opacity-0 group-hover/mem:opacity-100 transition-opacity relative z-10">
                                       <History className="w-3.5 h-3.5 text-slate-300 hover:text-indigo-600 transition-colors" onClick={(e) => { e.stopPropagation(); setSelectedEmpForLogs(emp); }} />
@@ -784,8 +785,12 @@ export const OrganizationAdmin: React.FC = () => {
             <form onSubmit={handleCreateEmployee} className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <input type="text" required placeholder="이름" value={newEmp.name} onChange={(e) => setNewEmp({...newEmp, name: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
-                <input type="text" required placeholder="아이디(이메일)" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
+                <input type="text" required aria-label="직원 로그인 ID" aria-describedby="employee-login-preview" placeholder="직원 ID 또는 전체 이메일" value={newEmp.email} onChange={(e) => setNewEmp({...newEmp, email: e.target.value})} className="p-5 bg-slate-50 rounded-[2rem] outline-none font-black" />
               </div>
+              <p id="employee-login-preview" role="status" className="break-all text-sm leading-6 text-indigo-700">
+                {employeeLoginPreview ? `생성할 로그인 ID: ${employeeLoginPreview}` : '회사 영문명과 직원 ID를 확인하거나 전체 로그인 주소를 입력해 주세요.'}
+                <span className="mt-1 block text-xs text-slate-500">아이디만 입력하면 @영문회사명.com으로 완성됩니다. 전체 이메일을 입력하면 해당 주소를 사용합니다. 기존 직원의 주소는 변경되지 않습니다.</span>
+              </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="rounded-[2rem] bg-indigo-50 p-5 text-sm text-indigo-700"><span className="block font-bold">초기 임시 비밀번호: !123456</span><span className="mt-1 block text-xs">자동 발급되며 최초 로그인 시 반드시 변경합니다.</span></div>
                 <select className="w-full p-5 bg-slate-50 rounded-[2rem] outline-none font-black" value={newEmp.teamId} onChange={(e) => setNewEmp({...newEmp, teamId: e.target.value})}>
@@ -827,7 +832,7 @@ export const OrganizationAdmin: React.FC = () => {
                 <div className="space-y-2">
                   <label className="text-xs font-black text-slate-400 ml-1">
                     권한 등급 
-                    {editingEmployee.uid === companyData?.adminUid ? " (사내 최고 관리자 - 변경 불가)" : 
+                    {editingEmployee.uid === companyData?.adminUid ? " (회사 대표 가입자 SUPER_ADMIN - 변경 불가)" :
                      editingEmployee.uid === userData?.uid ? " (본인 변경 불가)" : ""}
                   </label>
                   <select 
@@ -838,7 +843,7 @@ export const OrganizationAdmin: React.FC = () => {
                   >
                     <option value="MEMBER">일반 직원 (MEMBER)</option>
                     <option value="SUB_ADMIN">부관리자 (SUB_ADMIN)</option>
-                    <option value="ADMIN">최고 관리자 (ADMIN)</option>
+                    <option value="ADMIN" disabled={editingEmployee.uid === companyData?.adminUid}>{editingEmployee.uid === companyData?.adminUid ? '회사 대표 가입자 (SUPER_ADMIN)' : '회사 관리자 (ADMIN)'}</option>
                   </select>
                 </div>
                <button onClick={() => handleUpdateRole(editingEmployee, editingEmployee.teamId || '', editingEmployee.role)} className="w-full p-5 text-white bg-indigo-600 rounded-2xl font-black shadow-lg">상태 저장하기</button>

@@ -183,7 +183,7 @@ export const Login: React.FC = () => {
                       maxLength={254}
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="admin@yourcompany.co.kr"
+                      placeholder="admin@yourcompany.com"
                       className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
                     />
                   </div>
@@ -248,7 +248,7 @@ export const Login: React.FC = () => {
                       maxLength={254}
                       value={regEmail}
                       onChange={(e) => setRegEmail(e.target.value)}
-                      placeholder="admin@yourcompany.co.kr"
+                      placeholder="admin@yourcompany.com"
                       className="w-full pl-12 pr-4 py-3.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600/50 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-medium"
                     />
                   </div>

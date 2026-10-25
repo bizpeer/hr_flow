@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, CreditCard, LogOut, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 
 export const SubscriptionRequired: React.FC = () => {
   const { userData, companyData, logout } = useAuthStore();
@@ -27,7 +28,7 @@ export const SubscriptionRequired: React.FC = () => {
           <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Next Steps</p>
           {isAdmin ? (
             <p className="text-sm font-bold text-slate-600">
-              최고 관리자(ADMIN) 권한으로 로그인 중입니다. 아래 버튼을 클릭하여 구독 플랜을 갱신하고 서비스를 계속 이용하세요.
+              회사 관리자({userData ? getRoleDisplayName(userData, companyData ?? undefined) : 'ADMIN'}) 권한으로 로그인 중입니다. 아래 버튼을 클릭하여 구독 플랜을 갱신하고 서비스를 계속 이용하세요.
             </p>
           ) : (
             <p className="text-sm font-bold text-slate-600">

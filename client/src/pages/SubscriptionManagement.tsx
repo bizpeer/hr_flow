@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
@@ -187,8 +188,8 @@ export const SubscriptionManagement: React.FC = () => {
           <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-center gap-4">
             <ShieldCheck className="w-8 h-8 text-amber-500" />
             <div>
-               <p className="font-black text-amber-900">SUPER_ADMIN 접근 모드</p>
-               <p className="text-sm font-bold text-amber-700">관리자 화면에서는 결제 버튼만 확인 가능하며, 실제 데이터 수정은 수퍼 어드민 대시보드에서 권장합니다.</p>
+               <p className="font-black text-amber-900">{getRoleDisplayName(userData, companyData)} 접근 모드</p>
+               <p className="text-sm font-bold text-amber-700">관리자 화면에서는 결제 버튼만 확인 가능하며, 실제 데이터 수정은 플랫폼 관리 센터에서 권장합니다.</p>
             </div>
           </div>
         )}

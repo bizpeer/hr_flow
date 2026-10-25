@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Home, CalendarClock, Network, Settings, FileText, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2, CreditCard } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 
 interface SidebarProps {
   userRole: string;
@@ -123,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
               userData.role === 'SUB_ADMIN' ? 'bg-emerald-500/20 text-emerald-400' :
               'bg-slate-700 text-slate-400'
             }`}>
-              {userData.role}
+              {getRoleDisplayName(userData, companyData ?? undefined)}
             </span>
           </div>
         )}

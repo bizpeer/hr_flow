@@ -7,11 +7,12 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 import type { UserData } from '../store/authStore';
 import { calculateNetPay, getDeductionCounts, MEAL_ALLOWANCE_DEFAULT } from '../utils/payroll';
 
 export const SalaryManagement: React.FC = () => {
-  const { userData } = useAuthStore();
+  const { userData, companyData } = useAuthStore();
   const isAdminOrMaster = userData?.role === 'SUPER_ADMIN' || userData?.role === 'ADMIN';
   const [employees, setEmployees] = useState<UserData[]>([]);
   const [divisions, setDivisions] = useState<any[]>([]);
@@ -132,7 +133,7 @@ export const SalaryManagement: React.FC = () => {
     if (!data) return;
 
     if (!isAdminOrMaster) {
-      alert('최고 관리자 또는 관리자(ADMIN)만 수정 가능합니다.');
+      alert('회사 관리자(SUPER_ADMIN 또는 ADMIN)만 수정 가능합니다.');
       return;
     }
     setIsSaving(uid);
@@ -431,7 +432,7 @@ export const SalaryManagement: React.FC = () => {
                                       </div>
                                       <div>
                                          <div onClick={() => setSelectedDetails(emp)} className="text-md font-black text-slate-800 cursor-pointer hover:text-indigo-600 transition-colors uppercase">{emp.name}</div>
-                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{emp.role}</div>
+                                         <div className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{getRoleDisplayName(emp, companyData ?? undefined)}</div>
                                       </div>
                                    </div>
                                 </td>
@@ -627,7 +628,7 @@ export const SalaryManagement: React.FC = () => {
                                </div>
                                <div>
                                   <h3 onClick={() => setSelectedDetails(emp)} className="text-sm font-black text-slate-900 cursor-pointer hover:text-indigo-600 uppercase">{emp.name}</h3>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase">{emp.role}</p>
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase">{getRoleDisplayName(emp, companyData ?? undefined)}</p>
                                </div>
                            </div>
                            <button onClick={() => setSelectedDetails(emp)} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Calculator className="w-5 h-5" /></button>

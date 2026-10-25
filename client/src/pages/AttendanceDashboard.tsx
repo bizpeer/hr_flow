@@ -4,6 +4,7 @@ import {
   KeyRound 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
+import { getRoleDisplayName } from '../utils/roleDisplay';
 import { collection, query, where, onSnapshot, addDoc, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, startOfMonth, endOfMonth, startOfWeek, eachDayOfInterval, isSameDay, isToday, addMonths, subMonths, isSameMonth } from 'date-fns';
@@ -24,7 +25,7 @@ interface LeaveSummary { status: string; type?: string; requestDays?: number }
 
 export const AttendanceDashboard: React.FC = () => {
   const { 
-    user, userData, sessionReady,
+    user, userData, companyData, sessionReady,
     openPasswordChange 
   } = useAuthStore();
   const [kstTime, setKstTime] = useState<string>('');
@@ -251,7 +252,7 @@ export const AttendanceDashboard: React.FC = () => {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h1 className="text-2xl font-black text-slate-900 tracking-tight">{userData?.name || '로딩 중...'}님, 반갑습니다.</h1>
-                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg uppercase tracking-wider">{userData?.role || 'MEMBER'}</span>
+                <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-lg uppercase tracking-wider">{userData ? getRoleDisplayName(userData, companyData ?? undefined) : 'MEMBER'}</span>
               </div>
               <p className="text-slate-400 text-xs font-semibold flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-indigo-400" />
