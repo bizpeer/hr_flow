@@ -3,6 +3,8 @@ import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
+import { getErrorCode, getErrorMessage } from '../utils/errors';
+import type { TaxTable } from '../utils/payroll';
 import type { CompanyData, UserData } from '../store/authStore';
 import { 
   Shield, Building2, Users, Globe, Search, 
@@ -14,6 +16,24 @@ import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import readExcelFile from 'read-excel-file/browser';
 import { setDoc } from 'firebase/firestore';
 import { functions, auth } from '../firebase';
+
+interface BackendStatus { version: string; deployedAt: string }
+interface PaymentRecord {
+  id: string;
+  companyName?: string;
+  adminName?: string;
+  adminEmail?: string;
+  adminUid?: string;
+  transactionId?: string;
+  amount?: number | string;
+  currency?: string;
+  createdAt?: { seconds: number };
+}
+interface PaymentClaim extends Pick<PaymentRecord, 'companyName' | 'adminName' | 'createdAt'> {
+  id: string;
+  orderId: string;
+}
+type TaxBracket = NonNullable<NonNullable<TaxTable>['brackets']>[number];
 
 export const SuperAdminDashboard: React.FC = () => {
   const { userData } = useAuthStore();
@@ -34,11 +54,11 @@ export const SuperAdminDashboard: React.FC = () => {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null); // companyId
   const [adminPassword, setAdminPassword] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
-  const [backendStatus, setBackendStatus] = useState<{ version: string; deployedAt: string } | null>(null);
+  const [backendStatus, setBackendStatus] = useState<BackendStatus | null>(null);
   const [isUploadingTaxTable, setIsUploadingTaxTable] = useState(false);
   const [taxTableInfo, setTaxTableInfo] = useState<{ updateDate: string; count: number; fileName?: string } | null>(null);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [paymentClaims, setPaymentClaims] = useState<any[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [paymentClaims, setPaymentClaims] = useState<PaymentClaim[]>([]);
 
   // 구독 기간 연장 모달 상태
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
@@ -53,9 +73,9 @@ export const SuperAdminDashboard: React.FC = () => {
 
   const checkBackend = async () => {
     try {
-      const checkFn = httpsCallable(functions, 'checkDeploymentStatus');
+      const checkFn = httpsCallable<unknown, BackendStatus>(functions, 'checkDeploymentStatus');
       const result = await checkFn();
-      setBackendStatus(result.data as any);
+      setBackendStatus(result.data);
     } catch (e) {
       console.warn("Backend status check failed:", e);
     }
@@ -95,13 +115,13 @@ export const SuperAdminDashboard: React.FC = () => {
     });
 
     const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPayments(data.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentRecord));
+      setPayments(data.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     });
 
     const unsubClaims = onSnapshot(collection(db, 'payment_claims'), (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPaymentClaims(data.sort((a: any, b: any) =>
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() } as PaymentClaim));
+      setPaymentClaims(data.sort((a, b) =>
         (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)));
     });
 
@@ -174,10 +194,11 @@ export const SuperAdminDashboard: React.FC = () => {
       setSubscriptionTarget(null);
       setSubscriptionPassword('');
       setSubscriptionDaysToAdd(30);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[Subscription Update Error]', err);
-      let msg = err.message || '알 수 없는 오류가 발생했습니다.';
-      if (err.code === 'auth/wrong-password' || err.message?.includes('password')) {
+      const message = getErrorMessage(err, '알 수 없는 오류가 발생했습니다.');
+      let msg = message;
+      if (getErrorCode(err) === 'auth/wrong-password' || message.includes('password')) {
         msg = '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
       }
       alert('기간 연장 실패:\n' + msg);
@@ -204,10 +225,11 @@ export const SuperAdminDashboard: React.FC = () => {
       setShowDeleteModal(false);
       setDeleteTarget(null);
       setAdminPassword('');
-    } catch (err: any) {
+    } catch (err) {
       console.error('[AdminDeleteCompanyData Error]', err);
-      let msg = err.message || '알 수 없는 오류가 발생했습니다.';
-      if (err.code === 'auth/wrong-password' || err.message?.includes('password')) {
+      const message = getErrorMessage(err, '알 수 없는 오류가 발생했습니다.');
+      let msg = message;
+      if (getErrorCode(err) === 'auth/wrong-password' || message.includes('password')) {
         msg = '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
       }
       // HttpsError의 상세 메시지를 사용자에게 직접 표시하여 디버깅 정보 제공
@@ -234,10 +256,10 @@ export const SuperAdminDashboard: React.FC = () => {
     setIsUploadingTaxTable(true);
     
     // 헬퍼 함수: 값 파싱
-    const parseValue = (val: any) => {
+    const parseValue = (val: unknown): number => {
       if (val === '-' || val === null || val === undefined) return 0;
       if (typeof val === 'string') return parseInt(val.replace(/,/g, ''), 10) || 0;
-      return val;
+      return typeof val === 'number' ? val : 0;
     };
 
     try {
@@ -245,7 +267,7 @@ export const SuperAdminDashboard: React.FC = () => {
       reader.onload = async (event) => {
         try {
           const workbook = await readExcelFile(event.target?.result as ArrayBuffer);
-          const allBrackets: any[] = [];
+          const allBrackets: TaxBracket[] = [];
 
           // 처음 2개 시트 처리 (요청 사항: 엑셀 파일 내 sheet 2개 분석)
           for (let i = 0; i < Math.min(2, workbook.length); i++) {
@@ -255,6 +277,14 @@ export const SuperAdminDashboard: React.FC = () => {
               const min = parseValue(row[0]);
               const max = parseValue(row[1]);
               
+              if (typeof min === 'number' && min >= 770) {
+                const numericCells = [row[1], ...row.slice(2, 13)];
+                if (numericCells.some(value => value !== null && value !== undefined &&
+                  typeof value !== 'number' && typeof value !== 'string')) {
+                  throw new Error('세액표 구간의 상한과 세액에는 숫자, 숫자 문자열 또는 빈 셀만 사용할 수 있습니다.');
+                }
+              }
+
               // 숫자인 유효한 구간 데이터만 추출 (770원 이상)
               if (typeof min === 'number' && min >= 770 && (max > min || max === 0)) {
                 const taxes = [];
@@ -284,8 +314,8 @@ export const SuperAdminDashboard: React.FC = () => {
           });
 
           alert(`[업로드 성공]\n파일명: ${file.name}\n반영된 구간: ${sortedBrackets.length}개\n\n이제 모든 사용자의 급여 산출에 최신 세액표가 실시간 적용됩니다.`);
-        } catch (innerErr: any) {
-          alert('데이터 처리 오류: ' + innerErr.message);
+        } catch (innerErr) {
+          alert('데이터 처리 오류: ' + getErrorMessage(innerErr));
         } finally {
           setIsUploadingTaxTable(false);
           e.target.value = '';
@@ -296,8 +326,8 @@ export const SuperAdminDashboard: React.FC = () => {
         setIsUploadingTaxTable(false);
       };
       reader.readAsArrayBuffer(file);
-    } catch (err: any) {
-      alert('세액표 업로드 실패: ' + err.message);
+    } catch (err) {
+      alert('세액표 업로드 실패: ' + getErrorMessage(err));
       setIsUploadingTaxTable(false);
     }
   };

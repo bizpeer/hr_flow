@@ -10,15 +10,41 @@ import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
 import type { UserData } from '../store/authStore';
 import { calculateNetPay, getDeductionCounts, MEAL_ALLOWANCE_DEFAULT } from '../utils/payroll';
+import type { TaxTable } from '../utils/payroll';
+import type { Timestamp } from 'firebase/firestore';
+
+interface Division {
+  id: string;
+  name: string;
+}
+
+interface Team extends Division {
+  divisionId: string;
+}
+
+interface PayrollRecord {
+  id: string;
+  year: number;
+  month: number;
+  divisionName: string;
+  employeeCount: number;
+  totalGross: number;
+  totalNet: number;
+  approvedAt?: Timestamp;
+  approvedByName?: string;
+}
+
+type PayrollSettings = Required<Pick<UserData, 'annualSalary' | 'salaryType' | 'isSeveranceIncluded' | 'dependents' | 'childrenUnder20' | 'nonTaxable'>>;
+type PayrollFieldUpdate = { [Field in keyof PayrollSettings]: [field: Field, value: PayrollSettings[Field]] }[keyof PayrollSettings];
 
 export const SalaryManagement: React.FC = () => {
   const { userData, companyData } = useAuthStore();
   const isAdminOrMaster = userData?.role === 'SUPER_ADMIN' || userData?.role === 'ADMIN';
   const [employees, setEmployees] = useState<UserData[]>([]);
-  const [divisions, setDivisions] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
-  const [taxTable, setTaxTable] = useState<any>(null);
+  const [taxTable, setTaxTable] = useState<TaxTable>(null);
   
   // Filters
   const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
@@ -30,12 +56,12 @@ export const SalaryManagement: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   
   // States for individual edits
-  const [editingData, setEditingData] = useState<Record<string, Partial<UserData>>>({});
+  const [editingData, setEditingData] = useState<Record<string, Partial<PayrollSettings>>>({});
   const [isSaving, setIsSaving] = useState<string | null>(null);
   const [isApproving, setIsApproving] = useState(false);
   const [selectedDetails, setSelectedDetails] = useState<UserData | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [historyRecords, setHistoryRecords] = useState<any[]>([]);
+  const [historyRecords, setHistoryRecords] = useState<PayrollRecord[]>([]);
   const [showHistory, setShowHistory] = useState(false);
 
   // History Range Filters
@@ -56,10 +82,10 @@ export const SalaryManagement: React.FC = () => {
     const companyId = userData.companyId;
 
     const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
-      setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Division)));
     });
     const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
-      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Team)));
     });
 
     const q = query(collection(db, 'UserProfile'), where('companyId', '==', companyId));
@@ -92,14 +118,14 @@ export const SalaryManagement: React.FC = () => {
   // 전역 시스템 설정(세액표)은 회사 정보와 무관하게 로드
   useEffect(() => {
     const unsubTax = onSnapshot(doc(db, 'system_config', 'tax_table'), (doc) => {
-      setTaxTable(doc.exists() ? doc.data() : null);
+      setTaxTable(doc.exists() ? doc.data() as TaxTable : null);
     }, () => setTaxTable(null));
 
     return () => unsubTax();
   }, []);
 
-  const handleUpdateField = (uid: string, field: string, value: any) => {
-    setEditingData((prev: any) => ({
+  const handleUpdateField = (uid: string, ...[field, value]: PayrollFieldUpdate) => {
+    setEditingData(prev => ({
       ...prev,
       [uid]: {
         ...prev[uid],
@@ -147,7 +173,7 @@ export const SalaryManagement: React.FC = () => {
   };
 
   const filteredEmployees = employees
-    .filter((emp: any) => {
+    .filter(emp => {
       if (emp.status === 'RESIGNED') return false;
       return (selectedDivision === 'ALL' || emp.divisionId === selectedDivision) &&
              (selectedTeam === 'ALL' || emp.teamId === selectedTeam) &&
@@ -220,7 +246,7 @@ export const SalaryManagement: React.FC = () => {
         where('companyId', '==', companyId)
       );
       const snap = await getDocs(q);
-      const allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+      const allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() } as PayrollRecord));
 
       const startValue = startYear * 12 + startMonth;
       const endValue = endYear * 12 + endMonth;
@@ -234,7 +260,7 @@ export const SalaryManagement: React.FC = () => {
 
       console.log(`[SalaryHistory] total=${allRecords.length}, filtered=${filteredRecords.length}`);
       setHistoryRecords(filteredRecords);
-    } catch (e: any) {
+    } catch (e) {
       console.error('[SalaryHistory] fetch error:', e);
     }
   };
@@ -368,7 +394,7 @@ export const SalaryManagement: React.FC = () => {
                 className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none cursor-pointer"
               >
                  <option value="ALL">전체 본부</option>
-                 {divisions.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
            </div>
            <div className="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm flex items-center gap-3 hover:border-emerald-200 transition-colors">
@@ -379,7 +405,7 @@ export const SalaryManagement: React.FC = () => {
                 className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none disabled:opacity-30 cursor-pointer"
               >
                  <option value="ALL">팀 검색</option>
-                 {teams.filter((t: any) => t.divisionId === selectedDivision).map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {teams.filter(t => t.divisionId === selectedDivision).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
            </div>
            <div className="md:col-span-2 premium-card p-4 bg-slate-900 text-white shadow-indigo-900/10 flex items-center justify-between px-8 border-none overflow-hidden relative">
@@ -408,7 +434,7 @@ export const SalaryManagement: React.FC = () => {
                        </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                       {filteredEmployees.map((emp: any) => {
+                        {filteredEmployees.map(emp => {
                           const data = editingData[emp.uid] || {};
                           const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
                           const isChanged = JSON.stringify(data) !== JSON.stringify({
@@ -604,7 +630,7 @@ export const SalaryManagement: React.FC = () => {
 
            {/* Mobile Card View */}
            <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
-               {filteredEmployees.map((emp: any) => {
+                {filteredEmployees.map(emp => {
                   const data = editingData[emp.uid] || {};
                   const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
                   const isChanged = JSON.stringify(data) !== JSON.stringify({

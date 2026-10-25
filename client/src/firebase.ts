@@ -17,7 +17,7 @@ const firebaseConfig = {
 
 // 필수 설정값 누락 여부 확인 (디버깅 용도)
 const missingKeys = Object.entries(firebaseConfig)
-  .filter(([_, value]) => !value)
+  .filter(([, value]) => !value)
   .map(([key]) => key);
 
 if (missingKeys.length > 0) {

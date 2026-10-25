@@ -14,6 +14,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 import { getEmployeeLoginDomain, getEmployeeLoginEmail } from '../utils/employeeLogin';
 import { getRoleDisplayName } from '../utils/roleDisplay';
+import { getErrorMessage } from '../utils/errors';
 
 interface Division {
   id: string;
@@ -34,7 +35,7 @@ interface Employee {
   email: string;
   teamId?: string;
   role: string;
-  teamHistory: any[];
+  teamHistory: { teamId: string; teamName: string; joinedAt: string; leftAt?: string; role?: string }[];
   joinDate?: string;
 }
 
@@ -103,7 +104,7 @@ export const OrganizationAdmin: React.FC = () => {
     const companyId = userData.companyId;
     setLoading(true);
 
-    const handleError = (error: any) => {
+    const handleError = (error: unknown) => {
       console.error("Firestore Subscription Error:", error);
       setLoading(false);
     };
@@ -236,9 +237,9 @@ export const OrganizationAdmin: React.FC = () => {
       
       setShowEmployeeModal(false);
       setNewEmp({ name: '', email: '', teamId: '', joinDate: new Date().toISOString().split('T')[0] });
-    } catch (err: any) {
+    } catch (err) {
       console.error("Employee Registration Error:", err);
-      alert("직원 등록 실패: " + (err.message || String(err)));
+      alert("직원 등록 실패: " + getErrorMessage(err, String(err)));
     } finally {
       setIsSubmittingEmployee(false);
     }
@@ -363,7 +364,7 @@ export const OrganizationAdmin: React.FC = () => {
         if (!administrator?.email) throw new Error('관리자 인증 상태를 확인해 주세요.');
         await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, deleteLogsPassword));
         await administrator.getIdToken(true);
-      } catch (err) {
+      } catch {
         throw new Error('비밀번호가 일치하지 않습니다.');
       }
 

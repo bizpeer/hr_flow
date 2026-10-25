@@ -7,6 +7,7 @@ import { accountSecurity } from '../services/accountSecurityService';
 import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 import { query, where } from 'firebase/firestore';
+import { getErrorCode, getErrorMessage } from '../utils/errors';
 
 export const AdminSettings: React.FC = () => {
   // Password Reset State
@@ -55,11 +56,11 @@ export const AdminSettings: React.FC = () => {
       } else {
         setMessage({ type: 'error', text: '인증 세션이 만료되었습니다. 다시 로그인해주세요.' });
       }
-    } catch (err: any) {
-      if (err.code === 'auth/requires-recent-login') {
+    } catch (err) {
+      if (getErrorCode(err) === 'auth/requires-recent-login') {
         setMessage({ type: 'error', text: '보안 정책상 최근 로그인이 필요합니다. 로그아웃 후 다시 시도해주세요.' });
       } else {
-        setMessage({ type: 'error', text: '비밀번호 변경 중 오류가 발생했습니다: ' + err.message });
+        setMessage({ type: 'error', text: '비밀번호 변경 중 오류가 발생했습니다: ' + getErrorMessage(err) });
       }
     } finally {
       setLoading(false);
@@ -78,11 +79,11 @@ export const AdminSettings: React.FC = () => {
       await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, verifyPassword));
       await administrator.getIdToken(true);
       return true;
-    } catch (err: any) {
-      if (err.code === 'auth/too-many-requests') {
+    } catch (err) {
+      if (getErrorCode(err) === 'auth/too-many-requests') {
         throw new Error("보안 정책상 너무 많은 요청이 발생했습니다. 잠시 후(약 10~30분) 다시 시도해 주세요.");
       }
-      if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+      if (getErrorCode(err) === 'auth/wrong-password' || getErrorCode(err) === 'auth/invalid-credential') {
         throw new Error("비밀번호가 일치하지 않습니다. 다시 확인해주세요.");
       }
       throw err;
@@ -142,9 +143,9 @@ export const AdminSettings: React.FC = () => {
       
       setMessage({ type: 'success', text: `회사 도메인과 사용자 로그인 ID가 @${cleanDomain}으로 동기화되었습니다.` });
       setVerifyPassword('');
-    } catch (err: any) {
+    } catch (err) {
       console.error("[AdminSettings] Domain update error:", err);
-      setMessage({ type: 'error', text: '도메인 변경 중 오류: ' + (err.message || '알 수 없는 오류') });
+      setMessage({ type: 'error', text: '도메인 변경 중 오류: ' + getErrorMessage(err) });
     } finally {
       setLoading(false);
     }
@@ -191,10 +192,10 @@ export const AdminSettings: React.FC = () => {
       }
 
       setVerifyPassword('');
-    } catch (err: any) {
+    } catch (err) {
       console.error("Sync Error Detailed:", err);
       // Firebase HttpsError의 경우 err.message에 서버의 메시지가 담깁니다.
-      const errorMsg = err.message || '알 수 없는 오류';
+      const errorMsg = getErrorMessage(err);
       setMessage({ type: 'error', text: '동기화 중 오류: ' + errorMsg });
     } finally {
       setLoading(false);
@@ -225,7 +226,7 @@ export const AdminSettings: React.FC = () => {
         'leaves', 'attendance', 'payroll_records', 'notices', 'AuditLogs'
       ];
       
-      const backupData: Record<string, any[]> = {};
+      const backupData: Record<string, Record<string, unknown>[]> = {};
 
       for (const colName of collectionsToBackup) {
         const q = query(collection(db, colName), where('companyId', '==', companyId));
@@ -279,8 +280,8 @@ export const AdminSettings: React.FC = () => {
         text: '백업 데이터 다운로드가 완료되었습니다. 안전한 곳에 보관해 주세요.' 
       });
       setVerifyPassword('');
-    } catch (err: any) {
-      setMessage({ type: 'error', text: '백업 처리 중 오류: ' + err.message });
+    } catch (err) {
+      setMessage({ type: 'error', text: '백업 처리 중 오류: ' + getErrorMessage(err) });
     } finally {
       setLoading(false);
     }

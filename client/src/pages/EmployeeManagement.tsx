@@ -13,6 +13,7 @@ import { httpsCallable } from 'firebase/functions';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
+import { getErrorCode, getErrorMessage } from '../utils/errors';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
 
 interface Employee {
@@ -38,11 +39,26 @@ interface AttendanceRecord {
   location?: string;
 }
 
+interface Division {
+  id: string;
+  name: string;
+}
+
+interface Team extends Division {
+  divisionId: string;
+}
+
+interface LeaveSummary {
+  status: string;
+  type?: string;
+  requestDays?: number;
+}
+
 export const EmployeeManagement: React.FC = () => {
   const { userData, companyData } = useAuthStore();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [divisions, setDivisions] = useState<any[]>([]);
-  const [teams, setTeams] = useState<any[]>([]);
+  const [divisions, setDivisions] = useState<Division[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   
@@ -52,7 +68,7 @@ export const EmployeeManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Modals
-  const [selectedEmpRecords, setSelectedEmpRecords] = useState<{emp: Employee, records: AttendanceRecord[], leaves: any[]} | null>(null);
+  const [selectedEmpRecords, setSelectedEmpRecords] = useState<{emp: Employee, records: AttendanceRecord[], leaves: LeaveSummary[]} | null>(null);
   const [deleteConfirmEmp, setDeleteConfirmEmp] = useState<Employee | null>(null);
   const [adminPassword, setAdminPassword] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,10 +99,10 @@ export const EmployeeManagement: React.FC = () => {
 
     // 1. Fetch Organization Data (companyId 기반 격리)
     const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
-      setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setDivisions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Division)));
     });
     const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
-      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setTeams(snap.docs.map(d => ({ id: d.id, ...d.data() } as Team)));
     });
 
     // 2. Subscribe to Employees
@@ -141,7 +157,7 @@ export const EmployeeManagement: React.FC = () => {
       additionalLeave: emp.additionalLeave || 0
     });
     
-    let leaves: any[] = [];
+    let leaves: LeaveSummary[] = [];
     if (emp.uid) {
       try {
         const q = query(
@@ -150,7 +166,7 @@ export const EmployeeManagement: React.FC = () => {
           where('companyId', '==', userData?.companyId || '')
         );
         const snap = await getDocs(q);
-        leaves = snap.docs.map(doc => doc.data());
+        leaves = snap.docs.map(doc => doc.data() as LeaveSummary);
       } catch (err) {
         console.error("Failed to fetch leaves for dashboard:", err);
       }
@@ -230,7 +246,7 @@ export const EmployeeManagement: React.FC = () => {
         if (!administrator?.email) throw new Error('관리자 인증 상태를 확인해 주세요.');
         await reauthenticateWithCredential(administrator, EmailAuthProvider.credential(administrator.email, adminPassword));
         await administrator.getIdToken(true);
-      } catch (err) {
+      } catch {
         throw new Error('비밀번호가 일치하지 않습니다.');
       }
 
@@ -258,22 +274,23 @@ export const EmployeeManagement: React.FC = () => {
       const temporaryPassword = btoa(String.fromCharCode(...randomBytes))
         .replace(/\+/g, '-').replace(/\//g, '_');
       // 1. Firebase Cloud Function을 통해 실제 Auth 비밀번호 변경 시도
-      const adminResetPassword = httpsCallable(functions, 'adminResetPassword');
-      const result: any = await adminResetPassword({ uid: emp.uid, password: temporaryPassword });
+      const adminResetPassword = httpsCallable<{ uid: string; password: string }, { success: boolean; message?: string }>(functions, 'adminResetPassword');
+      const result = await adminResetPassword({ uid: emp.uid, password: temporaryPassword });
 
       if (!result.data.success) {
         throw new Error(result.data.message || '비밀번호 초기화 중 오류가 발생했습니다.');
       }
 
       alert(`임시 비밀번호: ${temporaryPassword}\n직원에게 안전한 수단으로 전달하세요. 최초 로그인 시 변경해야 합니다.`);
-    } catch (e: any) {
+    } catch (e) {
       console.error('Password reset failed:', e);
-      let errorMsg = e.message;
+      let errorMsg = getErrorMessage(e);
+      const errorCode = getErrorCode(e);
       
       // 사용자에게 친숙한 에러 메시지 처리
-      if (e.code === 'permission-denied') {
+      if (errorCode === 'permission-denied') {
         errorMsg = '관리자 권한이 없습니다.';
-      } else if (e.code === 'unauthenticated') {
+      } else if (errorCode === 'unauthenticated') {
         errorMsg = '다시 로그인해 주세요.';
       }
       

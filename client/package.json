@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test:payroll": "node --test --test-isolation=none tests/payroll.test.mjs",
     "test:identity": "node --test --test-isolation=none tests/role-domain.test.mjs",
+    "test:unit": "node --test --test-isolation=none tests/*.test.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

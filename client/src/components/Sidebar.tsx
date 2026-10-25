@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, CalendarClock, Network, Settings, FileText, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2, CreditCard } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
@@ -11,35 +12,43 @@ interface SidebarProps {
   onItemClick?: () => void;
 }
 
+interface NavItemProps {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  colorClass?: string;
+  onItemClick?: () => void;
+}
+
+const NavItem = ({ to, icon: Icon, label, colorClass = 'indigo', onItemClick }: NavItemProps) => (
+  <NavLink
+    to={to}
+    onClick={onItemClick}
+    className={({ isActive }) => `
+      group flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden
+      ${isActive
+        ? `bg-${colorClass}-600/10 text-${colorClass}-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.05)]`
+        : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
+      }
+    `}
+  >
+    {({ isActive }) => (
+      <>
+        <Icon className={`w-5 h-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? `text-${colorClass}-400` : 'text-slate-500'}`} />
+        <span className="font-semibold tracking-tight">{label}</span>
+        {isActive && (
+          <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-${colorClass}-500 rounded-r-full shadow-[0_0_15px_rgba(99,102,241,0.5)]`} />
+        )}
+      </>
+    )}
+  </NavLink>
+);
+
 export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
   const { user, userData, companyData, logout, setLoginModalOpen } = useAuthStore();
   const isSuperAdmin = userData?.role === 'SUPER_ADMIN';
   const isDirector = userRole === 'ADMIN';
   const isManagement = userRole === 'ADMIN' || userRole === 'SUB_ADMIN'; // 결재함은 둘 다 가능
-
-  const NavItem = ({ to, icon: Icon, label, colorClass = 'indigo' }: { to: string, icon: any, label: string, colorClass?: string }) => (
-    <NavLink 
-      to={to} 
-      onClick={onItemClick}
-      className={({ isActive }) => `
-        group flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden
-        ${isActive 
-          ? `bg-${colorClass}-600/10 text-${colorClass}-400 shadow-[inset_0_0_20px_rgba(99,102,241,0.05)]` 
-          : 'hover:bg-slate-800/50 text-slate-400 hover:text-slate-200'
-        }
-      `}
-    >
-      {({ isActive }) => (
-        <>
-          <Icon className={`w-5 h-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? `text-${colorClass}-400` : 'text-slate-500'}`} />
-          <span className="font-semibold tracking-tight">{label}</span>
-          {isActive && (
-            <div className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-${colorClass}-500 rounded-r-full shadow-[0_0_15px_rgba(99,102,241,0.5)]`} />
-          )}
-        </>
-      )}
-    </NavLink>
-  );
 
   return (
     <div className="w-64 h-full bg-slate-900 flex flex-col p-6 border-r border-slate-800/50 relative overflow-hidden">
@@ -84,16 +93,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
         {isSuperAdmin ? (
           /* SUPER_ADMIN 전용 메뉴 */
           <>
-            <NavItem to="/super-admin" icon={Shield} label="플랫폼 관리" colorClass="violet" />
+            <NavItem onItemClick={onItemClick} to="/super-admin" icon={Shield} label="플랫폼 관리" colorClass="violet" />
           </>
         ) : (
           /* 일반 사용자 메뉴 */
           <>
-            <NavItem to="/dashboard" icon={Home} label="대시보드" />
-            <NavItem to="/leave" icon={CalendarClock} label="휴가신청" />
-            <NavItem to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
-            <NavItem to="/documents" icon={FileText} label="서류발급" />
-            <NavItem to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
+            <NavItem onItemClick={onItemClick} to="/dashboard" icon={Home} label="대시보드" />
+            <NavItem onItemClick={onItemClick} to="/leave" icon={CalendarClock} label="휴가신청" />
+            <NavItem onItemClick={onItemClick} to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
+            <NavItem onItemClick={onItemClick} to="/documents" icon={FileText} label="서류발급" />
+            <NavItem onItemClick={onItemClick} to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />
 
             {isManagement && (
               <div className="pt-8 pb-3 px-4">
@@ -101,13 +110,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
               </div>
             )}
 
-            {isManagement && <NavItem to="/admin/approvals" icon={CheckSquare} label="결재/승인 관리함" />}
-            {isDirector && <NavItem to="/admin/organization" icon={Network} label="조직관리" />}
-            {isDirector && <NavItem to="/admin/salary" icon={Banknote} label="급여관리" colorClass="indigo" />}
-            {isDirector && <NavItem to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
-            {isDirector && <NavItem to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
-            {isDirector && <NavItem to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
-            {isDirector && <NavItem to="/subscription" icon={CreditCard} label="결제/구독 관리" colorClass="amber" />}
+            {isManagement && <NavItem onItemClick={onItemClick} to="/admin/approvals" icon={CheckSquare} label="결재/승인 관리함" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/admin/organization" icon={Network} label="조직관리" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/admin/salary" icon={Banknote} label="급여관리" colorClass="indigo" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/admin/finance-stats" icon={PieChart} label="지출결의 조회" colorClass="emerald" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/admin/employees" icon={Users} label="인사관리" colorClass="indigo" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/admin/settings" icon={Settings} label="시스템 설정" colorClass="slate" />}
+            {isDirector && <NavItem onItemClick={onItemClick} to="/subscription" icon={CreditCard} label="결제/구독 관리" colorClass="amber" />}
           </>
         )}
       </nav>

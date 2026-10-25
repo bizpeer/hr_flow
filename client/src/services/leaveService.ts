@@ -1,5 +1,6 @@
 import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getErrorMessage } from '../utils/errors';
 
 export type LeaveType = 'annual' | 'half' | 'sick' | 'other';
 
@@ -51,8 +52,8 @@ export const handleApproveLeave = async (
     });
 
     return { success: true, message: '휴가 요청 승인 및 연차 차감이 완료되었습니다.' };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Leave Approval Transaction failed: ', error);
-    return { success: false, message: error.message };
+    return { success: false, message: getErrorMessage(error, '휴가 승인 중 오류가 발생했습니다.') };
   }
 };
