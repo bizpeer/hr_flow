@@ -1,6 +1,7 @@
 const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
 const { authorizeContext, recentAuthentication } = require('./security-context');
+const { createDraftingWorkflow } = require('./drafting-workflow');
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -45,7 +46,7 @@ function numberLabel(front, date) {
   return `${String(front).padStart(3, '0')}-${date.replaceAll('-', '').slice(2)}`;
 }
 const documentTypeInput = value => {
-  if (!['OFFICIAL', 'EMPLOYMENT', 'CAREER'].includes(value)) fail('invalid-argument', '서류 종류를 확인해 주세요.');
+  if (!['OFFICIAL', 'EMPLOYMENT', 'CAREER', 'DRAFTING'].includes(value)) fail('invalid-argument', '서류 종류를 확인해 주세요.');
   return value;
 };
 const certificateDate = (value, today, required = true, message = '날짜는 유효한 과거 또는 오늘 날짜(YYYY-MM-DD)로 입력해 주세요.') => {
@@ -71,6 +72,9 @@ function issuedDateRange(input, today) {
   return { startDate, endDate };
 }
 function contentInput(data, type, today) {
+  if (type === 'DRAFTING') return { recipient: '내부품의', reference: '', title: text(data.title, 200),
+    body: text(data.body, 20000), attachments: text(data.attachments || '', 1000, false),
+    cooperationNote: text(data.cooperationNote || '', 3000, false) };
   if (type !== 'OFFICIAL') {
     const c = data.certificate || {};
     const certificate = {
@@ -98,6 +102,7 @@ function contentInput(data, type, today) {
 
 /** All official-letter writes go through this service, including ADMIN writes. */
 function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Date() }) {
+  const drafting = createDraftingWorkflow({ db, now });
   const read = (reader, ref) => reader === db ? ref.get() : reader.get(ref);
   const settingsRef = companyId => db.collection('officialLetterSettings').doc(companyId);
   const letterRef = letterId => db.collection('officialLetters').doc(id(letterId));
@@ -123,11 +128,13 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     }
   }
   function delegated(user, letter) {
-    return user.documentApprovalGranted && letter.divisionId === user.divisionId &&
+    return letter.documentType !== 'DRAFTING' && user.documentApprovalGranted && letter.divisionId === user.divisionId &&
       ['PENDING', 'REJECTED', 'ISSUED'].includes(letter.status) && letter.creatorId !== user.uid;
   }
   function permissions(user, letter) {
     const next = letter.approvalLine.find(step => !step.approvedAt);
+    if (letter.documentType === 'DRAFTING') return { canReview: letter.status === 'PENDING' && next?.uid === user.uid,
+      canFinalApprove: letter.status === 'PENDING' && next?.uid === user.uid && letter.approvalLine.at(-1)?.uid === user.uid };
     return { canReview: letter.status === 'PENDING' &&
       (user.role === 'ADMIN' || next?.uid === user.uid || (!next && delegated(user, letter))),
     canFinalApprove: letter.status === 'PENDING' && !next && (user.role === 'ADMIN' || delegated(user, letter)) };
@@ -208,8 +215,8 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     const admins = await tx.get(db.collection('UserProfile').where('companyId', '==', next.companyId).where('role', '==', 'ADMIN'));
     const profiles = new Map(admins.docs.filter(d => !d.data().status || d.data().status === 'ACTIVE').map(d => [d.id, d.data()]));
     const first = next.status === 'PENDING' ? next.approvalLine.find(step => !step.approvedAt) : null;
-    const actionIds = next.status === 'PENDING' ? (first ? [first.uid] : [...profiles.keys()]) : [];
-    if (next.status === 'PENDING' && !first && next.divisionId) {
+    const actionIds = next.status === 'PENDING' ? (first ? [first.uid] : next.documentType === 'DRAFTING' ? [] : [...profiles.keys()]) : [];
+    if (next.documentType !== 'DRAFTING' && next.status === 'PENDING' && !first && next.divisionId) {
       const settings = (await tx.get(settingsRef(next.companyId))).data();
       for (const uid of settings?.documentApproverIds || []) {
         if (!profiles.has(uid)) {
@@ -283,22 +290,44 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     return { success: true, issued: true, number, revision: current.revision };
   }
 
+  async function issueDrafting(tx, user, current, ref, timestamp) {
+    if (!current.number || !current.approvalLine.length || current.approvalLine.some(step => !step.approvedAt)) {
+      fail('failed-precondition', '지정된 기안 결재가 모두 완료되어야 합니다.');
+    }
+    const changed = { ...current, status: 'ISSUED', issueDate: koreaDate(now()), approvedRevision: current.revision,
+      approvedBy: user.uid, approvedByName: user.name || '', approvedAt: timestamp, everIssued: true,
+      pdf: null, pdfReady: false, updatedAt: timestamp, updatedBy: user.uid };
+    const plan = await notifications(tx, ref, current, changed, 'ISSUED', user, timestamp);
+    tx.update(ref, { ...changed, notificationRecipientIds: plan.recipientIds });
+    writeNotifications(tx, ref, plan);
+    return { success: true, issued: true, number: current.number, revision: current.revision };
+  }
+
+  function privatePdfPath(letter, ref, revision) {
+    const suffix = letter.documentType === 'DRAFTING' ? `draft-${drafting.hash([letter.number]).slice(0, 24)}` : letter.number;
+    return `companies/${letter.companyId}/official-pdfs/${ref.id}/${revision}-${suffix}.pdf`;
+  }
+
   async function ensurePdf(request, ref, revision) {
     const user = await actor(request);
     const letter = (await ref.get()).data(); access(user, letter); expected(letter, revision);
     if (letter.status !== 'ISSUED' || letter.approvedRevision !== revision) {
       fail('failed-precondition', '현재 수정본의 최종 승인 후 PDF를 생성할 수 있습니다.');
     }
-    const path = `companies/${letter.companyId}/official-pdfs/${ref.id}/${revision}-${letter.number}.pdf`;
+    const path = privatePdfPath(letter, ref, revision);
     let bytes;
     if (letter.pdfReady && letter.pdf?.path === path && letter.pdf.revision === revision && letter.pdf.number === letter.number) {
       try { [bytes] = await bucket.file(path).download(); } catch { /* Regenerate a missing private object. */ }
     }
     if (!bytes) {
-      const [logo, seal] = await Promise.all([
-        bucket.file(letter.branding.logoPath).download(), bucket.file(letter.branding.sealPath).download(),
-      ]);
-      bytes = await renderPdf(letter, { logo: logo[0], seal: seal[0] });
+      const images = {};
+      if (letter.documentType !== 'DRAFTING') {
+        const [logo, seal] = await Promise.all([
+          bucket.file(letter.branding.logoPath).download(), bucket.file(letter.branding.sealPath).download(),
+        ]);
+        images.logo = logo[0]; images.seal = seal[0];
+      }
+      bytes = await renderPdf(letter, images);
       await bucket.file(path).save(bytes, { resumable: false,
         metadata: { contentType: 'application/pdf', cacheControl: 'private, no-store' } });
     }
@@ -399,12 +428,19 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     if (action === 'approverCandidates') {
       const user = await actor(request); admin(user);
       const current = (await letterRef(input.id).get()).data(); access(user, current);
+      if (current.documentType === 'DRAFTING') fail('failed-precondition', '기안 결재선은 조직도 결재 단계로 설정해 주세요.');
       const profiles = await db.collection('UserProfile').where('companyId', '==', user.companyId).get();
       return { candidates: profiles.docs.filter(d => d.id !== current.creatorId &&
         ['MEMBER', 'SUB_ADMIN'].includes(d.data().role) && (!d.data().status || d.data().status === 'ACTIVE'))
         .map(d => ({ uid: d.id, name: d.data().name || d.id, role: d.data().role,
           teamId: d.data().teamId || '', divisionId: d.data().divisionId || '' }))
         .sort((a, b) => a.name.localeCompare(b.name, 'ko')) };
+    }
+    if (action === 'draftingBootstrap') {
+      const user = await actor(request);
+      const letter = input.id ? (await letterRef(input.id).get()).data() : undefined;
+      if (input.id) { access(user, letter); if (letter.documentType !== 'DRAFTING') fail('invalid-argument', '기안서만 선택해 주세요.'); }
+      return drafting.bootstrap(user, letter);
     }
     // Read paths also authorize against server profiles, never browser role claims.
     if (action === 'bootstrap') {
@@ -472,7 +508,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         return { history: history.docs.map(d => ({ historyId: d.id, ...d.data() })) };
       }
       const bytes = await ensurePdf(request, ref, input.revision);
-      return { base64: bytes.toString('base64'), filename: `${letter.number}.pdf` };
+      return { base64: bytes.toString('base64'), filename: `${letter.number.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')}.pdf` };
     }
     if (action === 'saveSettings') {
       const user = await actor(request);
@@ -538,7 +574,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
     }
     if (action === 'save') {
       const ref = input.id ? letterRef(input.id) : db.collection('officialLetters').doc();
-      await db.runTransaction(async tx => {
+      return db.runTransaction(async tx => {
         const user = await actor(request, tx);
         const timestamp = now().toISOString();
         const current = input.id ? (await tx.get(ref)).data() : null;
@@ -546,6 +582,56 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         const documentType = documentTypeInput(input.documentType ?? current?.documentType ?? 'OFFICIAL');
         if (current && documentType !== (current.documentType || 'OFFICIAL')) fail('invalid-argument', '저장한 서류의 종류는 변경할 수 없습니다. 새로 신청해 주세요.');
         const content = contentInput(input.content || {}, documentType, koreaDate(now()));
+        if (documentType === 'DRAFTING') {
+          if (current && user.role !== 'ADMIN' && current.creatorId !== user.uid) fail('permission-denied', '기안자 또는 회사 관리자만 기안을 수정할 수 있습니다.');
+          if (current?.everIssued) admin(user);
+          const route = input.draftingRoute ?? current?.drafting?.route;
+          const resolved = await drafting.resolve(user, route, tx, current);
+          content.reference = resolved.reference;
+          if (!current) {
+            const request = drafting.requestRef(user, input.requestId);
+            const fingerprint = drafting.hash([contentInput(input.content || {}, documentType, koreaDate(now())), resolved.route]);
+            const previous = (await tx.get(request)).data();
+            if (previous) {
+              if (previous.fingerprint !== fingerprint) fail('already-exists', '같은 요청 식별자로 다른 기안을 생성할 수 없습니다.');
+              const saved = (await tx.get(letterRef(previous.letterId))).data();
+              if (!saved || saved.companyId !== user.companyId || saved.creatorId !== user.uid || ['DELETING', 'DELETED'].includes(saved.status)) {
+                fail('already-exists', '이미 사용된 기안 생성 요청입니다. 새 기안을 작성해 주세요.');
+              }
+              return { id: previous.letterId };
+            }
+            const draftDate = koreaDate(new Date(timestamp));
+            const yearMonth = draftDate.slice(0, 7).replace('-', '');
+            const counter = drafting.counterRef(user, resolved.org.division.id, yearMonth);
+            const savedCounter = (await tx.get(counter)).data();
+            if (savedCounter && (savedCounter.companyId !== user.companyId || savedCounter.divisionId !== resolved.org.division.id ||
+              savedCounter.yearMonth !== yearMonth || !Number.isSafeInteger(savedCounter.lastSequence) || savedCounter.lastSequence < 0)) {
+              fail('failed-precondition', '기안 번호 카운터를 확인해 주세요.');
+            }
+            const sequence = (savedCounter?.lastSequence || 0) + 1;
+            if (!Number.isSafeInteger(sequence)) fail('resource-exhausted', '기안 번호 범위를 초과했습니다.');
+            const number = `${resolved.org.division.prefix} ${draftDate.slice(5, 7)}-${String(sequence).padStart(3, '0')}`;
+            tx.set(counter, { companyId: user.companyId, divisionId: resolved.org.division.id, yearMonth, lastSequence: sequence });
+            tx.create(request, { companyId: user.companyId, creatorId: user.uid, letterId: ref.id, number, fingerprint, createdAt: timestamp });
+            tx.create(ref, { companyId: user.companyId, creatorId: user.uid, creatorName: user.name || '', documentType,
+              participantIds: [...new Set([user.uid, ...resolved.line.map(step => step.uid)])], approvalLine: resolved.line, content,
+              divisionId: resolved.org.division.id, teamId: resolved.org.team?.id || '', revision: 1, number,
+              drafting: { draftDate, yearMonth, sequence, divisionName: resolved.org.division.name,
+                teamName: resolved.org.team?.name || '', route: resolved.route },
+              status: 'DRAFT', everIssued: false, pdfReady: false, createdAt: timestamp, updatedAt: timestamp, updatedBy: user.uid });
+          } else {
+            const changed = { ...current, content, revision: current.revision + 1, status: 'DRAFT',
+              drafting: { ...current.drafting, route: resolved.route, submittedAt: null, submittedBy: null, submittedByName: null },
+              participantIds: [...new Set([current.creatorId, ...resolved.line.map(step => step.uid)])], approvalLine: resolved.line,
+              approvedRevision: null, approvedAt: null, approvedBy: null, approvedByName: '',
+              pdf: null, pdfReady: false, automaticApproval: false, rejectionReason: '', updatedAt: timestamp, updatedBy: user.uid };
+            const plan = await notifications(tx, ref, current, changed, 'CONTENT_CHANGED', user, timestamp);
+            tx.create(versionRef(ref, current.revision), { ...current, archivedAt: timestamp, archivedBy: user.uid });
+            tx.update(ref, { ...changed, notificationRecipientIds: plan.recipientIds });
+            writeNotifications(tx, ref, plan);
+          }
+          return { id: ref.id };
+        }
         if (!input.id) {
           const approvalLine = await routing(user, tx);
           tx.create(ref, { companyId: user.companyId, creatorId: user.uid, creatorName: user.name || '',
@@ -565,8 +651,8 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           tx.update(ref, { ...changed, notificationRecipientIds: plan.recipientIds });
           writeNotifications(tx, ref, plan);
         }
+        return { id: ref.id };
       });
-      return { id: ref.id };
     }
     if (['submit', 'review', 'deleteHistory', 'reassign'].includes(action)) {
       const ref = letterRef(input.id);
@@ -578,8 +664,8 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         // Delete content before removing its retryable archive entry. The number
         // reservation stays permanent, and no caller-supplied storage path is used.
         if (Number.isInteger(history.revision) && history.revision > 0 &&
-            /^\d{3}-\d{6}(?:-\d{3})?$/.test(history.number || '')) {
-          await bucket.file(`companies/${user.companyId}/official-pdfs/${ref.id}/${history.revision}-${history.number}.pdf`)
+            (history.documentType === 'DRAFTING' || /^\d{3}-\d{6}(?:-\d{3})?$/.test(history.number || ''))) {
+          await bucket.file(privatePdfPath({ ...history, companyId: user.companyId }, ref, history.revision))
             .delete({ ignoreNotFound: true });
         }
       }
@@ -589,6 +675,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         const timestamp = now().toISOString();
         if (action === 'reassign') {
           admin(user);
+          if (current.documentType === 'DRAFTING') fail('failed-precondition', '기안 내용을 수정하고 조직도 결재 단계를 다시 선택해 주세요.');
           const reason = text(input.reason, 1000);
           if (!Array.isArray(input.approverIds) || input.approverIds.length > 10) fail('invalid-argument', '결재자는 최대 10명까지 지정할 수 있습니다.');
           const uids = input.approverIds.map(id);
@@ -621,6 +708,20 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           return { success: true };
         }
         if (action === 'submit') {
+          if (current.documentType === 'DRAFTING') {
+            if (user.uid !== current.creatorId && user.role !== 'ADMIN') fail('permission-denied', '기안자 또는 회사 관리자만 결재 요청할 수 있습니다.');
+            if (!['DRAFT', 'REJECTED'].includes(current.status)) fail('failed-precondition', '작성 또는 반려 상태에서 결재 요청할 수 있습니다.');
+            contentInput(current.content, 'DRAFTING', koreaDate(now()));
+            const resolved = await drafting.validateLine(user, current, tx);
+            const changed = { ...current, status: 'PENDING', branding: { companyName: user.companyName },
+              content: { ...current.content, reference: resolved.reference },
+              drafting: { ...current.drafting, submittedAt: timestamp, submittedBy: user.uid, submittedByName: user.name || '' },
+              approvalLine: resolved.line, rejectionReason: '', updatedAt: timestamp, updatedBy: user.uid };
+            const plan = await notifications(tx, ref, current, changed, 'SUBMITTED', user, timestamp);
+            tx.update(ref, { ...changed, notificationRecipientIds: plan.recipientIds });
+            writeNotifications(tx, ref, plan);
+            return { success: true };
+          }
           if (user.role !== 'ADMIN' && !current.participantIds.includes(user.uid)) fail('permission-denied', '작성자와 지정 결재자만 결재 요청할 수 있습니다.');
           if (!['DRAFT', 'REJECTED'].includes(current.status)) fail('failed-precondition', '작성 또는 반려 상태에서 결재 요청할 수 있습니다.');
           // Revalidate stored certificate dates against the actual submission date.
@@ -645,6 +746,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
         if (current.status !== 'PENDING') fail('failed-precondition', '결재 대기 중인 공문만 승인·반려할 수 있습니다.');
         const nextStep = current.approvalLine.find(step => !step.approvedAt);
         if (!permissions(user, current).canReview) fail('permission-denied', '현재 결재 순서가 아닙니다.');
+        if (current.documentType === 'DRAFTING') await drafting.validateLine(user, current, tx);
         if (input.decision === 'reject') {
           const changed = { ...current, status: 'REJECTED', rejectionReason: text(input.reason, 1000),
             updatedAt: timestamp, updatedBy: user.uid, rejectedBy: user.uid };
@@ -654,6 +756,16 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           return { success: true };
         }
         if (input.decision !== 'approve') fail('invalid-argument', '승인 또는 반려를 선택해 주세요.');
+        if (current.documentType === 'DRAFTING') {
+          if (input.front !== undefined || input.issueDate !== undefined) fail('invalid-argument', '기안 번호와 기안일은 변경할 수 없습니다.');
+          const changed = { ...current, approvalLine: current.approvalLine.map(step => step.uid === user.uid
+            ? { ...step, name: user.name || step.name, approvedAt: timestamp } : step), updatedAt: timestamp, updatedBy: user.uid };
+          if (changed.approvalLine.every(step => step.approvedAt)) return issueDrafting(tx, user, changed, ref, timestamp);
+          const plan = await notifications(tx, ref, current, changed, 'STEP_APPROVED', user, timestamp);
+          tx.update(ref, { ...changed, notificationRecipientIds: plan.recipientIds });
+          writeNotifications(tx, ref, plan);
+          return { success: true };
+        }
         if (user.role !== 'ADMIN' && nextStep?.uid === user.uid) {
           const changed = { ...current, approvalLine: current.approvalLine.map(step => step.uid === user.uid ? { ...step, approvedAt: timestamp } : step),
             updatedAt: timestamp, updatedBy: user.uid };

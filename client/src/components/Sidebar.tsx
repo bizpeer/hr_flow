@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, CalendarClock, Network, Settings, FileText, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2, CreditCard } from 'lucide-react';
+import { Home, CalendarClock, Network, Settings, FileText, FilePenLine, CheckSquare, PieChart, BookOpen, LogIn, LogOut, Users, Banknote, Shield, Building2, CreditCard } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { useAuthStore } from '../store/authStore';
@@ -100,6 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
           <>
             <NavItem onItemClick={onItemClick} to="/dashboard" icon={Home} label="대시보드" />
             <NavItem onItemClick={onItemClick} to="/leave" icon={CalendarClock} label="휴가신청" />
+            <NavItem onItemClick={onItemClick} to="/drafting" icon={FilePenLine} label="기안서작성" />
             <NavItem onItemClick={onItemClick} to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
             <NavItem onItemClick={onItemClick} to="/documents" icon={FileText} label="서류발급" />
             <NavItem onItemClick={onItemClick} to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />

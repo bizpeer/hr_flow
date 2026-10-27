@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { FileText, Plus, Settings, Download, History, CheckCircle, Send, RefreshCw, X, Users, ArrowUp, ArrowDown } from 'lucide-react';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -12,7 +12,7 @@ import './OfficialLetters.css';
 
 const emptyContent = (): LetterContent => ({ recipient: '', reference: '', title: '',
   body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n- 아 래 -\n\n\n끝.', attachments: '' });
-const documentLabels: Record<DocumentType, string> = { OFFICIAL: '공문', EMPLOYMENT: '재직증명서', CAREER: '경력증명서' };
+const documentLabels: Record<DocumentType, string> = { OFFICIAL: '공문', EMPLOYMENT: '재직증명서', CAREER: '경력증명서', DRAFTING: '기안서' };
 const certificateFieldLabels: Record<keyof CertificateContent, string> = { nameKo: '한글 성명', nameEn: '영문 성명', birthDate: '생년월일', address: '주소', division: '소속', position: '직위', startDate: '입사일', endDate: '퇴사일', purpose: '제출 용도', department: '담당부서', contactName: '담당자', contactPhone: '연락처' };
 const emptyCertificate = (defaults: Partial<CertificateContent> = {}): CertificateContent => ({
   nameKo: '', nameEn: '', birthDate: '', address: '', division: '', position: '', startDate: '', endDate: '',
@@ -46,7 +46,7 @@ function recentDocumentRange(): LetterDateRange {
   return { startDate: start.toISOString().slice(0, 10), endDate };
 }
 
-function DeleteIssuedDialog({ letter, stillCurrent, onClose, onResult }: {
+export function DeleteIssuedDialog({ letter, stillCurrent, onClose, onResult }: {
   letter: OfficialLetter;
   stillCurrent: () => boolean;
   onClose: () => void;
@@ -120,6 +120,7 @@ if (typeof window !== 'undefined') {
 }
 
 export function OfficialLetters() {
+  const navigate = useNavigate();
   const { userData } = useAuthStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const routerLocation = useLocation();
@@ -322,12 +323,13 @@ export function OfficialLetters() {
       }
       const { letter } = await officialLetters.get(linkedLetterId);
       if (!active || !scopeIsCurrent(scope)) return;
+      if (letter.documentType === 'DRAFTING') { navigate(`/drafting?letter=${encodeURIComponent(letter.id)}${searchParams.get('notification') ? `&notification=${encodeURIComponent(searchParams.get('notification') || '')}` : ''}`, { replace: true }); return; }
       handledLink.current = linkedKey; setSettledLink(linkedKey);
       setSelected(letter); setDocumentType(letter.documentType || 'OFFICIAL'); setContent(letter.content); setEditing(true); setDirty(false); setHistory(null);
       setApprovalOpen(false); setReassignmentOpen(false); setTab('documents'); setError('');
     }).catch(e => { if (active) { handledLink.current = linkedKey; setSettledLink(linkedKey); setError(errorMessage(e)); } });
     return () => { active = false; };
-  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings, scope, scopeIsCurrent]);
+  }, [linkedLetterId, linkedKey, currentUserId, currentRole, confirmLeaveSettings, scope, scopeIsCurrent, navigate, searchParams]);
 
   function setLetterLink(id?: string) {
     const key = letterLinkKey(id || '');
@@ -363,6 +365,7 @@ export function OfficialLetters() {
     await run(async () => {
       const { letter } = await officialLetters.get(id);
       if (!scopeIsCurrent(scope)) return;
+      if (letter.documentType === 'DRAFTING') { navigate(`/drafting?letter=${encodeURIComponent(letter.id)}`, { replace: true }); return; }
       setSelected(letter); setDocumentType(letter.documentType || 'OFFICIAL'); setContent(letter.content); setEditing(true); setDirty(false); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false);
     });
   }
@@ -393,6 +396,7 @@ export function OfficialLetters() {
   function begin(type: DocumentType) {
     if (!confirmLeaveSettings()) return;
     if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새 서류를 작성할까요?')) return;
+    if (type === 'DRAFTING') { navigate('/drafting'); return; }
     setLetterLink(); setTab('documents'); setSelected(null); setDocumentType(type);
     setContent(type === 'OFFICIAL' ? emptyContent() : certificateContent(type, emptyCertificate(employeeDefaults)));
     setEditing(true); setDirty(false); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false); setError(''); setNotice('');

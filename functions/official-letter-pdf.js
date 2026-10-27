@@ -1,5 +1,6 @@
 const path = require('node:path');
 const PDFDocument = require('pdfkit');
+const { renderDraftingPdf } = require('./drafting-pdf');
 
 function sealSize(branding, legacyPoints) {
   if (branding.sealWidthMm == null && branding.sealHeightMm == null) return { width: legacyPoints, height: legacyPoints, legacy: true };
@@ -19,6 +20,7 @@ function drawSeal(pdf, image, x, y, seal) {
 
 /** A4 corporate letter with embedded Korean fonts and an immutable approved seal. */
 async function renderOfficialLetterPdf(letter, images) {
+  if (letter.documentType === 'DRAFTING') return renderDraftingPdf(letter);
   if (['EMPLOYMENT', 'CAREER'].includes(letter.documentType)) return renderCertificatePdf(letter, images);
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({ size: 'A4', pdfVersion: '1.7', margins: { top: 52, bottom: 56, left: 58, right: 58 },

@@ -144,7 +144,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
     try {
       // This also checks current membership before opening a possibly stale alert.
       await acknowledgeOfficialNotification(notification);
-      if (alive.current) goTo(`/documents?letter=${encodeURIComponent(notification.letterId)}&notification=${encodeURIComponent(`${notification.revision}:${notification.updatedAt}`)}`);
+      if (alive.current) goTo(`${notification.documentType === 'DRAFTING' ? '/drafting' : '/documents'}?letter=${encodeURIComponent(notification.letterId)}&notification=${encodeURIComponent(`${notification.revision}:${notification.updatedAt}`)}`);
     } catch (error) {
       if (alive.current) setActionError(officialNotificationError(error));
     } finally {

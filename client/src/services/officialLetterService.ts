@@ -1,7 +1,19 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
-export type DocumentType = 'OFFICIAL' | 'EMPLOYMENT' | 'CAREER';
+export type DocumentType = 'OFFICIAL' | 'EMPLOYMENT' | 'CAREER' | 'DRAFTING';
+export interface DraftingRoute { teamLeader: boolean; divisionHead: boolean; cooperationDivisionIds: string[]; representative: boolean }
+export interface DraftingApprover {
+  uid: string; name: string; kind: 'TEAM_LEADER' | 'DIVISION_HEAD' | 'COOPERATION' | 'REPRESENTATIVE';
+  roleLabel: string; divisionId: string; divisionName: string;
+}
+export interface DraftingBootstrap {
+  companyName: string; draftDate: string;
+  division: { id: string; name: string; prefix: string }; team: { id: string; name: string } | null;
+  candidates: { teamLeader: DraftingApprover | null; divisionHead: DraftingApprover | null;
+    cooperationHeads: DraftingApprover[]; representative: DraftingApprover | null };
+  defaults: DraftingRoute;
+}
 export interface CertificateContent {
   nameKo: string;
   nameEn: string;
@@ -23,9 +35,11 @@ export interface LetterContent {
   title: string;
   body: string;
   attachments: string;
+  cooperationNote?: string;
   certificate?: CertificateContent;
 }
-export interface ApprovalStep { uid: string; name: string; approvedAt: string | null }
+export interface ApprovalStep { uid: string; name: string; approvedAt: string | null;
+  kind?: DraftingApprover['kind']; roleLabel?: string; divisionId?: string; divisionName?: string }
 export interface ApproverCandidate {
   uid: string;
   name: string;
@@ -58,6 +72,8 @@ export interface OfficialLetter {
   creatorId: string;
   creatorName: string;
   documentType?: DocumentType;
+  drafting?: { draftDate: string; divisionName: string; teamName: string; sequence: number; yearMonth: string;
+    route: DraftingRoute; submittedAt?: string | null; submittedBy?: string | null; submittedByName?: string | null };
   content: LetterContent;
   approvalLine: ApprovalStep[];
   participantIds: string[];
@@ -109,6 +125,10 @@ async function call<T>(action: string, payload: Record<string, unknown> = {}): P
   return response.data as T;
 }
 export const officialLetters = {
+  draftingBootstrap: (id?: string) => call<DraftingBootstrap>('draftingBootstrap', id ? { id } : {}),
+  saveDrafting: (content: LetterContent, draftingRoute: DraftingRoute, letter: OfficialLetter | null, requestId: string) =>
+    call<{ id: string }>('save', { content, draftingRoute, documentType: 'DRAFTING', requestId,
+      ...(letter ? { id: letter.id, revision: letter.revision } : {}) }),
   bootstrap: () => call<LetterBootstrap>('bootstrap'),
   list: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('list', range ? { ...range } : {}),
   approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
