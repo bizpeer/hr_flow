@@ -218,3 +218,9 @@
   .workflow-theme .leave-screen .request-table td[data-label]::before,
   .workflow-theme .expense-screen .request-table td[data-label]::before { line-height: 1.9; }
 }
+@media (max-width: 480px) {
+  .workflow-theme .leave-screen [aria-label="보안 첨부파일"] > .flex > span,
+  .workflow-theme .expense-screen [aria-label="보안 첨부파일"] > .flex > span { flex: 1 0 calc(100% - 32px); }
+  .workflow-theme .expense-screen .expense-modal-footer { flex-wrap: wrap; }
+  .workflow-theme .expense-screen .expense-modal-footer .wf-btn { flex: 1 1 120px; white-space: nowrap; }
+}

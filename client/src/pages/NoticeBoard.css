@@ -110,3 +110,6 @@
   .workflow-theme .notice-board-screen .nb-upload-label { padding:18px 14px; }
   .workflow-theme .notice-board-screen .nb-form-actions button { flex:1; min-width:0; min-height:44px; }
 }
+@media (max-width:480px) {
+  .workflow-theme .notice-board-screen .nb-attachment [aria-label="보안 첨부파일"] > .flex > span { flex:1 0 calc(100% - 32px); }
+}
