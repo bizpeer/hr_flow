@@ -1,0 +1,112 @@
+.workflow-theme .notice-board-screen { min-width:0; min-height:0; color:var(--wf-text); background:var(--wf-bg); }
+.workflow-theme .notice-board-screen .nb-content { display:grid; gap:20px; }
+.workflow-theme .notice-board-screen .nb-page-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.workflow-theme .notice-board-screen .nb-heading { display:flex; align-items:center; gap:10px; }
+.workflow-theme .notice-board-screen .nb-heading-icon { width:22px; height:22px; flex-shrink:0; color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-description { margin:7px 0 0; color:var(--wf-muted); font-size:13px; line-height:1.65; }
+.workflow-theme .notice-board-screen .nb-header-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.workflow-theme .notice-board-screen .nb-search { position:relative; display:block; width:240px; max-width:100%; }
+.workflow-theme .notice-board-screen .nb-search > svg { position:absolute; left:11px; top:50%; width:17px; height:17px; transform:translateY(-50%); color:var(--wf-muted); pointer-events:none; }
+.workflow-theme .notice-board-screen .nb-search input { padding-left:36px; }
+.workflow-theme .notice-board-screen .nb-create-button { white-space:nowrap; }
+.workflow-theme .notice-board-screen .nb-create-button svg, .workflow-theme .notice-board-screen .nb-form-actions svg { width:17px; height:17px; }
+.workflow-theme .notice-board-screen .nb-stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+.workflow-theme .notice-board-screen .nb-stat { display:flex; flex-direction:column; gap:8px; padding:16px 20px; }
+.workflow-theme .notice-board-screen .nb-stat > span { color:var(--wf-muted); font-size:13px; font-weight:400; }
+.workflow-theme .notice-board-screen .nb-stat > strong { color:var(--wf-strong); font-size:26px; line-height:1.25; font-weight:600; }
+.workflow-theme .notice-board-screen .nb-stat small { margin-left:5px; color:var(--wf-muted); font-size:12px; font-weight:400; }
+.workflow-theme .notice-board-screen .nb-stat-highlight { background:var(--wf-primary-50); border-color:var(--wf-primary-100); }
+.workflow-theme .notice-board-screen .nb-stat-highlight > strong { color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-list-head { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.workflow-theme .notice-board-screen .nb-list-count { color:var(--wf-muted); font-size:13px; }
+.workflow-theme .notice-board-screen .nb-list { display:grid; gap:10px; }
+.workflow-theme .notice-board-screen .nb-notice { overflow:hidden; }
+.workflow-theme .notice-board-screen .nb-notice.is-expanded { border-color:var(--wf-primary-100); }
+.workflow-theme .notice-board-screen .nb-notice-header { display:flex; align-items:center; min-width:0; padding:0 16px 0 0; }
+.workflow-theme .notice-board-screen .nb-notice-toggle { display:flex; align-items:center; flex:1; gap:16px; min-width:0; padding:18px 20px; border:0; background:transparent; color:var(--wf-text); text-align:left; cursor:pointer; }
+.workflow-theme .notice-board-screen .nb-notice-toggle:hover { background:var(--wf-subtle); }
+.workflow-theme .notice-board-screen .nb-notice-toggle:focus-visible { outline-offset:-3px; }
+.workflow-theme .notice-board-screen .nb-date { display:flex; flex:0 0 54px; flex-direction:column; align-items:center; justify-content:center; gap:2px; min-height:56px; border:1px solid var(--wf-border); border-radius:8px; background:var(--wf-subtle); color:var(--wf-muted); }
+.workflow-theme .notice-board-screen .nb-date > span { font-size:11px; font-weight:400; }
+.workflow-theme .notice-board-screen .nb-date > strong { font-size:20px; line-height:1.2; font-weight:600; }
+.workflow-theme .notice-board-screen .nb-date.is-unread { color:var(--wf-primary-800); background:var(--wf-primary-50); border-color:var(--wf-primary-100); }
+.workflow-theme .notice-board-screen .nb-notice-summary { display:grid; flex:1; min-width:0; gap:7px; }
+.workflow-theme .notice-board-screen .nb-badges { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.workflow-theme .notice-board-screen .nb-category { min-height:24px; padding:2px 7px; font-size:11px; }
+.workflow-theme .notice-board-screen .nb-category.is-unread { background:var(--wf-primary-50); color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-unread { display:inline-flex; align-items:center; gap:4px; color:var(--wf-primary-800); font-size:11px; font-weight:500; }
+.workflow-theme .notice-board-screen .nb-unread svg { width:12px; height:12px; }
+.workflow-theme .notice-board-screen .nb-notice-title { color:var(--wf-strong); font-size:16px; line-height:1.5; font-weight:600; overflow-wrap:anywhere; }
+.workflow-theme .notice-board-screen .nb-notice-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px 16px; color:var(--wf-muted); font-size:12px; font-weight:400; }
+.workflow-theme .notice-board-screen .nb-notice-meta > span { display:inline-flex; align-items:center; gap:5px; min-width:0; overflow-wrap:anywhere; }
+.workflow-theme .notice-board-screen .nb-notice-meta svg { width:13px; height:13px; flex-shrink:0; }
+.workflow-theme .notice-board-screen .nb-expand-icon { width:18px; height:18px; flex-shrink:0; color:var(--wf-muted); transition:transform .15s ease; }
+.workflow-theme .notice-board-screen .is-expanded .nb-expand-icon { transform:rotate(180deg); color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-notice-actions { display:flex; align-items:center; gap:4px; flex-shrink:0; padding-left:10px; border-left:1px solid var(--wf-border); }
+.workflow-theme .notice-board-screen .nb-notice-actions svg { width:17px; height:17px; }
+.workflow-theme .notice-board-screen .nb-edit-button:hover { background:var(--wf-primary-50); color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-delete-button:hover { background:var(--wf-error-bg); color:var(--wf-text); }
+.workflow-theme .notice-board-screen .nb-notice-body { padding:20px; border-top:1px solid var(--wf-border); background:var(--wf-subtle); }
+.workflow-theme .notice-board-screen .nb-notice-text { color:var(--wf-text); font-size:14px; font-weight:400; line-height:1.9; white-space:pre-wrap; overflow-wrap:anywhere; }
+.workflow-theme .notice-board-screen .nb-attachment { margin-top:20px; padding-top:16px; border-top:1px solid var(--wf-border); }
+.workflow-theme .notice-board-screen .nb-attachment .text-indigo-500 { color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-attachment .border-slate-200 { border-color:var(--wf-border); }
+.workflow-theme .notice-board-screen .nb-attachment .text-slate-700 { color:var(--wf-text); font-weight:500; }
+.workflow-theme .notice-board-screen .nb-attachment .bg-rose-50 { background:var(--wf-error-bg); color:var(--wf-text); }
+.workflow-theme .notice-board-screen .nb-attachment button { min-height:40px; max-width:100%; padding:8px 12px; border:1px solid var(--wf-border-strong); border-radius:8px; background:var(--wf-panel); color:var(--wf-primary-800); font-size:13px; font-weight:500; }
+.workflow-theme .notice-board-screen .nb-attachment button:hover { background:var(--wf-primary-50); }
+.workflow-theme .notice-board-screen .nb-attachment button svg { width:16px; height:16px; flex-shrink:0; }
+.workflow-theme .notice-board-screen .nb-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-height:260px; padding:32px 20px; text-align:center; }
+.workflow-theme .notice-board-screen .nb-empty > svg { width:28px; height:28px; margin-bottom:4px; color:var(--wf-muted); }
+.workflow-theme .notice-board-screen .nb-empty p { margin:0; color:var(--wf-text); font-size:15px; font-weight:500; }
+.workflow-theme .notice-board-screen .nb-empty > span { color:var(--wf-muted); font-size:13px; }
+.workflow-theme .notice-board-screen .nb-modal-backdrop { position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:16px; overflow-y:auto; background:var(--wf-overlay); }
+.workflow-theme .notice-board-screen .nb-modal { width:100%; max-width:680px; max-height:calc(100dvh - 32px); overflow-y:auto; border:1px solid var(--wf-border); border-radius:12px; background:var(--wf-panel); box-shadow:0 8px 32px rgba(0,0,0,.12); }
+.workflow-theme .notice-board-screen .nb-modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:20px 24px; border-bottom:1px solid var(--wf-border); }
+.workflow-theme .notice-board-screen .nb-modal-head h2 { margin:0; color:var(--wf-strong); font-size:22px; line-height:1.4; font-weight:600; }
+.workflow-theme .notice-board-screen .nb-modal-head p { margin:6px 0 0; color:var(--wf-muted); font-size:13px; line-height:1.65; }
+.workflow-theme .notice-board-screen .nb-modal-head .wf-icon-button { flex-shrink:0; }
+.workflow-theme .notice-board-screen .nb-modal-head svg { width:20px; height:20px; }
+.workflow-theme .notice-board-screen .nb-form { display:grid; gap:20px; padding:24px; }
+.workflow-theme .notice-board-screen .nb-form-row { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:16px; }
+.workflow-theme .notice-board-screen .nb-form textarea { min-height:160px; }
+.workflow-theme .notice-board-screen .nb-upload { position:relative; border:1px dashed var(--wf-border-strong); border-radius:8px; background:var(--wf-subtle); }
+.workflow-theme .notice-board-screen .nb-upload:hover, .workflow-theme .notice-board-screen .nb-upload.has-file { border-color:var(--wf-primary-800); background:var(--wf-primary-50); }
+.workflow-theme .notice-board-screen .nb-upload:focus-within { outline:2px solid var(--border-focus); outline-offset:3px; }
+.workflow-theme .notice-board-screen .nb-file-input, .workflow-theme .notice-board-screen .nb-sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.workflow-theme .notice-board-screen .nb-upload-label { display:flex; align-items:center; justify-content:center; gap:12px; min-height:112px; padding:20px; cursor:pointer; }
+.workflow-theme .notice-board-screen .nb-upload-label > svg { width:28px; height:28px; flex-shrink:0; color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen .nb-upload-label > span { display:grid; min-width:0; gap:4px; }
+.workflow-theme .notice-board-screen .nb-upload-label strong { color:var(--wf-text); font-size:13px; line-height:1.6; font-weight:500; overflow-wrap:anywhere; }
+.workflow-theme .notice-board-screen .nb-upload-label small { color:var(--wf-muted); font-size:12px; font-weight:400; }
+.workflow-theme .notice-board-screen .nb-form-actions { display:flex; align-items:center; justify-content:flex-end; gap:8px; padding-top:4px; }
+.workflow-theme .notice-board-screen .nb-form-actions button { min-width:96px; }
+.workflow-theme .notice-board-screen.nb-loading { display:flex; align-items:center; justify-content:center; flex-direction:column; gap:12px; min-height:300px; }
+.workflow-theme .notice-board-screen .nb-spinner { width:28px; height:28px; color:var(--wf-primary-800); }
+.workflow-theme .notice-board-screen.nb-loading p { margin:0; color:var(--wf-muted); font-size:14px; }
+@media (max-width:767px) {
+  .workflow-theme .notice-board-screen .nb-content { gap:20px; }
+  .workflow-theme .notice-board-screen .nb-heading { align-items:flex-start; gap:8px; }
+  .workflow-theme .notice-board-screen .nb-heading-icon { margin-top:4px; width:20px; height:20px; }
+  .workflow-theme .notice-board-screen .nb-header-actions { width:100%; }
+  .workflow-theme .notice-board-screen .nb-search { flex:1; width:auto; min-width:160px; }
+  .workflow-theme .notice-board-screen .nb-stats { grid-template-columns:minmax(0,1fr); gap:8px; }
+  .workflow-theme .notice-board-screen .nb-stat { flex-direction:row; align-items:center; justify-content:space-between; gap:12px; padding:13px 16px; }
+  .workflow-theme .notice-board-screen .nb-stat > strong { font-size:22px; }
+  .workflow-theme .notice-board-screen .nb-notice-header { align-items:stretch; padding-right:8px; }
+  .workflow-theme .notice-board-screen .nb-notice-toggle { gap:10px; padding:16px 8px 16px 16px; }
+  .workflow-theme .notice-board-screen .nb-date { display:none; }
+  .workflow-theme .notice-board-screen .nb-notice-title { font-size:15px; }
+  .workflow-theme .notice-board-screen .nb-notice-meta { align-items:flex-start; flex-direction:column; gap:5px; }
+  .workflow-theme .notice-board-screen .nb-notice-actions { flex-direction:column; justify-content:center; gap:2px; margin-block:10px; padding-left:6px; }
+  .workflow-theme .notice-board-screen .nb-notice-actions .wf-icon-button { width:44px; min-height:44px; }
+  .workflow-theme .notice-board-screen .nb-notice-body { padding:16px; }
+  .workflow-theme .notice-board-screen .nb-attachment button { min-height:44px; overflow-wrap:anywhere; white-space:normal; }
+  .workflow-theme .notice-board-screen .nb-modal-head { padding:18px 16px; gap:8px; }
+  .workflow-theme .notice-board-screen .nb-modal-head h2 { font-size:20px; }
+  .workflow-theme .notice-board-screen .nb-modal-head .wf-icon-button { width:44px; min-height:44px; }
+  .workflow-theme .notice-board-screen .nb-form { padding:20px 16px; gap:18px; }
+  .workflow-theme .notice-board-screen .nb-form-row { grid-template-columns:minmax(0,1fr); gap:18px; }
+  .workflow-theme .notice-board-screen .nb-upload-label { padding:18px 14px; }
+  .workflow-theme .notice-board-screen .nb-form-actions button { flex:1; min-width:0; min-height:44px; }
+}

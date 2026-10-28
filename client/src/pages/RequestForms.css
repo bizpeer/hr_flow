@@ -1,0 +1,220 @@
+.workflow-theme .leave-screen,
+.workflow-theme .expense-screen { min-width: 0; color: var(--wf-text); }
+.workflow-theme .leave-screen .request-content,
+.workflow-theme .expense-screen .request-content { display: grid; gap: 20px; min-width: 0; container: request-forms / inline-size; }
+.workflow-theme .leave-screen .request-page-head,
+.workflow-theme .expense-screen .request-page-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+.workflow-theme .leave-screen .request-title-row,
+.workflow-theme .expense-screen .request-title-row { display: flex; align-items: center; gap: 10px; }
+.workflow-theme .leave-screen .request-title-row > svg,
+.workflow-theme .expense-screen .request-title-row > svg { width: 23px; height: 23px; flex-shrink: 0; color: var(--wf-primary-800); }
+.workflow-theme .leave-screen .request-description,
+.workflow-theme .expense-screen .request-description { margin: 7px 0 0; font-size: 13px; color: var(--wf-muted); }
+.workflow-theme .leave-screen .leave-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.workflow-theme .leave-screen .request-stat,
+.workflow-theme .expense-screen .request-stat { min-width: 108px; padding: 12px 18px; }
+.workflow-theme .leave-screen .request-stat span,
+.workflow-theme .expense-screen .request-stat span { display: block; font-size: 12px; color: var(--wf-muted); }
+.workflow-theme .leave-screen .request-stat strong,
+.workflow-theme .expense-screen .request-stat strong { display: block; margin-top: 2px; font-size: 26px; line-height: 1.35; font-weight: 600; font-variant-numeric: tabular-nums; }
+.workflow-theme .leave-screen .request-stat small,
+.workflow-theme .expense-screen .request-stat small { margin-left: 5px; font-size: 13px; font-weight: 400; color: var(--wf-muted); }
+.workflow-theme .leave-screen .request-stat-selected,
+.workflow-theme .expense-screen .request-stat-selected { background: var(--wf-primary-50); border-color: var(--wf-primary-100); }
+.workflow-theme .leave-screen .request-stat-selected strong,
+.workflow-theme .expense-screen .request-stat-selected strong { color: var(--wf-primary-800); }
+.workflow-theme .expense-screen .expense-pending { min-width: 146px; }
+.workflow-theme .leave-screen .request-main-grid,
+.workflow-theme .expense-screen .request-main-grid { display: grid; grid-template-columns: minmax(320px, .88fr) minmax(0, 1.4fr); align-items: start; gap: 20px; min-width: 0; }
+.workflow-theme .leave-screen .request-form-panel,
+.workflow-theme .expense-screen .request-form-panel,
+.workflow-theme .leave-screen .request-history-panel,
+.workflow-theme .expense-screen .request-history-panel { padding: 20px; min-width: 0; }
+.workflow-theme .leave-screen .request-history-column { display: grid; gap: 20px; min-width: 0; }
+.workflow-theme .leave-screen .request-section-title,
+.workflow-theme .expense-screen .request-section-title { display: flex; align-items: center; gap: 8px; }
+.workflow-theme .leave-screen .request-section-title > svg,
+.workflow-theme .expense-screen .request-section-title > svg { width: 18px; height: 18px; color: var(--wf-primary-800); flex-shrink: 0; }
+.workflow-theme .leave-screen .request-form,
+.workflow-theme .expense-screen .request-form { display: grid; gap: 18px; }
+.workflow-theme .leave-screen .request-form-panel > .request-section-title { margin-bottom: 22px; }
+.workflow-theme .leave-screen .request-field-grid,
+.workflow-theme .expense-screen .request-field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.workflow-theme .expense-screen .request-field-full { grid-column: 1 / -1; }
+.workflow-theme .leave-screen .wf-field small,
+.workflow-theme .expense-screen .wf-field small { font-size: 12px; font-weight: 400; color: var(--wf-muted); }
+.workflow-theme .leave-screen .wf-input,
+.workflow-theme .expense-screen .wf-input { min-height: 44px; max-width: 100%; }
+.workflow-theme .leave-screen textarea.wf-input,
+.workflow-theme .expense-screen textarea.wf-input { min-height: 108px; }
+.workflow-theme .leave-screen .request-upload,
+.workflow-theme .expense-screen .request-upload { position: relative; display: flex; align-items: center; justify-content: center; min-height: 108px; padding: 18px 14px; border: 1px dashed var(--wf-border-strong); border-radius: 8px; color: var(--wf-muted); background: var(--wf-subtle); cursor: pointer; }
+.workflow-theme .leave-screen .request-upload:hover,
+.workflow-theme .expense-screen .request-upload:hover { border-color: var(--wf-primary-800); background: var(--wf-primary-50); }
+.workflow-theme .leave-screen .request-upload:focus-within,
+.workflow-theme .expense-screen .request-upload:focus-within { outline: 2px solid var(--border-focus); outline-offset: 3px; }
+.workflow-theme .leave-screen .request-upload-copy,
+.workflow-theme .expense-screen .request-upload-copy { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; text-align: center; font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.workflow-theme .leave-screen .request-upload-copy svg,
+.workflow-theme .expense-screen .request-upload-copy svg { width: 24px; height: 24px; color: var(--wf-primary-800); }
+.workflow-theme .leave-screen .request-file-input,
+.workflow-theme .expense-screen .request-file-input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.workflow-theme .leave-screen .request-submit,
+.workflow-theme .expense-screen .request-submit { width: 100%; min-height: 44px; }
+.workflow-theme .leave-screen .wf-btn > svg,
+.workflow-theme .expense-screen .wf-btn > svg { width: 17px; height: 17px; flex-shrink: 0; }
+.workflow-theme .expense-screen .expense-cancel-edit { padding-inline: 8px; min-height: 44px; font-size: 12px; }
+.workflow-theme .expense-screen .expense-amount-field { position: relative; }
+.workflow-theme .expense-screen .expense-amount-field .wf-input { padding-right: 34px; }
+.workflow-theme .expense-screen .expense-amount-field svg { position: absolute; width: 16px; height: 16px; right: 12px; top: 14px; color: var(--wf-muted); pointer-events: none; }
+.workflow-theme .leave-screen .request-history-head,
+.workflow-theme .expense-screen .request-history-head { margin-bottom: 18px; }
+.workflow-theme .leave-screen .request-count,
+.workflow-theme .expense-screen .request-count { font-size: 12px; color: var(--wf-muted); }
+.workflow-theme .expense-screen .expense-month-filter { position: relative; width: 164px; }
+.workflow-theme .expense-screen .expense-month-filter .wf-input { padding-left: 34px; font-size: 13px; }
+.workflow-theme .expense-screen .expense-month-filter > svg { position: absolute; left: 11px; top: 14px; width: 16px; height: 16px; color: var(--wf-muted); pointer-events: none; }
+.workflow-theme .leave-screen .request-table-wrap,
+.workflow-theme .expense-screen .request-table-wrap { min-width: 0; }
+.workflow-theme .leave-screen .request-table,
+.workflow-theme .expense-screen .request-table { width: 100%; border-collapse: collapse; text-align: left; table-layout: fixed; font-size: 13px; }
+.workflow-theme .leave-screen .request-table th,
+.workflow-theme .expense-screen .request-table th { padding: 11px 10px; border-block: 1px solid var(--wf-border); color: var(--wf-muted); background: var(--wf-subtle); font-size: 12px; font-weight: 500; }
+.workflow-theme .leave-screen .request-table td,
+.workflow-theme .expense-screen .request-table td { padding: 16px 10px; border-bottom: 1px solid var(--wf-border); vertical-align: middle; overflow-wrap: anywhere; }
+.workflow-theme .leave-screen .request-table th:first-child { width: 15%; }
+.workflow-theme .leave-screen .request-table th:nth-child(2) { width: 48%; }
+.workflow-theme .leave-screen .request-table th:nth-child(3) { width: 15%; }
+.workflow-theme .leave-screen .request-table th:nth-child(4) { width: 22%; }
+.workflow-theme .expense-screen .request-table th:first-child { width: 24%; }
+.workflow-theme .expense-screen .request-table th:nth-child(2) { width: 32%; }
+.workflow-theme .expense-screen .request-table th:nth-child(3) { width: 26%; }
+.workflow-theme .expense-screen .request-table th:nth-child(4) { width: 18%; }
+.workflow-theme .leave-screen .request-record-title,
+.workflow-theme .expense-screen .request-record-title { color: var(--wf-text); font-size: 13px; font-weight: 500; }
+.workflow-theme .leave-screen .request-record-description,
+.workflow-theme .expense-screen .request-record-description { margin-top: 4px; color: var(--wf-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.workflow-theme .leave-screen .request-nowrap { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.workflow-theme .leave-screen .request-type { display: inline-block; padding: 4px 7px; border-radius: 5px; background: var(--wf-bg); color: var(--wf-muted); font-size: 12px; white-space: nowrap; }
+.workflow-theme .leave-screen .request-type-annual { background: var(--wf-primary-50); color: var(--wf-primary-800); }
+.workflow-theme .leave-screen .request-type-half { background: var(--wf-info-bg); color: var(--wf-text); }
+.workflow-theme .expense-screen .expense-record { cursor: pointer; }
+.workflow-theme .expense-screen .expense-record:hover,
+.workflow-theme .expense-screen .expense-record:focus-within { background: var(--wf-primary-50); }
+.workflow-theme .expense-screen .expense-record-category { color: var(--wf-primary-800); font-size: 12px; font-weight: 500; }
+.workflow-theme .expense-screen .expense-record-button { min-height: 44px; padding: 0; border: 0; background: transparent; color: var(--wf-text); font-size: 13px; font-weight: 500; line-height: 1.6; text-align: left; overflow-wrap: anywhere; cursor: pointer; }
+.workflow-theme .expense-screen .expense-record-button:hover { color: var(--wf-primary-800); text-decoration: underline; }
+.workflow-theme .expense-screen .expense-amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
+.workflow-theme .leave-screen .request-table .request-empty-cell,
+.workflow-theme .expense-screen .request-table .request-empty-cell { padding: 0; border: 0; }
+.workflow-theme .leave-screen .request-empty,
+.workflow-theme .expense-screen .request-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 210px; padding: 24px 12px; color: var(--wf-muted); font-size: 13px; text-align: center; }
+.workflow-theme .leave-screen .request-empty > svg,
+.workflow-theme .expense-screen .request-empty > svg { width: 28px; height: 28px; color: var(--wf-border-strong); }
+.workflow-theme .leave-screen .request-empty p,
+.workflow-theme .expense-screen .request-empty p { margin: 0; }
+.workflow-theme .leave-screen .request-notice,
+.workflow-theme .expense-screen .request-notice { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px; }
+.workflow-theme .leave-screen .request-notice > svg,
+.workflow-theme .expense-screen .request-notice > svg { width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px; color: var(--wf-primary-800); }
+.workflow-theme .leave-screen .request-notice h3,
+.workflow-theme .expense-screen .request-notice h3 { margin: 0 0 5px; font-size: 14px; font-weight: 500; }
+.workflow-theme .leave-screen .request-notice p,
+.workflow-theme .expense-screen .request-notice p { margin: 0; font-size: 12px; color: var(--wf-muted); line-height: 1.8; }
+.workflow-theme .leave-screen .request-attachment { margin-top: 10px; }
+.workflow-theme .leave-screen [aria-label="보안 첨부파일"],
+.workflow-theme .expense-screen [aria-label="보안 첨부파일"] { min-width: 0; font-weight: 400; }
+.workflow-theme .leave-screen [aria-label="보안 첨부파일"] button,
+.workflow-theme .expense-screen [aria-label="보안 첨부파일"] button { min-height: 44px; border-radius: 8px; font-weight: 500; }
+.workflow-theme .leave-screen [aria-label="보안 첨부파일"] .bg-indigo-600,
+.workflow-theme .expense-screen [aria-label="보안 첨부파일"] .bg-indigo-600 { background: var(--wf-primary-800); }
+.workflow-theme .leave-screen [aria-label="보안 첨부파일"] .text-indigo-500,
+.workflow-theme .expense-screen [aria-label="보안 첨부파일"] .text-indigo-500 { color: var(--wf-primary-800); }
+.workflow-theme .leave-screen.request-loading,
+.workflow-theme .expense-screen.request-loading { display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 14px; min-height: 360px; color: var(--wf-muted); }
+.workflow-theme .expense-screen .request-loading-copy { display: grid; justify-items: center; gap: 14px; }
+.workflow-theme .expense-screen .request-loading-copy p { margin: 0; }
+.workflow-theme .leave-screen .request-spinner,
+.workflow-theme .expense-screen .request-spinner { width: 28px; height: 28px; color: var(--wf-primary-800); }
+.workflow-theme .expense-screen .expense-success { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 360px; padding: 24px 0; text-align: center; }
+.workflow-theme .expense-screen .expense-success > svg { width: 44px; height: 44px; margin-bottom: 18px; color: var(--wf-primary-800); }
+.workflow-theme .expense-screen .expense-success p { margin: 8px 0 22px; color: var(--wf-muted); font-size: 13px; }
+.workflow-theme .expense-screen .expense-modal-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; background: var(--wf-overlay); overflow-y: auto; overscroll-behavior: contain; }
+.workflow-theme .expense-screen .expense-modal { display: flex; flex-direction: column; width: min(100%, 640px); min-height: 0; max-height: calc(100dvh - 48px); box-shadow: 0 12px 48px rgba(0, 0, 0, .16); overflow: hidden; }
+.workflow-theme .expense-screen .expense-modal-head { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; gap: 16px; padding: 20px; border-bottom: 1px solid var(--wf-border); }
+.workflow-theme .expense-screen .expense-detail-eyebrow { margin: 0 0 5px; color: var(--wf-primary-800); font-size: 12px; font-weight: 500; }
+.workflow-theme .expense-screen .expense-created-date { display: flex; align-items: center; gap: 5px; margin-top: 7px; color: var(--wf-muted); font-size: 12px; }
+.workflow-theme .expense-screen .expense-created-date > svg { width: 14px; height: 14px; }
+.workflow-theme .expense-screen .expense-modal-close { min-width: 44px; min-height: 44px; padding: 10px; border-color: transparent; }
+.workflow-theme .expense-screen .expense-modal-body { display: grid; gap: 20px; min-height: 0; padding: 20px; overflow-y: auto; overscroll-behavior: contain; }
+.workflow-theme .expense-screen .expense-detail-value { min-height: 44px; padding: 11px 12px; border: 1px solid var(--wf-border); border-radius: 8px; background: var(--wf-subtle); font-size: 14px; font-weight: 400; overflow-wrap: anywhere; }
+.workflow-theme .expense-screen .expense-detail-amount { color: var(--wf-primary-800); font-weight: 600; font-variant-numeric: tabular-nums; background: var(--wf-primary-50); border-color: var(--wf-primary-100); }
+.workflow-theme .expense-screen .expense-detail-description { min-height: 80px; }
+.workflow-theme .expense-screen .expense-detail-description p { margin: 0; white-space: pre-wrap; line-height: 1.8; }
+.workflow-theme .expense-screen .expense-detail-status { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 8px; background: var(--wf-subtle); font-size: 13px; }
+.workflow-theme .expense-screen .expense-detail-status > svg { width: 20px; height: 20px; color: var(--wf-primary-800); flex-shrink: 0; }
+.workflow-theme .expense-screen .expense-detail-status p { margin: 0; }
+.workflow-theme .expense-screen .expense-detail-status .expense-detail-status-label { color: var(--wf-muted); font-size: 12px; margin-bottom: 3px; }
+.workflow-theme .expense-screen .expense-detail-status strong { color: var(--wf-primary-800); font-weight: 500; }
+.workflow-theme .expense-screen .expense-detail-attachment { padding-top: 18px; border-top: 1px solid var(--wf-border); }
+.workflow-theme .expense-screen .expense-attachment-empty { min-height: 110px; border: 1px dashed var(--wf-border-strong); border-radius: 8px; background: var(--wf-subtle); }
+.workflow-theme .expense-screen .expense-modal-footer { display: flex; align-items: center; gap: 8px; padding: 16px 20px; flex-shrink: 0; border-top: 1px solid var(--wf-border); background: var(--wf-subtle); }
+.workflow-theme .expense-screen .expense-modal-footer .wf-btn { min-height: 44px; }
+.workflow-theme .expense-screen .expense-footer-dismiss { flex: 1; }
+.workflow-theme .expense-screen .expense-footer-edit { flex: 1.5; }
+.workflow-theme .leave-screen .request-sr-only,
+.workflow-theme .expense-screen .request-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@container request-forms (max-width: 1020px) {
+  .workflow-theme .leave-screen .request-main-grid,
+  .workflow-theme .expense-screen .request-main-grid { grid-template-columns: minmax(0, 1fr); }
+  .workflow-theme .leave-screen .request-page-head { align-items: flex-start; }
+  .workflow-theme .leave-screen .leave-summary { width: 100%; }
+}
+@container request-forms (max-width: 620px) {
+  .workflow-theme .leave-screen .request-form-panel,
+  .workflow-theme .expense-screen .request-form-panel,
+  .workflow-theme .leave-screen .request-history-panel,
+  .workflow-theme .expense-screen .request-history-panel { padding: 16px; }
+  .workflow-theme .leave-screen .request-table thead,
+  .workflow-theme .expense-screen .request-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .workflow-theme .leave-screen .request-table,
+  .workflow-theme .expense-screen .request-table,
+  .workflow-theme .leave-screen .request-table tbody,
+  .workflow-theme .expense-screen .request-table tbody { display: block; width: 100%; }
+  .workflow-theme .leave-screen .request-table tr,
+  .workflow-theme .expense-screen .request-table tr { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--wf-border); }
+  .workflow-theme .leave-screen .request-table td,
+  .workflow-theme .expense-screen .request-table td { display: grid; grid-template-columns: 80px minmax(0, 1fr); align-items: start; gap: 4px 12px; padding: 0; border: 0; min-width: 0; text-align: left; }
+  .workflow-theme .leave-screen .request-table td[data-label]::before,
+  .workflow-theme .expense-screen .request-table td[data-label]::before { content: attr(data-label); grid-column: 1; grid-row: 1 / span 4; color: var(--wf-muted); font-size: 12px; line-height: 1.8; }
+  .workflow-theme .leave-screen .request-table td > *,
+  .workflow-theme .expense-screen .request-table td > * { grid-column: 2; min-width: 0; justify-self: start; }
+  .workflow-theme .leave-screen .request-table .request-empty-cell,
+  .workflow-theme .expense-screen .request-table .request-empty-cell { display: block; }
+  .workflow-theme .leave-screen .request-table .request-empty-cell > *,
+  .workflow-theme .expense-screen .request-table .request-empty-cell > * { width: 100%; }
+  .workflow-theme .leave-screen .request-record-description,
+  .workflow-theme .expense-screen .request-record-description { margin: 0; }
+  .workflow-theme .expense-screen .expense-record-button { margin: -9px 0; }
+  .workflow-theme .leave-screen .request-attachment { margin-top: 6px; }
+  .workflow-theme .leave-screen .request-notice,
+  .workflow-theme .expense-screen .request-notice { padding: 16px; }
+  .workflow-theme .expense-screen .expense-month-filter { width: 100%; }
+}
+@container request-forms (max-width: 420px) {
+  .workflow-theme .leave-screen .request-field-grid,
+  .workflow-theme .expense-screen .request-field-grid { grid-template-columns: minmax(0, 1fr); }
+  .workflow-theme .leave-screen .request-stat { min-width: 0; padding: 12px 10px; }
+  .workflow-theme .leave-screen .request-stat strong { font-size: 24px; }
+  .workflow-theme .expense-screen .expense-pending { width: 100%; }
+}
+@media (max-width: 600px) {
+  .workflow-theme .expense-screen .expense-modal-overlay { padding: 12px; }
+  .workflow-theme .expense-screen .expense-modal { max-height: calc(100dvh - 24px); }
+  .workflow-theme .expense-screen .expense-modal-head,
+  .workflow-theme .expense-screen .expense-modal-body { padding: 16px; }
+  .workflow-theme .expense-screen .expense-modal-footer { padding: 12px 16px; }
+  .workflow-theme .expense-screen .expense-modal .request-field-grid { grid-template-columns: minmax(0, 1fr); }
+  .workflow-theme .leave-screen .request-table td[data-label]::before,
+  .workflow-theme .expense-screen .request-table td[data-label]::before { line-height: 1.9; }
+}

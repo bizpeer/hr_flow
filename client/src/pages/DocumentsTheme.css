@@ -1,0 +1,105 @@
+.workflow-theme .documents-screen { display:flex; flex-direction:column; gap:20px; padding:24px; min-width:0; color:var(--wf-text); }
+.workflow-theme .documents-screen > * { min-width:0; margin-block:0; }
+.workflow-theme .documents-page-head { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap; }
+.workflow-theme .documents-page-head p { margin-top:8px; font-size:13px; line-height:1.7; color:var(--wf-muted); }
+.workflow-theme .documents-create-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.workflow-theme .documents-screen .ol-card { min-width:0; padding:22px 24px; border:1px solid var(--wf-border); border-radius:12px; background:var(--wf-panel); box-shadow:none; }
+.workflow-theme .documents-screen :is(.ol-button,.ol-primary) { min-height:40px; padding:8px 13px; border:1px solid var(--wf-border-strong); border-radius:8px; gap:7px; color:var(--wf-text); background:var(--wf-panel); font-size:14px; font-weight:500; line-height:1.5; }
+.workflow-theme .documents-screen .ol-button:hover:not(:disabled) { background:var(--wf-subtle); }
+.workflow-theme .documents-screen .ol-primary { background:var(--wf-primary-800); border-color:var(--wf-primary-800); color:var(--wf-on-primary); }
+.workflow-theme .documents-screen .ol-primary:hover:not(:disabled) { background:var(--wf-primary-900); border-color:var(--wf-primary-900); }
+.workflow-theme .documents-screen .ol-label { min-width:0; gap:7px; font-size:13px; font-weight:500; }
+.workflow-theme .documents-screen .ol-input { min-width:0; min-height:40px; padding:8px 11px; border:1px solid var(--wf-field-border); border-radius:8px; color:var(--wf-text); background:var(--wf-panel); font-size:14px; line-height:1.6; }
+.workflow-theme .documents-screen textarea.ol-input { resize:vertical; line-height:1.85; }
+.workflow-theme .documents-screen .ol-input:disabled { background:var(--wf-subtle); color:var(--wf-muted); }
+.workflow-theme .documents-screen .ol-input:focus { outline:2px solid var(--wf-secondary); outline-offset:2px; }
+.workflow-theme .documents-screen input[type=checkbox] { accent-color:var(--wf-primary-800); width:17px; height:17px; flex-shrink:0; }
+.workflow-theme .documents-screen :is(h2,h3) { font-weight:600; }
+.workflow-theme .documents-screen h2 { font-size:18px; line-height:1.5; }
+.workflow-theme .documents-screen :is(.font-bold,.font-semibold) { font-weight:500; }
+.workflow-theme .documents-screen :is(.text-slate-400,.text-slate-500,.text-slate-600) { color:var(--wf-muted); }
+.workflow-theme .documents-screen :is(.text-indigo-600,.text-indigo-700,.text-indigo-900) { color:var(--wf-primary-800); }
+.workflow-theme .documents-screen :is(.text-red-700,.text-red-800,.text-amber-700,.text-amber-800,.text-amber-900,.text-emerald-800) { color:var(--wf-text); }
+.workflow-theme .documents-screen :is(.bg-red-50) { background:var(--wf-error-bg); }
+.workflow-theme .documents-screen :is(.bg-amber-50) { background:var(--wf-warning-bg); }
+.workflow-theme .documents-screen :is(.bg-emerald-50) { background:var(--wf-success-bg); }
+.workflow-theme .documents-screen :is(.bg-indigo-50) { background:var(--wf-primary-50); }
+.workflow-theme .documents-screen .bg-slate-50 { background:var(--wf-subtle); }
+.workflow-theme .documents-screen :is(.border-slate-100,.border-slate-200) { border-color:var(--wf-border); }
+.workflow-theme .documents-screen .border-indigo-200 { border-color:var(--wf-primary-100); }
+.workflow-theme .documents-screen .rounded-xl { border-radius:8px; }
+.workflow-theme .documents-tabs { display:flex; align-items:center; flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--wf-border); padding-bottom:16px; }
+.workflow-theme .documents-tabs > button[aria-pressed] { background:transparent; border-color:transparent; color:var(--wf-muted); }
+.workflow-theme .documents-tabs > button[aria-pressed=true] { background:var(--wf-primary-50); border-color:var(--wf-primary-100); color:var(--wf-primary-800); }
+.workflow-theme .documents-tabs .documents-refresh { margin-left:auto; }
+.workflow-theme .documents-list-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:18px; }
+.workflow-theme .documents-list-head h2 { margin:0; }
+.workflow-theme .documents-list-head h2 > span { margin-left:5px; font-size:14px; color:var(--wf-muted); }
+.workflow-theme .documents-list-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
+.workflow-theme .documents-list-tools select { width:165px; }
+.workflow-theme .documents-list-tools input { width:300px; }
+.workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] { padding-block:16px; border-block:1px solid var(--wf-border); margin-bottom:16px; }
+.workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] > div { gap:10px; }
+.workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] > p { margin-top:10px; line-height:1.7; }
+.workflow-theme .documents-list-table { border-collapse:collapse; table-layout:fixed; }
+.workflow-theme .documents-list-table th { padding:13px 12px; font-size:12px; font-weight:500; background:var(--wf-subtle); }
+.workflow-theme .documents-list-table th:nth-child(1) { width:18%; }
+.workflow-theme .documents-list-table th:nth-child(2) { width:36%; }
+.workflow-theme .documents-list-table th:nth-child(3) { width:14%; }
+.workflow-theme .documents-list-table th:nth-child(4), .workflow-theme .documents-list-table th:nth-child(5) { width:16%; }
+.workflow-theme .documents-list-table td { padding:16px 12px; font-size:13px; vertical-align:middle; overflow-wrap:anywhere; white-space:normal; }
+.workflow-theme .documents-list-table td button { color:var(--wf-primary-800); font-size:14px; font-weight:500; line-height:1.6; text-decoration:none; overflow-wrap:anywhere; }
+.workflow-theme .documents-list-table td button:hover { text-decoration:underline; }
+.workflow-theme .documents-list-table tr:hover { background:var(--wf-subtle); }
+.workflow-theme .documents-screen .ol-status { border-radius:5px; padding:4px 8px; background:var(--wf-subtle); color:var(--wf-text); font-weight:500; white-space:nowrap; }
+.workflow-theme .documents-screen .ol-status-PENDING { background:var(--wf-warning-bg); }
+.workflow-theme .documents-screen .ol-status-ISSUED { background:var(--wf-success-bg); }
+.workflow-theme .documents-screen :is(.ol-status-REJECTED,.ol-status-DELETING) { background:var(--wf-error-bg); }
+.workflow-theme .documents-branding-field { padding:16px; border:1px solid var(--wf-border); border-radius:8px; background:var(--wf-subtle); }
+.workflow-theme .documents-branding-field input[type=file] { padding:9px; min-height:44px; font-size:13px; }
+.workflow-theme .documents-settings-save { padding-top:18px; border-top:1px solid var(--wf-border); }
+.workflow-theme .documents-approval-guide { font-size:13px; line-height:1.8; }
+.workflow-theme .documents-editor > div:first-child h2 { font-size:20px; }
+.workflow-theme .documents-editor fieldset { min-width:0; }
+.workflow-theme .documents-editor .min-w-52 { min-width:0; }
+.workflow-theme .documents-actions { gap:8px; padding-top:18px; }
+.workflow-theme .documents-reassignment, .workflow-theme .documents-final-approval { border-width:1px; background:var(--wf-subtle); }
+.workflow-theme .documents-screen .ol-delete-dialog { width:calc(100% - 32px); max-height:calc(100dvh - 32px); overflow-y:auto; padding:24px; border:1px solid var(--wf-border); border-radius:12px; color:var(--wf-text); background:var(--wf-panel); box-shadow:0 8px 32px rgba(0,0,0,.12); }
+.workflow-theme .documents-screen .ol-delete-dialog::backdrop { background:var(--wf-overlay); }
+@media (max-width:1023px) {
+  .workflow-theme .documents-list-tools { width:100%; }
+  .workflow-theme .documents-list-tools input { flex:1; max-width:none; }
+}
+@media (max-width:767px) {
+  .workflow-theme .documents-screen { padding:20px 16px; gap:16px; }
+  .workflow-theme .documents-screen .ol-card { padding:18px 16px; }
+  .workflow-theme .documents-create-actions { width:100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .workflow-theme .documents-create-actions :is(.ol-button,.ol-primary) { padding:8px; font-size:13px; }
+  .workflow-theme .documents-screen :is(.ol-button,.ol-primary,input.ol-input,select.ol-input) { min-height:44px; }
+  .workflow-theme .documents-screen .ol-input { font-size:16px; }
+  .workflow-theme .documents-tabs { gap:6px; padding-bottom:12px; }
+  .workflow-theme .documents-tabs > button { padding-inline:10px; font-size:13px; }
+  .workflow-theme .documents-tabs .documents-refresh { margin-left:0; }
+  .workflow-theme .documents-list-tools { display:grid; grid-template-columns:minmax(0,1fr); }
+  .workflow-theme .documents-list-tools :is(input,select) { width:100%; max-width:none; }
+  .workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] > div { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] label { grid-column:auto; }
+  .workflow-theme .documents-list [aria-label="관리자 서류함 기간 조회"] input { width:100%; }
+  .workflow-theme .documents-table-scroll { overflow:visible; }
+  .workflow-theme .documents-list-table { display:block; }
+  .workflow-theme .documents-list-table thead { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .workflow-theme .documents-list-table tbody { display:grid; gap:12px; }
+  .workflow-theme .documents-list-table tr { display:flex; flex-direction:column; gap:8px; padding:14px; border:1px solid var(--wf-border); border-radius:8px; background:var(--wf-panel); }
+  .workflow-theme .documents-list-table td { display:block; padding:0; font-size:13px; }
+  .workflow-theme .documents-list-table td:nth-child(2) { order:-1; margin-bottom:2px; }
+  .workflow-theme .documents-list-table td:nth-child(2) button { min-height:44px; font-size:15px; }
+  .workflow-theme .documents-list-table td:first-child { padding-block:8px; border-block:1px solid var(--wf-border); }
+  .workflow-theme .documents-list-table td:first-child::before { display:block; content:attr(data-label); margin-bottom:4px; font-size:12px; color:var(--wf-muted); }
+  .workflow-theme .documents-list-table td:nth-child(n+3) { display:grid; grid-template-columns:64px minmax(0,1fr); gap:8px; align-items:center; }
+  .workflow-theme .documents-list-table td:nth-child(n+3)::before { content:attr(data-label); font-size:12px; color:var(--wf-muted); }
+  .workflow-theme .documents-list-table td .ol-status { justify-self:start; }
+  .workflow-theme .documents-actions > button { flex:1 1 135px; }
+  .workflow-theme .documents-screen .ol-delete-dialog { width:calc(100% - 24px); max-height:calc(100dvh - 24px); padding:20px 16px; }
+  .workflow-theme .documents-screen .ol-delete-dialog h2 { font-size:17px; }
+  .workflow-theme .documents-screen .ol-delete-dialog form > div:last-child { flex-wrap:wrap; }
+}

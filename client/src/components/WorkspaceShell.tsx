@@ -11,6 +11,8 @@ import '../styles/WorkflowTheme.css';
 const workflowTitles: Record<string, string> = {
   '/dashboard': '대시보드', '/drafting': '기안(업무보고)', '/admin/approvals': '결재/승인 관리함',
   '/admin/organization': '조직관리', '/admin/employees': '인사관리', '/admin/salary': '급여관리',
+  '/leave': '휴가신청', '/expense': '지출결의 신청', '/documents': '서류발급',
+  '/official-letters': '서류발급', '/board': '공지 게시판',
 };
 
 /** Presentation shell only. Route guards and server authorization remain in their existing layers. */

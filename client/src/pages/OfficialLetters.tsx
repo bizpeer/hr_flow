@@ -9,6 +9,7 @@ import type { UserData } from '../store/authStore';
 import { officialLetters, seoulDate, koreanDate, previewNumber, readLetterImage } from '../services/officialLetterService';
 import type { ApprovalStep, ApproverCandidate, CertificateContent, DocumentApprover, DocumentType, LetterBootstrap, LetterContent, LetterDateRange, LetterHistory, LetterSettings, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import './OfficialLetters.css';
+import './DocumentsTheme.css';
 
 const emptyContent = (): LetterContent => ({ recipient: '', reference: '', title: '',
   body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n- 아 래 -\n\n\n끝.', attachments: '' });
@@ -90,7 +91,7 @@ export function DeleteIssuedDialog({ letter, stillCurrent, onClose, onResult }: 
       if (alive.current) { setPassword(''); setPending(false); }
     }
   };
-  return <dialog ref={dialog} aria-labelledby="delete-issued-title" className="m-auto w-11/12 max-w-lg rounded-2xl p-6 shadow-xl backdrop:bg-slate-900/50"
+  return <dialog ref={dialog} aria-labelledby="delete-issued-title" className="ol-delete-dialog m-auto w-11/12 max-w-lg rounded-2xl p-6 shadow-xl backdrop:bg-slate-900/50"
     onCancel={event => { event.preventDefault(); if (!pending) { setPassword(''); onClose(); } }}>
     <form onSubmit={event => { void remove(event); }} className="space-y-4">
       <div className="flex items-center justify-between gap-3"><h2 id="delete-issued-title" className="font-bold text-lg">발급 서류 삭제 확인</h2><button type="button" aria-label="삭제 확인 닫기" className="ol-button" disabled={pending} onClick={() => { setPassword(''); onClose(); }}><X size={16} /></button></div>
@@ -512,16 +513,16 @@ export function OfficialLetters() {
   };
   const hasUnavailableApprover = approverIds.some(uid => !candidates.some(candidate => candidate.uid === uid));
 
-  return <div className="official-letters-screen p-4 md:p-8 space-y-6">
-    <header className="flex flex-wrap items-center justify-between gap-4">
-      <div><h1 className="text-2xl font-black flex gap-2 items-center"><FileText className="text-indigo-600" />서류 발급</h1>
+  return <div className="official-letters-screen documents-screen">
+    <header className="documents-page-head">
+      <div><h1 className="wf-title">서류 발급</h1>
         <p className="text-slate-500 mt-2 text-sm">공문·재직증명서·경력증명서를 작성·결재하고, 승인된 PDF를 다운로드해 외부에서 인쇄합니다.</p></div>
-      <div className="flex flex-wrap gap-2">{(Object.keys(documentLabels) as DocumentType[]).map(type => <button key={type} className="ol-primary" disabled={busy} onClick={() => begin(type)}><Plus size={17} />{documentLabels[type]} 작성</button>)}</div>
+      <div className="documents-create-actions">{(Object.keys(documentLabels) as DocumentType[]).map(type => <button key={type} className={type === 'OFFICIAL' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => begin(type)}><Plus size={17} />{documentLabels[type]} 작성</button>)}</div>
     </header>
-    <div className="flex flex-wrap gap-2">
-      <button className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveSettings()) setTab('documents'); }}><FileText size={16} />서류함</button>
-      {isAdmin && <button className={tab === 'settings' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
-      <button className="ol-button" disabled={busy} onClick={() => { if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새로고침할까요?')) return; void run(async () => { await reloadSelected(); setNotice('최신 내용을 불러왔습니다.'); }); }}><RefreshCw size={16} />새로고침</button>
+    <div className="documents-tabs" aria-label="서류 관리 메뉴">
+      <button aria-pressed={tab === 'documents'} className={tab === 'documents' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => { if (confirmLeaveSettings()) setTab('documents'); }}><FileText size={16} />서류함</button>
+      {isAdmin && <button aria-pressed={tab === 'settings'} className={tab === 'settings' ? 'ol-primary' : 'ol-button'} disabled={busy} onClick={() => setTab('settings')}><Settings size={16} />회사 서류 템플릿</button>}
+      <button className="ol-button documents-refresh" disabled={busy} onClick={() => { if (dirty && !window.confirm('저장하지 않은 입력을 닫고 새로고침할까요?')) return; void run(async () => { await reloadSelected(); setNotice('최신 내용을 불러왔습니다.'); }); }}><RefreshCw size={16} />새로고침</button>
       {busy && <span role="status" className="text-sm self-center text-indigo-600">처리 중…</span>}
     </div>
     {error && <div role="alert" className="rounded-xl bg-red-50 text-red-800 p-4">{error}</div>}
@@ -529,7 +530,7 @@ export function OfficialLetters() {
     {templateStatus && !templateStatus.configured && <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{missingTemplateMessage(templateStatus.missingFields)}{isAdmin && tab !== 'settings' && <button type="button" className="ol-button mt-2" disabled={busy} onClick={() => setTab('settings')}>회사 템플릿 등록</button>}</div>}
     {!isAdmin && canApproveDocuments && <p className="rounded-xl bg-indigo-50 p-4 text-sm text-indigo-900">서류 최종 승인 권한이 부여되어 있습니다. 본인 작성 서류를 제외한 같은 본부의 서류를 순차 결재 완료 후 최종 승인할 수 있습니다. 회사 로고·인감·번호 설정은 회사 관리자만 변경할 수 있습니다.</p>}
 
-    {tab === 'settings' && isAdmin ? <><form className="ol-card space-y-5" onSubmit={event => { void saveTemplate(event); }}>
+    {tab === 'settings' && isAdmin ? <><form className="ol-card documents-settings space-y-5" onSubmit={event => { void saveTemplate(event); }}>
       <h2 className="text-xl font-bold">회사 서류 기본정보</h2>
       <p className="text-sm text-slate-500">로고와 인감은 3MB 이하 PNG/JPEG, 최대 4096px로 등록합니다. 인감 원본은 회사 관리자에게만 표시됩니다.</p>
       {settingsDirty && <p role="status" className="rounded-xl bg-amber-50 p-4 text-sm font-semibold text-amber-900">저장하지 않은 템플릿 변경이 있습니다. 이미지 미리보기만으로는 등록되지 않습니다. 아래 ‘템플릿 저장’을 눌러 서버 저장 완료를 확인해 주세요.</p>}
@@ -537,12 +538,12 @@ export function OfficialLetters() {
       {settingsSaving && <p role="status" className="text-sm text-indigo-700">회사정보·이미지·인감 규격을 저장하고 서버 저장본을 다시 확인하는 중입니다.</p>}
       {templateConfirmation && !settingsDirty && <p role="status" className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-800">서버 저장본 확인 완료 · 버전 {templateConfirmation.version} · {new Date(templateConfirmation.at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p>}
       <fieldset disabled={busy} className="space-y-5">
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="documents-company-fields grid md:grid-cols-2 gap-4">
         {([['companyName', '회사명', 120], ['companyNameEn', '영문 회사명 (선택)', 120], ['representative', '대표자 이름', 80], ['address', '회사 주소', 300], ['phone', '전화번호', 80], ['email', '이메일', 120]] as const).map(([key, label, max]) =>
           <label className="ol-label" key={key}>{label}<input className="ol-input" required={!['phone', 'email', 'companyNameEn'].includes(key)} maxLength={max} value={settings[key] || ''} onChange={e => changeSettings(previous => ({ ...previous, [key]: e.target.value }))} /></label>)}
       </div>
-      <div className="grid md:grid-cols-2 gap-4">{([['logoData', '회사 로고'], ['sealData', '대표자 인감']] as const).map(([key, label]) =>
-        <label key={key} className="ol-label">{label}
+      <div className="documents-branding-fields grid md:grid-cols-2 gap-4">{([['logoData', '회사 로고'], ['sealData', '대표자 인감']] as const).map(([key, label]) =>
+        <label key={key} className="ol-label documents-branding-field">{label}
           <input aria-label={`${label} 이미지 선택`} className="ol-input" type="file" accept="image/png,image/jpeg" required={!(key === 'logoData' ? settings.logoPath : settings.sealPath) && !settings[key]} onChange={event => {
             const file = event.target.files?.[0]; if (!file) return;
             selectTemplateImage(key, file); event.target.value = '';
@@ -568,12 +569,12 @@ export function OfficialLetters() {
         {documentApprovers.length ? documentApprovers.map(approver => <label key={approver.uid} className="flex items-center gap-3 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" checked={(settings.documentApproverIds || []).includes(approver.uid)} disabled={!(settings.documentApproverIds || []).includes(approver.uid) && (settings.documentApproverIds || []).length >= 50} onChange={event => changeSettings(previous => ({ ...previous, documentApproverIds: event.target.checked ? [...new Set([...(previous.documentApproverIds || []), approver.uid])] : (previous.documentApproverIds || []).filter(uid => uid !== approver.uid) }))} /><span className="font-semibold">{approver.name}</span><span className="text-slate-500">{approver.divisionName || '소속 본부 서류'}</span></label>) : <p className="text-sm text-slate-500">권한을 위임할 활성 부서관리자가 없습니다.</p>}
         {(settings.documentApproverIds || []).some(uid => !documentApprovers.some(approver => approver.uid === uid)) && <button type="button" className="ol-button" onClick={() => changeSettings(previous => ({ ...previous, documentApproverIds: (previous.documentApproverIds || []).filter(uid => documentApprovers.some(approver => approver.uid === uid)) }))}>현재 선택할 수 없는 관리자의 기존 승인 권한 제거</button>}
       </fieldset>
-      <div className="flex flex-wrap gap-2"><button className="ol-primary" disabled={busy || Object.values(imageErrors).some(Boolean)}>템플릿 저장</button><button type="button" className="ol-button" disabled={busy || !settingsDirty} onClick={() => { confirmLeaveSettings(); }}>저장 전 변경 취소</button></div>
+      <div className="documents-settings-save flex flex-wrap gap-2"><button className="ol-primary" disabled={busy || Object.values(imageErrors).some(Boolean)}>템플릿 저장</button><button type="button" className="ol-button" disabled={busy || !settingsDirty} onClick={() => { confirmLeaveSettings(); }}>저장 전 변경 취소</button></div>
       </fieldset>
     </form></> : <>
-      <section className="ol-card">
-        <div className="flex flex-wrap justify-between items-center gap-3 mb-4"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
-          <div className="flex flex-wrap gap-2"><select aria-label="서류 종류 필터" className="ol-input max-w-48" value={typeFilter} onChange={event => setTypeFilter(event.target.value as DocumentType | 'ALL')}><option value="ALL">모든 서류</option>{(Object.keys(documentLabels) as DocumentType[]).map(type => <option key={type} value={type}>{documentLabels[type]}</option>)}</select><input aria-label="서류 검색" placeholder="문서번호, 제목, 대상자, 작성자 검색" className="ol-input max-w-sm" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
+      <section className="ol-card documents-list">
+        <div className="documents-list-head"><h2 className="font-bold text-lg">{isAdmin ? '회사 전체 서류' : '내 서류와 결재 서류'} <span className="text-slate-400">{letters.length}</span></h2>
+          <div className="documents-list-tools"><select aria-label="서류 종류 필터" className="ol-input max-w-48" value={typeFilter} onChange={event => setTypeFilter(event.target.value as DocumentType | 'ALL')}><option value="ALL">모든 서류</option>{(Object.keys(documentLabels) as DocumentType[]).map(type => <option key={type} value={type}>{documentLabels[type]}</option>)}</select><input aria-label="서류 검색" placeholder="문서번호, 제목, 대상자, 작성자 검색" className="ol-input max-w-sm" value={search} onChange={e => setSearch(e.target.value)} /></div></div>
         {isAdmin && <form className="mb-4 space-y-3" aria-label="관리자 서류함 기간 조회" noValidate onSubmit={event => { event.preventDefault(); applyListRange(draftRange); }}>
           <div className="grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
             <label className="ol-label col-span-2 sm:col-span-1">시작일<input className="ol-input w-full sm:w-auto" type="date" min="1900-01-01" required value={draftRange.startDate} disabled={busy} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} /></label>
@@ -585,21 +586,21 @@ export function OfficialLetters() {
         </form>}
         {listError && <div role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-800">{listError}<button type="button" className="ol-button ml-2" disabled={busy} onClick={() => { void fetchLetters(appliedRangeRef.current).catch(() => {}); }}>목록 다시 시도</button></div>}
         {listLoading && <p role="status" className="py-4 text-sm text-indigo-700">서류 목록을 불러오는 중입니다.</p>}
-        <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500"><tr>{['문서번호 / 개정', '종류 / 제목 / 대상자', '작성자', '상태', '수정일'].map(label => <th key={label} className="p-3 whitespace-nowrap">{label}</th>)}</tr></thead>
+        <div className="documents-table-scroll overflow-x-auto"><table role="table" className="documents-list-table w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500"><tr>{['문서번호 / 개정', '종류 / 제목 / 대상자', '작성자', '상태', '수정일'].map(label => <th key={label} className="p-3 whitespace-nowrap">{label}</th>)}</tr></thead>
           <tbody>{!listLoading && !listError && filtered.map(letter => <tr key={letter.id} className="border-t border-slate-100 hover:bg-indigo-50">
-            <td className="p-3 whitespace-nowrap">{letter.number || (letter.draftingKind && letter.draftingKind !== 'DRAFT' ? '번호 없음' : '미발행')}<div className="text-xs text-slate-400">개정 {letter.revision}</div></td>
+            <td data-label="문서번호 / 개정" className="p-3 whitespace-nowrap">{letter.number || (letter.draftingKind && letter.draftingKind !== 'DRAFT' ? '번호 없음' : '미발행')}<div className="text-xs text-slate-400">개정 {letter.revision}</div></td>
             <td className="p-3"><div className="text-xs text-slate-500 mb-1">{letter.draftingKind === 'DAILY' ? '일일 업무보고' : letter.draftingKind === 'WEEKLY' ? '주간 업무보고' : documentLabels[letter.documentType || 'OFFICIAL']}</div><button className="text-indigo-700 font-bold text-left underline underline-offset-4" disabled={busy} onClick={() => { void open(letter.id); }}>{letter.title}</button><div className="text-xs text-slate-500 mt-1">{letter.recipient}</div></td>
-            <td className="p-3 whitespace-nowrap">{letter.creatorName}</td><td className="p-3 whitespace-nowrap"><span className={`ol-status ol-status-${letter.status}`}>{letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'ISSUED' ? '확인 완료' : letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'PENDING' ? '확인 대기' : statuses[letter.status]}</span></td>
-            <td className="p-3 whitespace-nowrap text-slate-500">{new Date(letter.updatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
+            <td data-label="작성자" className="p-3 whitespace-nowrap">{letter.creatorName}</td><td data-label="상태" className="p-3 whitespace-nowrap"><span className={`ol-status ol-status-${letter.status}`}>{letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'ISSUED' ? '확인 완료' : letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'PENDING' ? '확인 대기' : statuses[letter.status]}</span></td>
+            <td data-label="수정일" className="p-3 whitespace-nowrap text-slate-500">{new Date(letter.updatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
           </tr>)}</tbody></table>
           {!filtered.length && !listLoading && !listError && <p className="text-center p-8 text-slate-500">{busy ? '서류를 불러오는 중입니다.' : '표시할 서류가 없습니다. 기간을 변경하거나 새 서류를 작성해 주세요.'}</p>}
         </div>
       </section>
-      {editing && <section className="ol-card space-y-5">
+      {editing && <section className="ol-card documents-editor space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-bold">{documentLabels[documentType]} {selected ? `상세 · 개정 ${selected.revision}` : '작성'}</h2>
           <button aria-label="서류 닫기" className="ol-button" onClick={() => { if (!dirty || window.confirm('저장하지 않은 입력을 닫을까요?')) { setLetterLink(); setEditing(false); setDirty(false); setHistory(null); setApprovalOpen(false); setReassignmentOpen(false); } }}><X size={16} /></button></div>
         {selected && <div className="flex flex-wrap gap-3 text-sm items-center"><span className={`ol-status ol-status-${selected.status}`}>{statuses[selected.status]}</span><span>작성자: {selected.creatorName}</span>{selected.number && <span>최근 발행번호: {selected.number}</span>}{selected.approvedByName && selected.status === 'ISSUED' && <span>최종 승인: {selected.approvedByName}</span>}</div>}
-        <div className="rounded-xl bg-indigo-50 p-4 text-sm space-y-2"><p className="font-bold">결재라인: 작성자 → {line.map(step => `${step.name}${step.approvedAt ? ' (승인)' : ''}`).join(' → ')}{line.length ? ' → ' : ''}회사 관리자 또는 권한을 위임받은 부서관리자</p>
+        <div className="documents-approval-guide rounded-xl bg-indigo-50 p-4 text-sm space-y-2"><p className="font-bold">결재라인: 작성자 → {line.map(step => `${step.name}${step.approvedAt ? ' (승인)' : ''}`).join(' → ')}{line.length ? ' → ' : ''}회사 관리자 또는 권한을 위임받은 부서관리자</p>
           <p>결재 요청과 처리 결과는 앱 알림으로 전달됩니다. 회사 관리자가 직접 작성한 서류는 제출 즉시 승인·발급됩니다. 그 외 서류는 결재 후 발급되며, 위임받은 부서관리자는 같은 본부 서류만 최종 승인할 수 있습니다. 발행본 수정은 회사 관리자만 가능하며 재승인이 필요합니다.</p></div>
         {selected?.reassignment && <div className="rounded-xl bg-slate-50 p-4 text-sm space-y-1"><p className="font-semibold">최근 결재자 재배정: {new Date(selected.reassignment.at).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</p><p className="whitespace-pre-wrap break-words">사유: {selected.reassignment.reason}</p><p className="text-slate-500">재배정 전에 진행한 승인은 초기화되었습니다.</p></div>}
         {selected?.rejectionReason && <p className="rounded-xl bg-amber-50 p-4 text-amber-900">반려 사유: {selected.rejectionReason}</p>}
@@ -627,7 +628,7 @@ export function OfficialLetters() {
           </fieldset>
           {canEdit ? <button className="ol-primary" disabled={busy || (!!selected && !dirty)}>{selected?.everIssued ? '새 개정본 저장 (재승인 필요)' : '초안 저장'}</button> : <p className="text-sm text-slate-500">{deleting ? '삭제 처리 중인 서류는 읽기만 가능합니다.' : '내용 수정은 작성자와 지정 결재자에게 허용하며, 발행 후에는 회사 관리자만 가능합니다.'}</p>}
         </form>
-        {selected && <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+        {selected && <div className="documents-actions flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           {['DRAFT', 'REJECTED'].includes(selected.status) && <button className="ol-primary" disabled={busy || dirty} onClick={() => { void run(async () => {
             await officialLetters.submit(selected); const refreshed = await reloadSelected();
             setNotice(refreshed?.status === 'ISSUED' ? refreshed.pdfReady === false ? '제출 즉시 승인·발급되었습니다. PDF 다운로드를 눌러 파일 생성을 다시 시도해 주세요.' : '제출 즉시 승인·발급되었습니다. 서버에 저장된 PDF를 다운로드해 외부에서 인쇄할 수 있습니다.' : '결재를 요청했습니다.');
@@ -646,7 +647,7 @@ export function OfficialLetters() {
           {deleting && <p className="w-full rounded-xl bg-amber-50 p-3 text-sm text-amber-900">삭제 처리 중인 서류입니다. 내용 변경·결재·PDF 다운로드는 중단되며 회사 관리자가 남은 삭제를 다시 시도할 수 있습니다.</p>}
           {dirty && <p className="w-full text-sm text-amber-700">변경 내용을 먼저 저장해 주세요. 저장하면 결재를 다시 요청해야 합니다.</p>}
         </div>}
-        {reassignmentOpen && selected && isAdmin && !deleting && <form className="rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
+        {reassignmentOpen && selected && isAdmin && !deleting && <form className="documents-reassignment rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
           event.preventDefault();
           if (!reassignmentReason.trim() || hasUnavailableApprover || dirty) return;
           if (!approverIds.length && !window.confirm('중간 결재자 없이 최종 승인권자가 직접 승인하는 결재라인으로 변경할까요? 이전 승인은 모두 초기화됩니다.')) return;
@@ -687,7 +688,7 @@ export function OfficialLetters() {
           </fieldset>
           <div className="flex gap-2"><button className="ol-primary" disabled={busy || dirty || !reassignmentReason.trim() || hasUnavailableApprover}>결재자 재배정 저장</button><button type="button" className="ol-button" disabled={busy} onClick={() => setReassignmentOpen(false)}>취소</button></div>
         </form>}
-        {approvalOpen && selected && canFinalApprove && <form className="rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
+        {approvalOpen && selected && canFinalApprove && <form className="documents-final-approval rounded-xl border-2 border-indigo-200 p-5 space-y-4" onSubmit={event => {
           event.preventDefault(); void run(async () => {
             await officialLetters.review(selected, 'approve', isAdmin && overrideNumber ? { front } : {}); setApprovalOpen(false);
             const refreshed = await reloadSelected(); setNotice(refreshed?.pdfReady === false ? '최종 승인하고 발급번호를 부여했습니다. PDF 다운로드를 눌러 파일 저장을 다시 시도해 주세요.' : '현재 개정본을 최종 승인하고 발급번호를 부여했습니다. 서버에 저장된 PDF를 다운로드해 외부에서 인쇄할 수 있습니다.');
