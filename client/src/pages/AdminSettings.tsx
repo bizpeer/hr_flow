@@ -8,6 +8,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useAuthStore } from '../store/authStore';
 import { query, where } from 'firebase/firestore';
 import { getErrorCode, getErrorMessage } from '../utils/errors';
+import './AdminSettings.css';
 
 export const AdminSettings: React.FC = () => {
   // Password Reset State
@@ -288,93 +289,95 @@ export const AdminSettings: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-6xl mx-auto space-y-8 md:space-y-10">
+    <div className="settings-screen wf-page">
+      <div className="settings-workspace">
         
         {/* Page Header */}
-        <div className="space-y-2">
+        <div className="settings-page-head">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
+            <div className="settings-heading-icon">
               <Settings className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">시스템 환경 설정</h1>
+            <h1 className="wf-title">시스템 환경 설정</h1>
           </div>
-          <p className="text-slate-500 text-xs md:text-sm font-medium leading-relaxed">인사 시스템 기본 정보 및 관리자 보안 옵션을 구성합니다.</p>
+          <p className="settings-description">인사 시스템 기본 정보 및 관리자 보안 옵션을 구성합니다.</p>
         </div>
 
         {/* Status Message */}
         {message.text && (
-          <div className={`w-full p-5 md:p-6 bg-white rounded-3xl md:rounded-[2rem] flex items-center gap-4 shadow-xl border-l-[6px] md:border-l-8 animate-modal-pop transition-all ${
-            message.type === 'success' ? 'border-emerald-500 shadow-emerald-50' : 'border-rose-500 shadow-rose-50'
+          <div role="status" aria-live="polite" className={`settings-message wf-panel ${
+            message.type === 'success' ? 'settings-message-success' : 'settings-message-error'
           }`}>
-            <div className={`p-2 rounded-full ${message.type === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+            <div className="settings-message-icon">
               {message.type === 'success' ? <CheckCircle2 className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
             </div>
             <div>
-              <p className={`text-sm font-black tracking-tight ${message.type === 'success' ? 'text-emerald-800' : 'text-rose-800'}`}>
+              <p className="settings-message-title">
                 {message.type === 'success' ? '환경 설정 업데이트 완료' : '시스템 경고'}
               </p>
-              <p className="text-slate-500 text-xs font-semibold mt-0.5">{message.text}</p>
+              <p className="settings-message-text">{message.text}</p>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        <div className="settings-grid">
           
           {/* System Default Domain Section - Replacing External DB per user request */}
-          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden group">
-             <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-indigo-50/50">
+          <div className="settings-section wf-panel">
+             <div className="settings-section-head wf-panel-head">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-600 text-white rounded-xl">
+                  <div className="settings-section-icon">
                     <Globe className="w-5 h-5" />
                   </div>
-                  <h2 className="text-xl font-black text-slate-800 tracking-tight">시스템 기본 도메인 설정</h2>
+                  <h2 className="wf-section-title">시스템 기본 도메인 설정</h2>
                 </div>
                 <div className="flex items-center gap-2">
                    <ShieldCheck className="w-4 h-4 text-indigo-500" />
-                   <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Global Policy</span>
+                   <span className="settings-section-label">Global Policy</span>
                 </div>
              </div>
 
-             <form onSubmit={handleUpdateDomain} className="p-8 space-y-6">
-                <div className="space-y-6">
-                   <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-sm font-black text-slate-800 ml-1">
+             <form onSubmit={handleUpdateDomain} className="settings-section-body settings-form">
+                <div className="settings-fields">
+                   <div className="wf-field settings-field">
+                      <label htmlFor="settings-domain" className="settings-label">
                         회사 공용 도메인 (Email Domain)
                       </label>
-                      <div className="relative">
-                         <span className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400 font-bold">@</span>
-                         <input 
+                      <div className="settings-domain-input">
+                         <span className="settings-domain-prefix">@</span>
+                         <input
+                           id="settings-domain"
                            type="text"
                            value={tempDomain}
                            onChange={(e) => setTempDomain(e.target.value.replace('@', ''))}
                            placeholder="bzpeer.com"
-                           className="w-full pl-12 pr-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                           className="wf-input"
                          />
                       </div>
-                      <p className="text-[10px] text-slate-400 font-bold ml-1">입력 시 자동 완성 및 기본 ID 배정에 사용됩니다.</p>
+                      <p className="settings-help">입력 시 자동 완성 및 기본 ID 배정에 사용됩니다.</p>
                    </div>
 
-                   <div className="space-y-3">
-                      <label className="flex items-center gap-2 text-sm font-black text-rose-600 ml-1">
+                   <div className="wf-field settings-field">
+                      <label htmlFor="settings-domain-password" className="settings-label">
                         <Key className="w-4 h-4" /> 정보 변경 승인 (관리자 암호)
                       </label>
-                      <input 
-                        type="password"
+                      <input
+                           id="settings-domain-password"
+                           type="password"
                         required
                         value={verifyPassword}
                         onChange={(e) => setVerifyPassword(e.target.value)}
                         placeholder="현재 접속된 관리자 비밀번호 입력"
-                        className="w-full px-6 py-4 bg-rose-50/30 border-2 border-transparent rounded-2xl focus:border-rose-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                        className="wf-input"
                       />
                    </div>
 
-                   <div className="p-5 bg-indigo-50/30 rounded-2xl border border-indigo-100/50">
+                   <div className="settings-note">
                       <div className="flex items-start gap-3">
                          <AlertCircle className="w-4 h-4 text-indigo-500 mt-0.5" />
                          <div className="space-y-1">
-                            <p className="text-[11px] font-black text-indigo-900">도메인 변경 시 주의사항</p>
-                            <p className="text-[10px] text-indigo-700 font-medium leading-relaxed">
+                            <p className="settings-note-title">도메인 변경 시 주의사항</p>
+                            <p className="settings-note-text">
                               도메인을 변경하면 새로 생성되는 직원의 ID에 즉시 적용됩니다.<br/>
                               기존 사용자의 도메인도 아래 버튼으로 일괄 전환할 수 있습니다.
                             </p>
@@ -386,18 +389,18 @@ export const AdminSettings: React.FC = () => {
                 <button 
                   type="submit"
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 py-5 bg-slate-900 text-white font-black rounded-2xl shadow-xl shadow-slate-200 hover:bg-black transition-all active:scale-95 disabled:opacity-50"
+                  className="wf-btn wf-btn-primary settings-action"
                 >
                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                    <span>시스템 도메인 변경 적용</span>
                 </button>
 
-                <div className="pt-4 border-t border-slate-100">
+                <div className="settings-secondary-actions">
                   <button 
                     type="button"
                     onClick={handleSyncAllUsersDomain}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-3 py-4 bg-indigo-50 text-indigo-600 font-bold rounded-2xl hover:bg-indigo-100 transition-all active:scale-95 disabled:opacity-50 border border-indigo-100"
+                    className="wf-btn settings-action settings-secondary"
                   >
                     <Users className="w-4 h-4" />
                     <span>기존 사용자 도메인 일체화 수행</span>
@@ -407,45 +410,47 @@ export const AdminSettings: React.FC = () => {
           </div>
 
           {/* Security & Access Protection Section */}
-          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden group">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+          <div className="settings-section wf-panel">
+            <div className="settings-section-head wf-panel-head">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-600 text-white rounded-xl">
+                <div className="settings-section-icon">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">코어 보안 프로토콜</h2>
+                <h2 className="wf-section-title">코어 보안 프로토콜</h2>
               </div>
-              <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100 uppercase tracking-widest">
+              <span className="wf-status settings-section-badge">
                 Protected
               </span>
             </div>
 
-            <form onSubmit={handleChangePassword} className="p-8 space-y-8">
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm font-black text-slate-800 ml-1">
+            <form onSubmit={handleChangePassword} className="settings-section-body settings-form">
+              <div className="settings-fields">
+                <div className="wf-field settings-field">
+                  <label htmlFor="settings-new-password" className="settings-label">
                     <Fingerprint className="w-4 h-4 text-emerald-500" /> 신규 마스터 비밀번호
                   </label>
                   <input
-                    type="password"
+                           id="settings-new-password"
+                           type="password"
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="최소 4자 이상"
-                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                    placeholder="최소 12자 이상"
+                    className="wf-input"
                   />
                 </div>
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm font-black text-slate-800 ml-1">
+                <div className="wf-field settings-field">
+                  <label htmlFor="settings-confirm-password" className="settings-label">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" /> 비밀번호 재검증
                   </label>
                   <input
-                    type="password"
+                           id="settings-confirm-password"
+                           type="password"
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="재입력 확인"
-                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                    className="wf-input"
                   />
                 </div>
               </div>
@@ -453,7 +458,7 @@ export const AdminSettings: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-5 bg-emerald-600 text-white font-black rounded-2xl shadow-xl shadow-emerald-100 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-50"
+                className="wf-btn wf-btn-primary settings-action"
               >
                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Lock className="w-5 h-5" />}
                 <span>보안 키 업데이트 적용</span>
@@ -462,28 +467,28 @@ export const AdminSettings: React.FC = () => {
           </div>
 
           {/* Data Backup & Recovery Section */}
-          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden group">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-indigo-900">
+          <div className="settings-section wf-panel">
+            <div className="settings-section-head wf-panel-head">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-indigo-500 text-white rounded-xl">
+                <div className="settings-section-icon">
                   <Database className="w-5 h-5" />
                 </div>
-                <h2 className="text-xl font-black text-white tracking-tight">데이터 백업 및 보안 보관</h2>
+                <h2 className="wf-section-title">데이터 백업 및 보안 보관</h2>
               </div>
               <div className="flex items-center gap-2">
                 <CloudDownload className="w-4 h-4 text-indigo-400" />
-                <span className="text-[10px] font-black text-indigo-300 uppercase tracking-widest font-mono">Archive Protocol</span>
+                <span className="settings-section-label">Archive Protocol</span>
               </div>
             </div>
 
-            <div className="p-8 space-y-8">
-              <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-3xl border border-slate-100 shadow-inner">
-                <div className="p-4 bg-white rounded-2xl shadow-sm text-indigo-600">
+            <div className="settings-section-body settings-form">
+              <div className="settings-backup-summary">
+                <div className="settings-backup-icon">
                   <Clock className="w-6 h-6" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">최종 시스템 백업 일시</p>
-                  <p className="text-lg font-black text-slate-800 tabular-nums tracking-tight">
+                  <p className="settings-help">최종 시스템 백업 일시</p>
+                  <p className="settings-backup-date">
                     {companyData?.lastBackupAt 
                       ? new Date(companyData.lastBackupAt).toLocaleString('ko-KR', { 
                           year: 'numeric', month: '2-digit', day: '2-digit', 
@@ -494,24 +499,25 @@ export const AdminSettings: React.FC = () => {
                 </div>
               </div>
 
-              <form onSubmit={handleRequestBackup} className="space-y-6">
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-sm font-black text-slate-800 ml-1">
+              <form onSubmit={handleRequestBackup} className="settings-fields">
+                <div className="wf-field settings-field">
+                  <label htmlFor="settings-backup-password" className="settings-label">
                     <Lock className="w-4 h-4 text-indigo-500" /> 백업 실행 승인 (관리자 암호)
                   </label>
-                  <input 
-                    type="password"
+                  <input
+                           id="settings-backup-password"
+                           type="password"
                     required
                     value={verifyPassword}
                     onChange={(e) => setVerifyPassword(e.target.value)}
                     placeholder="보안을 위해 비밀번호를 입력하세요"
-                    className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 focus:bg-white outline-none transition-all font-bold text-slate-700 shadow-inner"
+                    className="wf-input"
                   />
                 </div>
 
-                <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-100 flex items-start gap-4">
+                <div className="settings-note settings-backup-note">
                   <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-800 font-bold leading-relaxed">
+                  <p className="settings-note-text">
                     백업 프로세스는 브라우저 내에서 안전하게 처리되며 즉시 JSON 파일로 다운로드됩니다. <br/>
                     데이터 크기에 따라 수 초에서 수십 초가 소요될 수 있으니 창을 닫지 말고 기다려주세요.
                   </p>
@@ -520,7 +526,7 @@ export const AdminSettings: React.FC = () => {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50"
+                  className="wf-btn wf-btn-primary settings-action"
                 >
                   {loading ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -534,51 +540,51 @@ export const AdminSettings: React.FC = () => {
           </div>
 
           {/* System Infrastructure Info - Added to replace/restore previous External DB info */}
-          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden lg:col-span-2">
-            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-slate-900">
+          <div className="settings-infrastructure wf-panel">
+            <div className="settings-section-head wf-panel-head">
                <div className="flex items-center gap-3">
-                 <div className="p-2 bg-indigo-500 text-white rounded-xl">
+                 <div className="settings-section-icon">
                    <Layout className="w-5 h-5" />
                  </div>
-                 <h2 className="text-xl font-black text-white tracking-tight">시스템 백본 및 인프라 상태</h2>
+                 <h2 className="wf-section-title">시스템 백본 및 인프라 상태</h2>
                </div>
                <div className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest">Core Engine Active</span>
+                  <span className="settings-section-label">Core Engine Active</span>
                </div>
             </div>
-            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="settings-info-grid">
                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">주력 데이터베이스 엔진</p>
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                     <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center text-orange-600 font-black italic">F</div>
+                  <p className="settings-info-label">주력 데이터베이스 엔진</p>
+                  <div className="settings-info-card">
+                     <div className="settings-info-icon">F</div>
                      <div>
-                        <p className="text-sm font-black text-slate-800">Firebase Firestore</p>
-                        <p className="text-[10px] text-slate-400 font-bold">Cloud Native NoSQL</p>
+                        <p className="settings-info-title">Firebase Firestore</p>
+                        <p className="settings-info-description">Cloud Native NoSQL</p>
                      </div>
                   </div>
                </div>
                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">인증 보안 프로토콜</p>
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                     <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600">
+                  <p className="settings-info-label">인증 보안 프로토콜</p>
+                  <div className="settings-info-card">
+                     <div className="settings-info-icon">
                         <ShieldCheck className="w-5 h-5" />
                      </div>
                      <div>
-                        <p className="text-sm font-black text-slate-800">Firebase Auth</p>
-                        <p className="text-[10px] text-slate-400 font-bold">JWT / OAuth 2.0</p>
+                        <p className="settings-info-title">Firebase Auth</p>
+                        <p className="settings-info-description">JWT / OAuth 2.0</p>
                      </div>
                   </div>
                </div>
                <div className="space-y-2">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">파일 서버 스토리지</p>
-                  <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                     <div className="w-10 h-10 bg-sky-100 rounded-xl flex items-center justify-center text-sky-600">
+                  <p className="settings-info-label">파일 서버 스토리지</p>
+                  <div className="settings-info-card">
+                     <div className="settings-info-icon">
                         <Globe className="w-5 h-5" />
                      </div>
                      <div>
-                        <p className="text-sm font-black text-slate-800">Firebase Storage</p>
-                        <p className="text-[10px] text-slate-400 font-bold">GCP Infrastructure</p>
+                        <p className="settings-info-title">Firebase Storage</p>
+                        <p className="settings-info-description">GCP Infrastructure</p>
                      </div>
                   </div>
                </div>
@@ -588,8 +594,8 @@ export const AdminSettings: React.FC = () => {
         </div>
 
         {/* Footer info */}
-        <div className="text-center py-10 opacity-30">
-           <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">System Version 2.0.4 Premium Core</p>
+        <div className="settings-footer">
+           <p className="settings-help">System Version 2.0.4 Premium Core</p>
         </div>
       </div>
     </div>

@@ -27,8 +27,16 @@ function fixture({ fail = false, defer = false, component = 'HostedPayPalCheckou
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx: element, jsxs: element };
       if (name === 'lucide-react') return {};
+      if (name === './SubscriptionManagement.css') return {};
       if (name === '../firebase') return { functions: {} };
       if (name === '../store/authStore') return { useAuthStore };
+      if (name === '../utils/roleDisplay') {
+        const helperPath = path.join(root, 'client/src/utils/roleDisplay.ts');
+        const helperCode = ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+        const helper = { exports: {} };
+        vm.runInNewContext(helperCode, { module: helper, exports: helper.exports }, { filename: helperPath });
+        return helper.exports;
+      }
       if (name === 'firebase/functions') return { httpsCallable(_functions, action) { return async payload => { calls.push({ action, payload: clone(payload) }); if (defer) await new Promise(resolve => { resolveCall = resolve; }); if (failRequest) throw new Error('local request failure'); return { data: { success: true } }; }; } };
       throw new Error('unexpected module ' + name);
     },

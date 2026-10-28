@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
+import './SubscriptionManagement.css';
 
 const HostedPayPalCheckout: React.FC<{ uid: string; companyId: string }> = ({ uid, companyId }) => {
   const submitting = useRef(false);
@@ -45,21 +46,21 @@ const HostedPayPalCheckout: React.FC<{ uid: string; companyId: string }> = ({ ui
       submitting.current = false; setLoading(false);
     }
   };
-  return <div className="space-y-5">
+  return <div className="subscription-checkout space-y-5">
     <a href="https://www.paypal.com/ncp/payment/36DMV6NKPEZYW" target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"
-      className="block rounded-xl bg-indigo-600 px-5 py-3 text-center font-bold text-white hover:bg-indigo-700">PayPal에서 구독 결제 (새 탭)</a>
+      className="wf-btn wf-btn-primary block rounded-xl bg-indigo-600 px-5 py-3 text-center font-bold text-white hover:bg-indigo-700">PayPal에서 구독 결제 (새 탭)</a>
     <p className="text-xs text-slate-500 leading-relaxed">PayPal에서 월간 또는 연간 플랜을 선택해 결제한 뒤 이 화면으로 돌아와 주세요. 이미 결제했다면 다시 결제하지 마세요.</p>
-    <form onSubmit={submit} className="space-y-3" aria-label="PayPal 결제 확인 요청">
-      <label htmlFor="paypal-transaction-id" className="block text-sm font-bold text-slate-700">PayPal 거래 또는 주문번호</label>
+    <form onSubmit={submit} className="subscription-claim-form space-y-3" aria-label="PayPal 결제 확인 요청">
+      <label htmlFor="paypal-transaction-id" className="wf-field block text-sm font-bold text-slate-700">PayPal 거래 또는 주문번호</label>
       <input id="paypal-transaction-id" value={orderId} onChange={event => { setOrderId(event.target.value); setError(''); setSubmittedOrder(''); }}
         minLength={6} maxLength={80} required disabled={loading} autoComplete="off" spellCheck={false}
-        className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" placeholder="PayPal 영수증의 거래/주문번호" />
+        className="wf-input w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" placeholder="PayPal 영수증의 거래/주문번호" />
       <button type="submit" disabled={loading || submittedOrder === orderId.trim()}
-        className="w-full rounded-xl border border-indigo-300 px-4 py-2 text-sm font-bold text-indigo-700 disabled:opacity-50">
+        className="wf-btn w-full rounded-xl border border-indigo-300 px-4 py-2 text-sm font-bold text-indigo-700 disabled:opacity-50">
         {loading ? '결제 확인 요청 중...' : error ? '결제 확인 요청 다시 보내기' : '결제 확인 요청 보내기'}
       </button>
-      {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
-      {submittedOrder && <p role="status" className="text-xs text-emerald-700">결제 확인 요청이 접수되었습니다. 플랫폼 관리자의 거래 확인 후 이용 기간이 반영됩니다.</p>}
+      {error && <p role="alert" className="subscription-message subscription-error text-xs text-rose-700">{error}</p>}
+      {submittedOrder && <p role="status" className="subscription-message subscription-success text-xs text-emerald-700">결제 확인 요청이 접수되었습니다. 플랫폼 관리자의 거래 확인 후 이용 기간이 반영됩니다.</p>}
     </form>
   </div>;
 };
@@ -78,36 +79,36 @@ export const SubscriptionManagement: React.FC = () => {
   const isActive = companyData.subscriptionStatus === 'ACTIVE';
 
   return (
-    <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="subscription-screen wf-page flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
+      <div className="subscription-content max-w-4xl mx-auto space-y-8">
         
         {/* Header */}
-        <div className="space-y-2">
+        <header className="subscription-page-head space-y-2">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
+            <div className="subscription-heading-icon p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
               <CreditCard className="w-6 h-6" />
             </div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">구독 및 결제 관리</h1>
+            <h1 className="wf-title text-3xl font-black text-slate-900 tracking-tight">구독 및 결제 관리</h1>
           </div>
-          <p className="text-slate-500 font-medium">서비스 이용을 위한 구독 플랜을 관리하고 결제 내역을 확인합니다.</p>
-        </div>
+          <p className="text-slate-500 font-medium">서비스 구독 상태와 플랜을 확인하고 결제 확인을 요청합니다.</p>
+        </header>
 
         {/* Status Card */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className={`bg-white rounded-[2.5rem] p-8 shadow-xl border-2 transition-all ${
+        <div className="subscription-summary grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className={`subscription-status-card wf-panel ${isActive ? 'is-active' : isExpired ? 'is-expired' : 'is-trial'} bg-white rounded-[2.5rem] p-8 shadow-xl border-2 transition-all ${
             isActive ? 'border-emerald-500 shadow-emerald-50' : 
             isExpired ? 'border-rose-500 shadow-rose-50' : 'border-indigo-100'
           }`}>
             <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">현재 구독 상태</h2>
-            <div className="flex items-center gap-4">
-              <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
+            <div className="subscription-status-row flex items-center gap-4">
+              <div className={`subscription-status-icon w-16 h-16 rounded-2xl flex items-center justify-center ${
                 isActive ? 'bg-emerald-50 text-emerald-600' : 
                 isExpired ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'
               }`}>
                 {isActive ? <Zap className="w-8 h-8 fill-current" /> : <AlertTriangle className="w-8 h-8" />}
               </div>
               <div>
-                <p className={`text-2xl font-black ${
+                <p className={`subscription-status-label text-2xl font-black ${
                   isActive ? 'text-emerald-600' : 
                   isExpired ? 'text-rose-600' : 'text-indigo-600'
                 }`}>
@@ -122,8 +123,8 @@ export const SubscriptionManagement: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -mr-16 -mt-16"></div>
+          <div className="subscription-plan-card wf-panel bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white relative overflow-hidden">
+            <div className="subscription-decoration absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -mr-16 -mt-16"></div>
             <h2 className="text-sm font-black text-indigo-300 uppercase tracking-widest mb-4">구독 플랜 정보</h2>
             <div className="space-y-4 relative z-10">
               <div className="flex items-center justify-between">
@@ -139,13 +140,13 @@ export const SubscriptionManagement: React.FC = () => {
         </div>
 
         {/* Payment Section */}
-        <div className="bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
-          <div className="p-10 md:p-16 flex flex-col md:flex-row items-center gap-12">
-            <div className="flex-1 space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-widest">
+        <div className="subscription-payment wf-panel bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+          <div className="subscription-payment-grid p-10 md:p-16 flex flex-col md:flex-row items-center gap-12">
+            <div className="subscription-benefits flex-1 space-y-6">
+              <div className="subscription-benefit-badge inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-widest">
                 <Zap className="w-4 h-4 fill-current" /> Premium SaaS Benefits
               </div>
-              <h3 className="text-4xl font-black text-slate-900 tracking-tight leading-tight">
+              <h3 className="subscription-payment-title text-4xl font-black text-slate-900 tracking-tight leading-tight">
                 중단 없는 서비스를 위해<br />구독을 시작하세요.
               </h3>
               <ul className="space-y-3">
@@ -162,11 +163,11 @@ export const SubscriptionManagement: React.FC = () => {
               </ul>
             </div>
 
-            <div className="w-full md:w-[400px] space-y-6">
-              <div className="bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
+            <div className="subscription-payment-column w-full md:w-[400px] space-y-6">
+              <div className="subscription-price-card bg-slate-50 p-8 rounded-[2rem] border-2 border-slate-100">
                 <div className="text-center mb-6">
                   <p className="text-slate-400 font-black text-xs uppercase tracking-widest mb-2">Subscription Fee</p>
-                  <p className="text-4xl font-black text-slate-900">$15<span className="text-lg text-slate-400">/mo</span></p>
+                  <p className="subscription-price text-4xl font-black text-slate-900">$15<span className="text-lg text-slate-400">/mo</span></p>
                   <p className="text-sm font-bold text-indigo-600 mt-1">또는 연간 $150 (특별 할인 적용)</p>
                 </div>
                 
@@ -185,7 +186,7 @@ export const SubscriptionManagement: React.FC = () => {
 
         {/* Warning for Super Admin */}
         {userData?.role === 'SUPER_ADMIN' && (
-          <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-center gap-4">
+          <div className="subscription-platform-mode p-6 bg-amber-50 border border-amber-200 rounded-3xl flex items-center gap-4">
             <ShieldCheck className="w-8 h-8 text-amber-500" />
             <div>
                <p className="font-black text-amber-900">{getRoleDisplayName(userData, companyData)} 접근 모드</p>

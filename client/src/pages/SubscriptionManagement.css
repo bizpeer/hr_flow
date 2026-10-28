@@ -1,0 +1,67 @@
+.workflow-theme .subscription-screen { min-height:100%; min-width:0; background:var(--wf-bg); color:var(--wf-text); }
+.workflow-theme .subscription-content { display:grid; gap:20px; max-width:none; min-width:0; }
+.workflow-theme .subscription-content > * { min-width:0; margin-block:0; }
+.workflow-theme .subscription-page-head p { margin-top:8px; font-size:13px; font-weight:400; line-height:1.7; color:var(--wf-muted); }
+.workflow-theme .subscription-heading-icon, .workflow-theme .subscription-decoration { display:none; }
+.workflow-theme .subscription-summary { gap:16px; }
+.workflow-theme .subscription-summary > .wf-panel { padding:20px 24px; border:1px solid var(--wf-border); border-radius:12px; background:var(--wf-panel); box-shadow:none; color:var(--wf-text); }
+.workflow-theme .subscription-summary h2 { margin-bottom:18px; font-size:18px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--wf-strong); }
+.workflow-theme .subscription-status-row { gap:14px; }
+.workflow-theme .subscription-status-row > div:last-child { min-width:0; }
+.workflow-theme .subscription-status-icon { flex-shrink:0; width:44px; height:44px; border-radius:10px; color:var(--wf-primary-800); background:var(--wf-primary-50); }
+.workflow-theme .subscription-status-icon svg { width:22px; height:22px; fill:none; }
+.workflow-theme .subscription-status-card.is-active .subscription-status-icon { color:var(--wf-text); background:var(--wf-success-bg); }
+.workflow-theme .subscription-status-card.is-expired .subscription-status-icon { color:var(--wf-text); background:var(--wf-error-bg); }
+.workflow-theme .subscription-status-label { margin-bottom:6px; color:var(--wf-strong); font-size:23px; line-height:1.5; font-weight:600; overflow-wrap:anywhere; }
+.workflow-theme .subscription-status-row > div > p:last-child { color:var(--wf-muted); font-size:13px; font-weight:400; }
+.workflow-theme .subscription-plan-card > div:last-child { display:grid; gap:14px; }
+.workflow-theme .subscription-plan-card > div:last-child > div { gap:16px; margin:0; }
+.workflow-theme .subscription-plan-card span { font-size:14px; font-weight:500; overflow-wrap:anywhere; }
+.workflow-theme .subscription-plan-card span:first-child { color:var(--wf-muted); font-size:13px; font-weight:400; }
+.workflow-theme .subscription-payment { border:1px solid var(--wf-border); border-radius:12px; box-shadow:none; }
+.workflow-theme .subscription-payment-grid { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1fr); gap:32px; align-items:start; padding:28px; }
+.workflow-theme .subscription-payment-grid > * { min-width:0; }
+.workflow-theme .subscription-benefits { display:flex; flex-direction:column; align-items:flex-start; gap:20px; padding-top:4px; }
+.workflow-theme .subscription-benefits > * { margin-block:0; }
+.workflow-theme .subscription-benefit-badge { gap:7px; padding:5px 9px; border-radius:5px; color:var(--wf-primary-800); background:var(--wf-primary-50); font-size:12px; font-weight:500; letter-spacing:0; text-transform:none; }
+.workflow-theme .subscription-benefit-badge svg { fill:none; }
+.workflow-theme .subscription-payment-title { font-size:27px; font-weight:600; color:var(--wf-strong); line-height:1.6; letter-spacing:-.5px; }
+.workflow-theme .subscription-benefits ul { display:grid; gap:13px; padding:0; list-style:none; }
+.workflow-theme .subscription-benefits li { align-items:flex-start; gap:9px; margin:0; font-size:14px; font-weight:400; line-height:1.7; color:var(--wf-muted); }
+.workflow-theme .subscription-benefits li svg { flex-shrink:0; width:17px; height:17px; margin-top:4px; color:var(--wf-primary-800); }
+.workflow-theme .subscription-payment-column { width:100%; }
+.workflow-theme .subscription-price-card { padding:24px; border:1px solid var(--wf-border); border-radius:8px; background:var(--wf-subtle); }
+.workflow-theme .subscription-price-card > div:first-child { margin-bottom:22px; }
+.workflow-theme .subscription-price-card > div:first-child > p:first-child { margin-bottom:8px; font-size:12px; font-weight:500; color:var(--wf-muted); text-transform:none; letter-spacing:0; }
+.workflow-theme .subscription-price { color:var(--wf-strong); font-size:36px; font-weight:600; line-height:1.4; }
+.workflow-theme .subscription-price > span { margin-left:5px; color:var(--wf-muted); font-size:15px; font-weight:400; }
+.workflow-theme .subscription-price-card > div:first-child > p:last-child { color:var(--wf-primary-800); font-size:13px; font-weight:500; }
+.workflow-theme .subscription-price-card > p { font-size:12px; font-weight:400; line-height:1.8; color:var(--wf-muted); }
+.workflow-theme .subscription-checkout { display:grid; gap:16px; }
+.workflow-theme .subscription-checkout > * { min-width:0; margin-block:0; }
+.workflow-theme .subscription-checkout > a { display:flex; min-height:44px; text-decoration:none; font-size:14px; font-weight:500; }
+.workflow-theme .subscription-checkout > p { color:var(--wf-muted); font-size:12px; font-weight:400; line-height:1.8; }
+.workflow-theme .subscription-claim-form { display:grid; gap:10px; }
+.workflow-theme .subscription-claim-form > * { margin-block:0; min-width:0; }
+.workflow-theme .subscription-claim-form .wf-btn { min-height:44px; color:var(--wf-primary-800); border-color:var(--wf-border-strong); white-space:normal; }
+.workflow-theme .subscription-claim-form .wf-input { min-height:44px; }
+.workflow-theme .subscription-message { padding:12px; border-radius:8px; color:var(--wf-text); font-size:13px; font-weight:400; line-height:1.8; overflow-wrap:anywhere; }
+.workflow-theme .subscription-error { background:var(--wf-error-bg); }
+.workflow-theme .subscription-success { background:var(--wf-success-bg); }
+.workflow-theme .subscription-platform-mode { padding:18px; border-color:var(--wf-border); border-radius:12px; background:var(--wf-warning-bg); }
+@media (max-width:1000px) {
+  .workflow-theme .subscription-summary { grid-template-columns:minmax(0,1fr); }
+  .workflow-theme .subscription-payment-grid { grid-template-columns:minmax(0,1fr); gap:24px; padding:24px; }
+}
+@media (max-width:767px) {
+  .workflow-theme .subscription-content { gap:16px; }
+  .workflow-theme .subscription-summary > .wf-panel { padding:18px 16px; }
+  .workflow-theme .subscription-summary h2 { margin-bottom:14px; }
+  .workflow-theme .subscription-status-label { font-size:21px; }
+  .workflow-theme .subscription-status-icon { width:38px; height:38px; }
+  .workflow-theme .subscription-payment-grid { padding:18px 16px; gap:22px; }
+  .workflow-theme .subscription-benefits { gap:16px; }
+  .workflow-theme .subscription-payment-title { font-size:24px; }
+  .workflow-theme .subscription-price-card { padding:18px 14px; }
+  .workflow-theme .subscription-price { font-size:32px; }
+}
