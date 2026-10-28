@@ -100,7 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ userRole, onItemClick }) => {
           <>
             <NavItem onItemClick={onItemClick} to="/dashboard" icon={Home} label="대시보드" />
             <NavItem onItemClick={onItemClick} to="/leave" icon={CalendarClock} label="휴가신청" />
-            <NavItem onItemClick={onItemClick} to="/drafting" icon={FilePenLine} label="기안서작성" />
+            <NavItem onItemClick={onItemClick} to="/drafting" icon={FilePenLine} label="기안(업무보고)" />
             <NavItem onItemClick={onItemClick} to="/expense" icon={FileText} label="지출결의 신청" colorClass="emerald" />
             <NavItem onItemClick={onItemClick} to="/documents" icon={FileText} label="서류발급" />
             <NavItem onItemClick={onItemClick} to="/board" icon={BookOpen} label="공지 게시판" colorClass="rose" />

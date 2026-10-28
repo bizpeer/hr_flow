@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, FileCheck2, Loader2, RefreshCw } from 'lucide-react';
 import type { DocumentApprovalInboxState } from '../hooks/useDocumentApprovalInbox';
+import { draftingKindLabel } from '../services/officialLetterService';
 
 type ApprovalFilter = 'PENDING' | 'ISSUED' | 'REJECTED' | 'ALL';
 
@@ -25,7 +26,7 @@ export function DocumentApprovalInbox({ inbox }: { inbox: DocumentApprovalInboxS
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><FileCheck2 className="h-5 w-5 text-indigo-600" />서류 결재함</h2>
-          <p className="mt-1 text-sm text-slate-500">{role === 'SUB_ADMIN' ? '내 결재 순서인 기안서와 관리자가 위임한 서류를 검토할 수 있습니다.' : '회사에서 신청한 기안서·공문·증명서의 결재를 관리합니다.'}</p>
+          <p className="mt-1 text-sm text-slate-500">{role === 'SUB_ADMIN' ? '내 차례인 기안서·업무보고와 관리자가 위임한 서류를 검토할 수 있습니다.' : '회사에서 신청한 기안서·업무보고·공문·증명서의 결재와 확인을 관리합니다.'}</p>
         </div>
         <button type="button" disabled={state.loading} onClick={refresh} className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${state.loading ? 'animate-spin' : ''}`} />새로고침</button>
       </div>
@@ -41,11 +42,11 @@ export function DocumentApprovalInbox({ inbox }: { inbox: DocumentApprovalInboxS
           {filtered.map(letter => (
             <div key={letter.id} className="flex flex-col justify-between gap-3 py-4 sm:flex-row sm:items-center">
               <div className="min-w-0">
-                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold text-indigo-600">{letter.documentType === 'DRAFTING' ? '기안서' : letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{statusLabels[letter.status]}</span></div>
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold text-indigo-600">{letter.documentType === 'DRAFTING' ? draftingKindLabel(letter.draftingKind) : letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</span><span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-600">{letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'PENDING' ? '확인 대기' : letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'ISSUED' ? '확인 완료' : statusLabels[letter.status]}</span></div>
                 <p className="break-words font-bold text-slate-800">{letter.title}</p>
-                <p className="mt-1 text-xs text-slate-500">신청자 {letter.creatorName || '-'} · {displayDate(letter.createdAt || letter.updatedAt)} · {letter.number || '발행 전'}</p>
+                <p className="mt-1 text-xs text-slate-500">신청자 {letter.creatorName || '-'} · {displayDate(letter.createdAt || letter.updatedAt)}{letter.draftingKind && letter.draftingKind !== 'DRAFT' ? '' : ` · ${letter.number || '발행 전'}`}</p>
               </div>
-              <Link to={`/${letter.documentType === 'DRAFTING' ? 'drafting' : 'documents'}?letter=${encodeURIComponent(letter.id)}`} className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-100 sm:self-auto">{letter.canReview ? '검토·결재' : '서류 확인'}<ArrowRight className="h-4 w-4" /></Link>
+              <Link to={`/${letter.documentType === 'DRAFTING' ? 'drafting' : 'documents'}?letter=${encodeURIComponent(letter.id)}`} className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-indigo-50 px-4 py-2 text-sm font-bold text-indigo-700 hover:bg-indigo-100 sm:self-auto">{letter.canReview ? letter.draftingKind && letter.draftingKind !== 'DRAFT' ? '업무보고 확인' : '검토·결재' : '서류 확인'}<ArrowRight className="h-4 w-4" /></Link>
             </div>
           ))}
         </div>

@@ -4,8 +4,8 @@ const PDFDocument = require('pdfkit');
 const text = value => typeof value === 'string' ? value : '';
 const dateLabel = value => /^\d{4}-\d{2}-\d{2}$/.test(text(value)) ? value.replaceAll('-', '. ') : text(value);
 
-function approvalDate(value) {
-  if (!value) return '미결재';
+function approvalDate(value, pendingLabel = '미결재') {
+  if (!value) return pendingLabel;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return text(value);
   const parts = Object.fromEntries(new Intl.DateTimeFormat('sv-SE', {
@@ -17,11 +17,14 @@ function approvalDate(value) {
 
 /** Internal drafting form. All identities and dates come from the approved server snapshot. */
 async function renderDraftingPdf(letter) {
+  const reportTitle = letter.drafting?.kind === 'DAILY' ? '일일 업무보고'
+    : letter.drafting?.kind === 'WEEKLY' ? '주간 업무보고' : '';
+  const isReport = Boolean(reportTitle);
   return new Promise((resolve, reject) => {
     const pdf = new PDFDocument({ size: 'A4', pdfVersion: '1.7', bufferPages: true,
       margins: { top: 100, bottom: 64, left: 50, right: 50 },
-      info: { Title: text(letter.content?.title), Author: text(letter.branding?.companyName),
-        Subject: text(letter.number), Creator: 'HR Flow' } });
+      info: { Title: reportTitle || text(letter.content?.title), Author: text(letter.branding?.companyName),
+        Subject: reportTitle || text(letter.number), Creator: 'HR Flow' } });
     const chunks = [];
     pdf.on('data', chunk => chunks.push(chunk));
     pdf.on('end', () => resolve(Buffer.concat(chunks)));
@@ -39,9 +42,15 @@ async function renderDraftingPdf(letter) {
       const width = pdf.page.width - left * 2;
       const innerLeft = left + 14;
       const innerWidth = width - 28;
-      const number = text(letter.number);
+      const number = isReport ? '' : text(letter.number);
+      const title = reportTitle || text(content.title);
+      const headingTitle = isReport ? `【 ${reportTitle} 】` : '【 기 안 지 】';
+      const period = drafting.reportPeriod || {};
+      const reportPeriod = period.startDate === period.endDate ? dateLabel(period.startDate)
+        : [dateLabel(period.startDate), dateLabel(period.endDate)].filter(Boolean).join(' ~ ');
       const revision = Number.isInteger(letter.revision) ? letter.revision : 1;
-      const footerText = `${number}  ·  개정 ${revision}`;
+      const footerText = isReport ? `${reportTitle}  ·  ${dateLabel(drafting.draftDate)}  ·  개정 ${revision}`
+        : `${number}  ·  개정 ${revision}`;
       const measure = (value, availableWidth, size = 10, bold = false, lineGap = 2) =>
         pdf.font(bold ? 'KoreanBold' : 'Korean').fontSize(size).heightOfString(value || '-', { width: availableWidth, lineGap });
       const footerHeight = measure(footerText, width - 90, 7, false, 1);
@@ -59,8 +68,9 @@ async function renderDraftingPdf(letter) {
         pdf.lineWidth(thickness).strokeColor('#222222').moveTo(x1, y1).lineTo(x2, y2).stroke();
       const continuation = () => {
         const previousFont = activeFont;
-        write('【 기 안 지 】 (계속)', left + 10, 40, width - 20, 11);
-        const heading = `${number}  ·  ${text(content.title)}`;
+        write(`${headingTitle} (계속)`, left + 10, 40, width - 20, 11);
+        const heading = isReport ? [reportTitle, reportPeriod].filter(Boolean).join('  ·  ')
+          : `${number}  ·  ${text(content.title)}`;
         const height = Math.max(28, measure(heading, innerWidth, 8.5, false, 2) + 16);
         write(heading, innerLeft, frameTop + 8, innerWidth, 8.5);
         line(left, frameTop + height, left + width, frameTop + height);
@@ -77,7 +87,13 @@ async function renderDraftingPdf(letter) {
         if (pdf.y + height > contentBottom) pdf.addPage();
       };
 
-      const metadata = [
+      const metadata = isReport ? [
+        ['작성일자', dateLabel(drafting.draftDate)],
+        ['보고기간', reportPeriod],
+        ['수신', '팀장·본부장'],
+        ['발신', text(drafting.divisionName)],
+        ['작성자', [text(letter.creatorName), text(drafting.teamName)].filter(Boolean).join(' · ')],
+      ] : [
         ['기안일자', dateLabel(drafting.draftDate)],
         ['문서번호', number],
         ['수신', '내부품의'],
@@ -106,7 +122,7 @@ async function renderDraftingPdf(letter) {
         const rows = [];
         for (let start = 0; start < approvals.length; start += 5) {
           const slots = approvals.slice(start, start + 5).map(step => ({
-            roleLabel: text(step.roleLabel) || '결재', name: text(step.name) || text(step.uid) || '-', date: approvalDate(step.approvedAt),
+            roleLabel: text(step.roleLabel) || (isReport ? '확인' : '결재'), name: text(step.name) || text(step.uid) || '-', date: approvalDate(step.approvedAt, isReport ? '미확인' : '미결재'),
           }));
           const cellWidth = availableWidth / slots.length;
           const headingHeight = Math.max(22, ...slots.map(slot => measure(slot.roleLabel, cellWidth - 12, 8.5, true, 1) + 12));
@@ -130,7 +146,7 @@ async function renderDraftingPdf(letter) {
         });
       };
 
-      write('【 기 안 지 】', left + 10, 40, width - 20, 11);
+      write(headingTitle, left + 10, 40, width - 20, 11);
       const metaWidth = 188;
       const approvalWidth = width - metaWidth - 30;
       const metaRows = metadataLayout(metaWidth);
@@ -140,7 +156,7 @@ async function renderDraftingPdf(letter) {
       if (Math.max(metaHeight, gridHeight) <= 300) {
         drawMetadata(metaRows, left + 14, 80, metaWidth);
         const approvalX = left + metaWidth + 20;
-        write('결 재', approvalX, 67, approvalWidth, 9, true);
+        write(isReport ? '확 인' : '결 재', approvalX, 67, approvalWidth, 9, true);
         let y = 84;
         for (const row of gridRows) { drawApprovalRow(row, approvalX, y); y += row.height + 8; }
         const boundary = Math.max(80 + metaHeight, y - 8) + 14;
@@ -152,7 +168,7 @@ async function renderDraftingPdf(letter) {
         for (const row of approvalRows(innerWidth)) {
           ensureSpace(row.height + 32);
           const y = pdf.y + 18;
-          write('결 재', innerLeft, pdf.y, innerWidth, 9, true);
+          write(isReport ? '확 인' : '결 재', innerLeft, pdf.y, innerWidth, 9, true);
           drawApprovalRow(row, innerLeft, y);
           pdf.y = y + row.height + 12;
         }
@@ -161,11 +177,11 @@ async function renderDraftingPdf(letter) {
         pdf.y += 16;
       }
 
-      ensureSpace(measure(`제 목 : ${text(content.title)}`, innerWidth, 11, true) + 74);
-      write(`제 목 : ${text(content.title)}`, innerLeft, pdf.y, innerWidth, 11, true);
+      ensureSpace(measure(`제 목 : ${title}`, innerWidth, 11, true) + 74);
+      write(`제 목 : ${title}`, innerLeft, pdf.y, innerWidth, 11, true);
       pdf.moveDown(1.3);
       ensureSpace(52);
-      write('검토하여 주시기 바랍니다.', innerLeft + 28, pdf.y, innerWidth - 28, 10.5);
+      write(isReport ? '업무 내용을 보고합니다.' : '검토하여 주시기 바랍니다.', innerLeft + 28, pdf.y, innerWidth - 28, 10.5);
       pdf.moveDown(1.2);
       write('- 아 래 -', innerLeft, pdf.y, innerWidth, 10.5, false, { align: 'center' });
       pdf.moveDown(1);
@@ -185,9 +201,10 @@ async function renderDraftingPdf(letter) {
         write(`첨부자료 (${content.attachmentFiles.length}건)`, innerLeft, pdf.y, innerWidth, 10, true);
         for (const [index, file] of content.attachmentFiles.entries()) {
           pdf.moveDown(0.4);
-          ensureSpace(24);
           const size = Number.isFinite(file.size) ? ` · ${(file.size / 1024 / 1024).toFixed(2)}MB` : '';
-          write(`${index + 1}. ${text(file.name)}${size}`, innerLeft, pdf.y, innerWidth, 9.5);
+          const label = `${index + 1}. ${text(file.name)}${size}`;
+          ensureSpace(isReport ? Math.max(24, measure(label, innerWidth, 9.5)) : 24);
+          write(label, innerLeft, pdf.y, innerWidth, 9.5);
         }
       }
       pdf.moveDown(0.8);
@@ -195,40 +212,42 @@ async function renderDraftingPdf(letter) {
       write('끝.', innerLeft, pdf.y, innerWidth, 10, false, { align: 'right' });
       pdf.y += 18;
 
-      const note = text(content.cooperationNote);
-      const noteLabelWidth = 80;
-      const noteWidth = width - noteLabelWidth - 24;
-      let remaining = Array.from(note);
-      let continued = false;
-      do {
-        ensureSpace(84);
-        const available = contentBottom - pdf.y;
-        const completeHeight = measure(remaining.join(''), noteWidth, 10, false, 3) + 20;
-        let count = remaining.length;
-        if (completeHeight > available) {
-          let low = 1;
-          let high = remaining.length;
-          count = 0;
-          while (low <= high) {
-            const middle = Math.floor((low + high) / 2);
-            if (measure(remaining.slice(0, middle).join(''), noteWidth, 10, false, 3) + 20 <= available) {
-              count = middle; low = middle + 1;
-            } else high = middle - 1;
+      if (!isReport) {
+        const note = text(content.cooperationNote);
+        const noteLabelWidth = 80;
+        const noteWidth = width - noteLabelWidth - 24;
+        let remaining = Array.from(note);
+        let continued = false;
+        do {
+          ensureSpace(84);
+          const available = contentBottom - pdf.y;
+          const completeHeight = measure(remaining.join(''), noteWidth, 10, false, 3) + 20;
+          let count = remaining.length;
+          if (completeHeight > available) {
+            let low = 1;
+            let high = remaining.length;
+            count = 0;
+            while (low <= high) {
+              const middle = Math.floor((low + high) / 2);
+              if (measure(remaining.slice(0, middle).join(''), noteWidth, 10, false, 3) + 20 <= available) {
+                count = middle; low = middle + 1;
+              } else high = middle - 1;
+            }
+            if (!count) throw new Error('Drafting note cannot fit the available page area');
           }
-          if (!count) throw new Error('Drafting note cannot fit the available page area');
-        }
-        const value = remaining.slice(0, count).join('');
-        const height = count < remaining.length ? available : Math.max(84, completeHeight);
-        const y = !continued && count === remaining.length ? contentBottom - height : pdf.y;
-        line(left, y, left + width, y, 0.9);
-        line(left + noteLabelWidth, y, left + noteLabelWidth, y + height);
-        line(left, y + height, left + width, y + height);
-        const label = continued ? '참조\n요청사항\n(계속)' : '참조\n요청사항';
-        write(label, left + 8, y + (height - measure(label, noteLabelWidth - 16, 9.5)) / 2, noteLabelWidth - 16, 9.5, false, { align: 'center' });
-        write(value || '해당 없음', left + noteLabelWidth + 12, y + 10, noteWidth, 10, false, { lineGap: 3 });
-        remaining = remaining.slice(count);
-        if (remaining.length) { pdf.addPage(); continued = true; }
-      } while (remaining.length);
+          const value = remaining.slice(0, count).join('');
+          const height = count < remaining.length ? available : Math.max(84, completeHeight);
+          const y = !continued && count === remaining.length ? contentBottom - height : pdf.y;
+          line(left, y, left + width, y, 0.9);
+          line(left + noteLabelWidth, y, left + noteLabelWidth, y + height);
+          line(left, y + height, left + width, y + height);
+          const label = continued ? '참조\n요청사항\n(계속)' : '참조\n요청사항';
+          write(label, left + 8, y + (height - measure(label, noteLabelWidth - 16, 9.5)) / 2, noteLabelWidth - 16, 9.5, false, { align: 'center' });
+          write(value || '해당 없음', left + noteLabelWidth + 12, y + 10, noteWidth, 10, false, { lineGap: 3 });
+          remaining = remaining.slice(count);
+          if (remaining.length) { pdf.addPage(); continued = true; }
+        } while (remaining.length);
+      }
 
       const pages = pdf.bufferedPageRange();
       for (let index = pages.start; index < pages.start + pages.count; index++) {

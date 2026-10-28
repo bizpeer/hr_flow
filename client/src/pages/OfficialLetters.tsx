@@ -12,7 +12,7 @@ import './OfficialLetters.css';
 
 const emptyContent = (): LetterContent => ({ recipient: '', reference: '', title: '',
   body: '1. 귀사의 무궁한 발전을 기원합니다.\n\n2. 아래와 같이 안내드립니다.\n\n- 아 래 -\n\n\n끝.', attachments: '' });
-const documentLabels: Record<DocumentType, string> = { OFFICIAL: '공문', EMPLOYMENT: '재직증명서', CAREER: '경력증명서', DRAFTING: '기안서' };
+const documentLabels: Record<DocumentType, string> = { OFFICIAL: '공문', EMPLOYMENT: '재직증명서', CAREER: '경력증명서', DRAFTING: '기안·업무보고' };
 const certificateFieldLabels: Record<keyof CertificateContent, string> = { nameKo: '한글 성명', nameEn: '영문 성명', birthDate: '생년월일', address: '주소', division: '소속', position: '직위', startDate: '입사일', endDate: '퇴사일', purpose: '제출 용도', department: '담당부서', contactName: '담당자', contactPhone: '연락처' };
 const emptyCertificate = (defaults: Partial<CertificateContent> = {}): CertificateContent => ({
   nameKo: '', nameEn: '', birthDate: '', address: '', division: '', position: '', startDate: '', endDate: '',
@@ -587,9 +587,9 @@ export function OfficialLetters() {
         {listLoading && <p role="status" className="py-4 text-sm text-indigo-700">서류 목록을 불러오는 중입니다.</p>}
         <div className="overflow-x-auto"><table className="w-full text-sm text-left"><thead className="bg-slate-50 text-slate-500"><tr>{['문서번호 / 개정', '종류 / 제목 / 대상자', '작성자', '상태', '수정일'].map(label => <th key={label} className="p-3 whitespace-nowrap">{label}</th>)}</tr></thead>
           <tbody>{!listLoading && !listError && filtered.map(letter => <tr key={letter.id} className="border-t border-slate-100 hover:bg-indigo-50">
-            <td className="p-3 whitespace-nowrap">{letter.number || '미발행'}<div className="text-xs text-slate-400">개정 {letter.revision}</div></td>
-            <td className="p-3"><div className="text-xs text-slate-500 mb-1">{documentLabels[letter.documentType || 'OFFICIAL']}</div><button className="text-indigo-700 font-bold text-left underline underline-offset-4" disabled={busy} onClick={() => { void open(letter.id); }}>{letter.title}</button><div className="text-xs text-slate-500 mt-1">{letter.recipient}</div></td>
-            <td className="p-3 whitespace-nowrap">{letter.creatorName}</td><td className="p-3 whitespace-nowrap"><span className={`ol-status ol-status-${letter.status}`}>{statuses[letter.status]}</span></td>
+            <td className="p-3 whitespace-nowrap">{letter.number || (letter.draftingKind && letter.draftingKind !== 'DRAFT' ? '번호 없음' : '미발행')}<div className="text-xs text-slate-400">개정 {letter.revision}</div></td>
+            <td className="p-3"><div className="text-xs text-slate-500 mb-1">{letter.draftingKind === 'DAILY' ? '일일 업무보고' : letter.draftingKind === 'WEEKLY' ? '주간 업무보고' : documentLabels[letter.documentType || 'OFFICIAL']}</div><button className="text-indigo-700 font-bold text-left underline underline-offset-4" disabled={busy} onClick={() => { void open(letter.id); }}>{letter.title}</button><div className="text-xs text-slate-500 mt-1">{letter.recipient}</div></td>
+            <td className="p-3 whitespace-nowrap">{letter.creatorName}</td><td className="p-3 whitespace-nowrap"><span className={`ol-status ol-status-${letter.status}`}>{letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'ISSUED' ? '확인 완료' : letter.draftingKind && letter.draftingKind !== 'DRAFT' && letter.status === 'PENDING' ? '확인 대기' : statuses[letter.status]}</span></td>
             <td className="p-3 whitespace-nowrap text-slate-500">{new Date(letter.updatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</td>
           </tr>)}</tbody></table>
           {!filtered.length && !listLoading && !listError && <p className="text-center p-8 text-slate-500">{busy ? '서류를 불러오는 중입니다.' : '표시할 서류가 없습니다. 기간을 변경하거나 새 서류를 작성해 주세요.'}</p>}

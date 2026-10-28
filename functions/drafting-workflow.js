@@ -97,8 +97,18 @@ function createDraftingWorkflow({ db, now }) {
       return `${division.name} ${step.name} 본부장`;
     }).join(', ') };
   }
+  async function resolveReport(user, input, reader, letter) {
+    const route = { teamLeader: true, divisionHead: true, cooperationDivisionIds: [], representative: false };
+    if (input !== undefined) {
+      const selected = routeInput(input);
+      if (!selected.teamLeader || !selected.divisionHead || selected.cooperationDivisionIds.length || selected.representative) {
+        fail('invalid-argument', '업무보고는 소속 팀장과 본부장 확인으로만 진행합니다.');
+      }
+    }
+    return resolve(user, route, reader, letter);
+  }
   async function validateLine(user, letter, reader) {
-    const resolved = await resolve(user, letter.drafting.route, reader, letter);
+    const resolved = await (['DAILY', 'WEEKLY'].includes(letter.drafting.kind) ? resolveReport : resolve)(user, letter.drafting.route, reader, letter);
     if (resolved.line.map(step => step.uid).join('|') !== letter.approvalLine.map(step => step.uid).join('|')) {
       fail('failed-precondition', '조직도 결재 담당자가 변경되었습니다. 기안을 수정하고 다시 결재 요청해 주세요.');
     }
@@ -113,7 +123,7 @@ function createDraftingWorkflow({ db, now }) {
   function counterRef(user, divisionId, yearMonth) {
     return db.collection('draftingCounters').doc(key([user.companyId, divisionId, yearMonth]));
   }
-  return { bootstrap, resolve, validateLine, requestRef, counterRef, today, hash: key };
+  return { bootstrap, resolve, resolveReport, validateLine, requestRef, counterRef, today, hash: key };
 }
 
 module.exports = { createDraftingWorkflow };

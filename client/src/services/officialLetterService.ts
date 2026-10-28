@@ -2,6 +2,8 @@ import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
 
 export type DocumentType = 'OFFICIAL' | 'EMPLOYMENT' | 'CAREER' | 'DRAFTING';
+export type DraftingKind = 'DRAFT' | 'DAILY' | 'WEEKLY';
+export const draftingKindLabel = (kind?: DraftingKind): string => kind === 'DAILY' ? '일일 업무보고' : kind === 'WEEKLY' ? '주간 업무보고' : '기안서';
 export interface DraftingRoute { teamLeader: boolean; divisionHead: boolean; cooperationDivisionIds: string[]; representative: boolean }
 export interface DraftingApprover {
   uid: string; name: string; kind: 'TEAM_LEADER' | 'DIVISION_HEAD' | 'COOPERATION' | 'REPRESENTATIVE';
@@ -74,7 +76,8 @@ export interface OfficialLetter {
   creatorId: string;
   creatorName: string;
   documentType?: DocumentType;
-  drafting?: { draftDate: string; divisionName: string; teamName: string; sequence: number; yearMonth: string;
+  drafting?: { draftDate: string; divisionName: string; teamName: string; sequence?: number; yearMonth?: string;
+    kind?: DraftingKind; reportPeriod?: LetterDateRange;
     route: DraftingRoute; submittedAt?: string | null; submittedBy?: string | null; submittedByName?: string | null };
   content: LetterContent;
   approvalLine: ApprovalStep[];
@@ -99,6 +102,8 @@ export interface LetterSummary {
   recipient: string;
   creatorName: string;
   documentType?: DocumentType;
+  draftingKind?: DraftingKind;
+  reportPeriod?: LetterDateRange;
   creatorId?: string;
   createdAt?: string;
   issueDate?: string;
@@ -128,11 +133,12 @@ async function call<T>(action: string, payload: Record<string, unknown> = {}): P
 }
 export const officialLetters = {
   draftingBootstrap: (id?: string) => call<DraftingBootstrap>('draftingBootstrap', id ? { id } : {}),
-  saveDrafting: (content: LetterContent, draftingRoute: DraftingRoute, letter: OfficialLetter | null, requestId: string) =>
-    call<{ id: string }>('save', { content, draftingRoute, documentType: 'DRAFTING', requestId,
+  saveDrafting: (content: LetterContent, draftingRoute: DraftingRoute, letter: OfficialLetter | null, requestId: string, options: { draftingKind?: DraftingKind; reportPeriod?: LetterDateRange } = {}) =>
+    call<{ id: string }>('save', { content, draftingRoute, documentType: 'DRAFTING', requestId, ...options,
       ...(letter ? { id: letter.id, revision: letter.revision } : {}) }),
   bootstrap: () => call<LetterBootstrap>('bootstrap'),
   list: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('list', range ? { ...range } : {}),
+  draftingList: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('draftingList', range ? { ...range } : {}),
   approvals: () => call<{ letters: LetterSummary[] }>('approvals'),
   mine: (range?: LetterDateRange) => call<{ letters: LetterSummary[] }>('mine', range ? { ...range } : {}),
   get: (id: string) => call<{ letter: OfficialLetter }>('get', { id }),

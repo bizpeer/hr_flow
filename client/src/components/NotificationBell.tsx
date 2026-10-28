@@ -27,6 +27,12 @@ interface UnreadState {
 }
 
 function notificationLabel(notification: OfficialNotification): string {
+  if (notification.draftingKind && notification.draftingKind !== 'DRAFT') {
+    if (notification.requiresAction) return '내 확인 차례';
+    if (notification.status === 'ISSUED') return '확인 완료';
+    if (notification.status === 'REJECTED') return '반려';
+    return notification.status === 'DRAFT' ? '업무보고 수정' : '확인 진행';
+  }
   if (notification.requiresAction) return '내 결재 차례';
   if (notification.status === 'ISSUED') return '발행 완료';
   if (notification.status === 'REJECTED') return '반려';

@@ -9,6 +9,7 @@ export interface OfficialNotification {
   recipientRole: 'ADMIN' | 'SUB_ADMIN' | 'MEMBER';
   letterId: string;
   documentType?: 'OFFICIAL' | 'EMPLOYMENT' | 'CAREER' | 'DRAFTING';
+  draftingKind?: 'DRAFT' | 'DAILY' | 'WEEKLY';
   revision: number;
   event: string;
   title: string;
