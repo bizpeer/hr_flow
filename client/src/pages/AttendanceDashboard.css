@@ -1,29 +1,130 @@
-.attendance-dashboard .attendance-summary-card {
-  min-height: 236px;
-  padding-block: 12px;
+.workflow-theme .attendance-dashboard { display:grid; gap:20px; min-width:0; }
+.workflow-theme .attendance-page-head { display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:4px; }
+.workflow-theme .attendance-page-head p { margin:0; }
+.workflow-theme .attendance-page-description { margin-top:7px!important; color:var(--wf-muted); font-size:13px; }
+.workflow-theme .attendance-page-description time { font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-user-caption { margin-top:5px!important; color:var(--wf-muted); font-size:12px; }
+.workflow-theme .attendance-page-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.workflow-theme .attendance-top-grid { display:grid; grid-template-columns:1.1fr 1fr 1fr; gap:16px; min-width:0; }
+.workflow-theme .attendance-summary-card { min-height:218px; padding:20px; display:flex; flex-direction:column; min-width:0; }
+.workflow-theme .attendance-dashboard h2,.workflow-theme .wf-issued-documents h2 { font-size:18px; font-weight:600; margin:0; color:var(--wf-strong); letter-spacing:-.3px; }
+.workflow-theme .attendance-dashboard .wf-panel-head { margin-bottom:18px; }
+.workflow-theme .attendance-label,.workflow-theme .attendance-muted { color:var(--wf-muted); font-size:13px; }
+.workflow-theme .attendance-label { margin:0 0 4px; }
+.workflow-theme .attendance-start-time { display:flex; align-items:baseline; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+.workflow-theme .attendance-start-time strong { font-size:30px; font-weight:600; letter-spacing:-.6px; font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-start-time span { color:var(--wf-muted); font-size:12px; }
+.workflow-theme .attendance-action-buttons { margin-top:auto; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.workflow-theme .attendance-summary-card .wf-status { font-size:12px; }
+.workflow-theme .attendance-summary-card .wf-status-success { background:var(--wf-success-bg); color:var(--wf-text); }
+.workflow-theme .attendance-timeline-feed { min-height:0; max-height:142px; overflow-y:auto; }
+.workflow-theme .attendance-timeline-list { list-style:none; display:grid; gap:14px; margin:0; padding:0; }
+.workflow-theme .attendance-timeline-list li { display:flex; align-items:flex-start; gap:10px; min-width:0; }
+.workflow-theme .attendance-log-icon { width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; border-radius:8px; background:var(--wf-bg); color:var(--wf-primary-800); }
+.workflow-theme .attendance-log-copy { flex:1; min-width:0; }
+.workflow-theme .attendance-log-copy strong { display:block; font-weight:500; font-size:14px; }
+.workflow-theme .attendance-log-copy small { display:flex; align-items:center; gap:3px; color:var(--wf-muted); font-size:12px; margin-top:3px; overflow-wrap:anywhere; }
+.workflow-theme .attendance-timeline-list time { font-size:13px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.workflow-theme .attendance-empty { display:flex; align-items:center; justify-content:center; gap:8px; min-height:110px; font-size:13px; color:var(--wf-muted); }
+.workflow-theme .attendance-text-link { display:inline-flex; align-items:center; gap:4px; font-size:12px; color:var(--wf-primary-800); text-decoration:none; }
+.workflow-theme .attendance-text-link:hover,.workflow-theme .wf-issued-link:hover { text-decoration:underline; }
+.workflow-theme .attendance-leave-total { display:flex; align-items:baseline; gap:7px; margin-top:2px; }
+.workflow-theme .attendance-leave-total strong { font-size:34px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.6px; }
+.workflow-theme .attendance-leave-total span { font-size:14px; color:var(--wf-muted); }
+.workflow-theme .attendance-leave-breakdown { display:flex; flex-wrap:wrap; gap:10px 22px; padding-top:15px; margin:auto 0 0; border-top:1px solid var(--wf-border); }
+.workflow-theme .attendance-leave-breakdown div { display:flex; gap:7px; font-size:13px; }
+.workflow-theme .attendance-leave-breakdown dt { color:var(--wf-muted); }
+.workflow-theme .attendance-leave-breakdown dd { margin:0; color:var(--wf-text); font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-lower-grid { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(240px,1fr); gap:16px; min-width:0; }
+.workflow-theme .attendance-calendar-card,.workflow-theme .attendance-month-summary { padding:20px; min-width:0; }
+.workflow-theme .attendance-calendar-head { gap:12px; align-items:center; }
+.workflow-theme .attendance-calendar-head h2 { display:flex; align-items:center; gap:7px; }
+.workflow-theme .attendance-calendar-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-width:0; }
+.workflow-theme .attendance-employee-filter { width:130px; min-width:0; }
+.workflow-theme .attendance-employee-filter select { max-width:100%; }
+.workflow-theme .attendance-month-controls { display:flex; align-items:center; gap:8px; }
+.workflow-theme .attendance-month-controls strong { min-width:76px; text-align:center; font-size:14px; font-weight:500; font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-month-controls .wf-btn { width:34px; min-width:34px; min-height:34px; padding:6px; border-color:transparent; }
+.workflow-theme .attendance-month-controls svg { min-width:16px; }
+.workflow-theme .attendance-calendar-weekdays,.workflow-theme .attendance-calendar-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); text-align:center; }
+.workflow-theme .attendance-calendar-weekdays { margin:4px 0 8px; color:var(--wf-muted); font-size:12px; }
+.workflow-theme .attendance-calendar-grid { gap:3px; }
+.workflow-theme .attendance-calendar-day { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; height:42px; min-width:0; border-radius:7px; color:var(--wf-text); font-size:13px; font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-calendar-day-today { background:var(--wf-primary-800); color:var(--wf-panel); }
+.workflow-theme .attendance-calendar-day:hover:not(.attendance-calendar-day-today) { background:var(--wf-subtle); }
+.workflow-theme .attendance-calendar-dots { display:flex; gap:3px; height:4px; }
+.workflow-theme .attendance-calendar-dots span { display:block; height:4px; width:4px; border-radius:50%; }
+.workflow-theme .attendance-calendar-legend { display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px; margin:14px 0 0; padding-top:14px; border-top:1px solid var(--wf-border); color:var(--wf-muted); font-size:12px; }
+.workflow-theme .attendance-calendar-legend span { display:flex; align-items:center; gap:5px; }
+.workflow-theme .attendance-calendar-legend i { display:inline-block; width:5px; height:5px; border-radius:50%; }
+.workflow-theme .attendance-dot-in { background:var(--wf-primary-500); }
+.workflow-theme .attendance-dot-out { background:var(--wf-secondary); }
+.workflow-theme .attendance-calendar-day-today .attendance-dot-in,.workflow-theme .attendance-calendar-day-today .attendance-dot-out { background:var(--wf-panel); }
+.workflow-theme .attendance-month-summary .wf-panel-head { align-items:baseline; }
+.workflow-theme .attendance-month-summary dl { margin:0; }
+.workflow-theme .attendance-month-summary dl > div { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px 0; border-top:1px solid var(--wf-border); }
+.workflow-theme .attendance-month-summary dt { color:var(--wf-muted); font-size:14px; }
+.workflow-theme .attendance-month-summary dd { margin:0; font-size:15px; font-weight:500; font-variant-numeric:tabular-nums; }
+.workflow-theme .attendance-month-summary .attendance-worked-total { display:block; padding-top:0; border:0; }
+.workflow-theme .attendance-worked-total dd { display:flex; align-items:baseline; gap:8px; margin-top:8px; }
+.workflow-theme .attendance-worked-total strong { font-size:32px; font-weight:600; }
+.workflow-theme .attendance-worked-total span { color:var(--wf-muted); font-size:14px; font-weight:400; }
+.workflow-theme .attendance-summary-note { margin:8px 0 0; color:var(--wf-muted); font-size:12px; line-height:1.65; }
+.workflow-theme .attendance-error,.workflow-theme .wf-issued-error { padding:13px 15px; border-radius:8px; background:var(--wf-error-bg); color:var(--wf-text); font-size:13px; line-height:1.6; overflow-wrap:anywhere; }
+.workflow-theme .attendance-error button,.workflow-theme .wf-issued-error button { border:0; background:transparent; color:var(--wf-primary-800); text-decoration:underline; margin-left:8px; padding:3px; }
+.workflow-theme .wf-issued-documents { padding:20px; min-width:0; }
+.workflow-theme .wf-issued-documents .wf-panel-head { gap:14px; margin-bottom:18px; }
+.workflow-theme .wf-issued-documents h2 { display:flex; align-items:center; gap:7px; }
+.workflow-theme .wf-issued-documents h2 svg { color:var(--wf-primary-800); }
+.workflow-theme .wf-issued-description { margin:5px 0 0; font-size:12px; line-height:1.6; color:var(--wf-muted); }
+.workflow-theme .wf-issued-head-actions { display:flex; align-items:center; gap:12px; }
+.workflow-theme .wf-issued-link { font-size:13px; font-weight:500; color:var(--wf-primary-800); text-decoration:none; }
+.workflow-theme .wf-issued-refresh { padding:7px; min-width:36px; }
+.workflow-theme .wf-issued-date-filter { display:flex; align-items:end; gap:10px; flex-wrap:wrap; }
+.workflow-theme .wf-issued-date-filter .wf-field { max-width:180px; }
+.workflow-theme .wf-issued-period { font-size:12px; color:var(--wf-muted); margin:12px 0 0; }
+.workflow-theme .wf-issued-error { display:flex; align-items:flex-start; flex-wrap:wrap; gap:7px; margin-top:12px; }
+.workflow-theme .wf-issued-error svg { flex-shrink:0; margin-top:2px; }
+.workflow-theme .wf-issued-empty { display:flex; align-items:center; justify-content:center; gap:8px; min-height:110px; text-align:center; font-size:13px; color:var(--wf-muted); margin:0; }
+.workflow-theme .wf-issued-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; list-style:none; margin:16px 0 0; padding:0 2px 2px 0; max-height:32rem; overflow-y:auto; }
+.workflow-theme .wf-issued-document { display:flex; flex-direction:column; gap:16px; border:1px solid var(--wf-border); border-radius:8px; padding:15px; min-width:0; }
+.workflow-theme .wf-issued-kind { font-size:12px; color:var(--wf-muted); margin:0 0 10px; }
+.workflow-theme .wf-issued-document-title { display:block; font-size:14px; font-weight:500; line-height:1.5; color:var(--wf-text); text-decoration:none; word-break:keep-all; overflow-wrap:anywhere; }
+.workflow-theme .wf-issued-document-title:hover { color:var(--wf-primary-800); text-decoration:underline; }
+.workflow-theme .wf-issued-number,.workflow-theme .wf-issued-date { font-size:12px; color:var(--wf-muted); margin:8px 0 0; overflow-wrap:anywhere; }
+.workflow-theme .wf-issued-date { margin-top:4px; }
+.workflow-theme .wf-issued-download { margin-top:auto; width:100%; font-size:12px; padding:8px; min-height:36px; color:var(--wf-primary-800); }
+@media (max-width:1200px) {
+  .workflow-theme .attendance-top-grid { gap:12px; }
+  .workflow-theme .attendance-summary-card { padding:16px; }
+  .workflow-theme .attendance-start-time { align-items:flex-start; flex-direction:column; gap:3px; }
+  .workflow-theme .attendance-lower-grid { grid-template-columns:minmax(0,1.6fr) minmax(220px,1fr); }
+  .workflow-theme .wf-issued-grid { gap:10px; }
+  .workflow-theme .wf-issued-document { padding:12px; }
 }
-
-.attendance-dashboard .attendance-timeline-card {
-  height: 236px;
+@media (max-width:900px) {
+  .workflow-theme .attendance-top-grid,.workflow-theme .attendance-lower-grid { grid-template-columns:minmax(0,1fr); }
+  .workflow-theme .attendance-summary-card { min-height:202px; padding:18px; }
+  .workflow-theme .attendance-start-time { flex-direction:row; align-items:baseline; gap:8px; }
+  .workflow-theme .wf-issued-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
-
-.attendance-dashboard .attendance-timeline-feed {
-  min-height: 0;
-}
-
-.attendance-dashboard .attendance-calendar-card {
-  padding-block: 8px;
-}
-
-.attendance-dashboard .attendance-calendar-day {
-  width: 100%;
-  min-width: 0;
-  aspect-ratio: 2 / 1;
-  min-height: 28px;
-}
-
-@media (min-width: 768px) {
-  .attendance-dashboard .attendance-calendar-card {
-    padding-block: 16px;
-  }
+@media (max-width:600px) {
+  .workflow-theme .attendance-dashboard { gap:16px; }
+  .workflow-theme .attendance-page-actions { width:100%; }
+  .workflow-theme .attendance-page-actions .wf-btn { flex:1; }
+  .workflow-theme .attendance-calendar-card,.workflow-theme .attendance-month-summary,.workflow-theme .wf-issued-documents { padding:16px; }
+  .workflow-theme .attendance-calendar-head { align-items:flex-start; }
+  .workflow-theme .attendance-calendar-controls { width:100%; justify-content:space-between; }
+  .workflow-theme .attendance-employee-filter { flex:1; min-width:110px; }
+  .workflow-theme .attendance-month-controls { gap:2px; }
+  .workflow-theme .attendance-month-controls .wf-btn { width:36px; min-width:36px; min-height:44px; }
+  .workflow-theme .attendance-calendar-day { height:40px; }
+  .workflow-theme .attendance-action-buttons .wf-btn,.workflow-theme .wf-issued-download { min-height:44px; }
+  .workflow-theme .wf-issued-date-filter { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .workflow-theme .wf-issued-date-filter .wf-field { max-width:none; }
+  .workflow-theme .wf-issued-date-filter .wf-btn { width:100%; }
+  .workflow-theme .wf-issued-head-actions { margin-left:auto; }
+  .workflow-theme .wf-issued-grid { gap:10px; }
+  .workflow-theme .wf-issued-document { padding:12px; }
+  .workflow-theme .wf-issued-download { white-space:normal; flex-wrap:wrap; gap:5px; }
 }

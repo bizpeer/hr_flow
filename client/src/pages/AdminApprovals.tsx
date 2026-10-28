@@ -1,755 +1,164 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, where } from 'firebase/firestore';
-import { db } from '../firebase';
-import { 
-  CheckCircle, XCircle, Clock, FileText, Calendar, Filter, User, 
-  Check, X, ShieldCheck, Search, Building, Users, RotateCcw, AlertCircle, DollarSign
-} from 'lucide-react';
+import { Calendar, Check, CheckCircle2, Clock, FileText, Loader2, RotateCcw, Search, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { db } from '../firebase';
 import { useAuthStore } from '../store/authStore';
 import { DocumentApprovalInbox } from '../components/DocumentApprovalInbox';
 import { SecureAttachment } from '../components/SecureAttachment';
 import { accountSecurity } from '../services/accountSecurityService';
 import type { DirectoryUser } from '../services/accountSecurityService';
 import { useDocumentApprovalInbox } from '../hooks/useDocumentApprovalInbox';
+import './AdminApprovals.css';
 
 interface LeaveRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
-  createdAt: string;
-  requestDays: number;
-  teamId?: string;
-  divisionId?: string;
-  attachmentName?: string;
-  attachmentUrl?: string;
-  attachmentPath?: string;
+  id: string; userId: string; userName: string; type: string; startDate: string; endDate: string; reason: string;
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED'; createdAt: string; requestDays: number;
+  teamId?: string; divisionId?: string; attachmentName?: string; attachmentUrl?: string; attachmentPath?: string;
 }
-
 interface ExpenseRequest {
-  id: string;
-  userId: string;
-  userName: string;
-  title: string;
-  amount: number;
-  date: string;
-  category: string;
-  description: string;
-  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED';
-  createdAt: string;
-  teamId?: string;
-  divisionId?: string;
-  attachmentName?: string;
-  attachmentUrl?: string;
-  attachmentPath?: string;
+  id: string; userId: string; userName: string; title: string; amount: number; date: string; category: string; description: string;
+  status: 'PENDING' | 'SUB_APPROVED' | 'APPROVED' | 'REJECTED'; createdAt: string;
+  teamId?: string; divisionId?: string; attachmentName?: string; attachmentUrl?: string; attachmentPath?: string;
 }
 type ApprovalRequest = Pick<LeaveRequest, 'id' | 'userId' | 'userName' | 'status' | 'createdAt'> & Partial<LeaveRequest & ExpenseRequest>;
 interface OrganizationUnit { id: string; name: string; divisionId?: string }
+type ApprovalTab = 'LEAVE' | 'EXPENSE' | 'DOCUMENT';
+const statusLabels = { PENDING: '결재 대기', SUB_APPROVED: '최종 승인 대기', APPROVED: '최종 승인', REJECTED: '반려' };
+const statusClass = (status: string) => status === 'APPROVED' ? 'wf-status-success' : status === 'REJECTED' ? 'wf-status-error' : status === 'SUB_APPROVED' ? 'wf-status-info' : 'wf-status-warning';
+function displayDate(value: string, withTime = false) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '-' : new Intl.DateTimeFormat('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}) }).format(date);
+}
 
-export const AdminApprovals: React.FC = () => {
+export function AdminApprovals() {
   const { userData, loading: authLoading, sessionReady } = useAuthStore();
   const documentInbox = useDocumentApprovalInbox();
   const documentCount = documentInbox.loading ? '…' : documentInbox.pendingCount ?? '—';
-  const [activeTab, setActiveTab] = useState<'LEAVE' | 'EXPENSE' | 'DOCUMENT'>('LEAVE');
+  const [activeTab, setActiveTab] = useState<ApprovalTab>('LEAVE');
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [expenseRequests, setExpenseRequests] = useState<ExpenseRequest[]>([]);
   const [filter, setFilter] = useState<'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
-
-  // 필터 상태 추가
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
-  const [selectedDivision, setSelectedDivision] = useState<string>('ALL');
-  const [selectedTeam, setSelectedTeam] = useState<string>('ALL');
-  
-  // 조직 데이터 상태
+  const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
+  const [selectedDivision, setSelectedDivision] = useState('ALL');
+  const [selectedTeam, setSelectedTeam] = useState('ALL');
+  const [search, setSearch] = useState('');
   const [divisions, setDivisions] = useState<OrganizationUnit[]>([]);
   const [teams, setTeams] = useState<OrganizationUnit[]>([]);
   const [employees, setEmployees] = useState<DirectoryUser[]>([]);
   const [directoryError, setDirectoryError] = useState('');
   const [directoryRetry, setDirectoryRetry] = useState(0);
   const [selectedRequest, setSelectedRequest] = useState<ApprovalRequest | null>(null);
+  const [updating, setUpdating] = useState(false);
+  const updatingRef = useRef(false);
 
   useEffect(() => {
     if (authLoading || !sessionReady || !userData?.companyId) return;
     const companyId = userData.companyId;
-    const divisionFilter = userData.role === 'SUB_ADMIN'
-      ? [where('divisionId', '==', userData.divisionId || '__unassigned__')]
-      : [];
-
-    // 1. 신청 내역 구독 (companyId 기반 격리)
-    const qLeave = query(collection(db, 'leaves'), where('companyId', '==', companyId), ...divisionFilter);
-    const unsubLeave = onSnapshot(qLeave, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as LeaveRequest));
-      setLeaveRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    const divisionFilter = userData.role === 'SUB_ADMIN' ? [where('divisionId', '==', userData.divisionId || '__unassigned__')] : [];
+    const unsubLeave = onSnapshot(query(collection(db, 'leaves'), where('companyId', '==', companyId), ...divisionFilter), snap => {
+      setLeaveRequests(snap.docs.map(item => ({ id: item.id, ...item.data() } as LeaveRequest)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
-
-    const qExpense = query(collection(db, 'expenses'), where('companyId', '==', companyId), ...divisionFilter);
-    const unsubExpense = onSnapshot(qExpense, (snap) => {
-      const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExpenseRequest));
-      setExpenseRequests(docs.sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
+    const unsubExpense = onSnapshot(query(collection(db, 'expenses'), where('companyId', '==', companyId), ...divisionFilter), snap => {
+      setExpenseRequests(snap.docs.map(item => ({ id: item.id, ...item.data() } as ExpenseRequest)).sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     });
-
-    // 2. 조직/사용자 데이터 구독 (조인을 위함)
-    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), (snap) => {
-      setDivisions(snap.docs.map(d => ({ ...d.data(), id: d.id } as OrganizationUnit)));
-    });
-    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), (snap) => {
-      setTeams(snap.docs.map(d => ({ ...d.data(), id: d.id } as OrganizationUnit)));
-    });
-    return () => { 
-      unsubLeave(); unsubExpense();
-      unsubDivs(); unsubTeams();
-    };
+    const unsubDivs = onSnapshot(query(collection(db, 'divisions'), where('companyId', '==', companyId)), snap => setDivisions(snap.docs.map(item => ({ ...item.data(), id: item.id } as OrganizationUnit))));
+    const unsubTeams = onSnapshot(query(collection(db, 'teams'), where('companyId', '==', companyId)), snap => setTeams(snap.docs.map(item => ({ ...item.data(), id: item.id } as OrganizationUnit))));
+    return () => { unsubLeave(); unsubExpense(); unsubDivs(); unsubTeams(); };
   }, [authLoading, sessionReady, userData]);
   useEffect(() => {
     if (authLoading || !sessionReady || !userData?.companyId) return;
     let active = true;
-    accountSecurity.directory().then(result => {
-      if (active) { setEmployees(result.users); setDirectoryError(''); }
-    }).catch(failure => {
+    accountSecurity.directory().then(result => { if (active) { setEmployees(result.users); setDirectoryError(''); } }).catch(failure => {
       if (active) { setEmployees([]); setDirectoryError(failure instanceof Error ? failure.message : '직원 목록을 불러오지 못했습니다.'); }
     });
     return () => { active = false; };
   }, [authLoading, sessionReady, userData?.uid, userData?.companyId, userData?.role, userData?.divisionId, directoryRetry]);
-  const handleUpdateStatus = async (collectionName: string, id: string, newStatus?: 'APPROVED' | 'REJECTED' | 'PENDING' | 'SUB_APPROVED') => {
+
+  async function handleUpdateStatus(collectionName: string, id: string, newStatus?: LeaveRequest['status']) {
+    if (updatingRef.current) return;
+    const actor = useAuthStore.getState();
+    if (actor.userData?.uid !== userData?.uid || actor.userData?.companyId !== userData?.companyId ||
+      actor.userData?.role !== userData?.role || actor.userData?.divisionId !== userData?.divisionId) return;
+    const sameActor = () => {
+      const current = useAuthStore.getState();
+      return current.sessionReady && current.user?.uid === actor.user?.uid && current.userData?.uid === actor.userData?.uid &&
+        current.userData?.companyId === actor.userData?.companyId && current.userData?.role === actor.userData?.role &&
+        current.userData?.divisionId === actor.userData?.divisionId && current.companyData?.status === 'ACTIVE' &&
+        (!current.userData?.status || current.userData.status === 'ACTIVE') && !current.userData?.mustChangePassword;
+    };
+    if (!sameActor()) return;
+    const targetStatus = newStatus || (userData?.role === 'SUB_ADMIN' ? 'SUB_APPROVED' : 'APPROVED');
+    const actionText = targetStatus === 'SUB_APPROVED' ? '1차 승인' : targetStatus === 'APPROVED' ? '최종 승인' : targetStatus === 'REJECTED' ? '반려' : '결재대기(취소)';
+    if (!window.confirm(`이 요청을 ${actionText} 상태로 변경하시겠습니까?${targetStatus === 'PENDING' ? '\n(연차 승인 건의 경우 소진된 연차가 자동으로 복구됩니다.)' : ''}`) || !sameActor()) return;
+    updatingRef.current = true; setUpdating(true);
     try {
-      const userRole = userData?.role;
-      const targetStatus = newStatus || (userRole === 'SUB_ADMIN' ? 'SUB_APPROVED' : 'APPROVED');
-      
-      const actionText = targetStatus === 'SUB_APPROVED' ? '1차 승인' : 
-                        targetStatus === 'APPROVED' ? '최종 승인' : 
-                        targetStatus === 'REJECTED' ? '반려' : '결재대기(취소)';
-
-      if (!window.confirm(`이 요청을 ${actionText} 상태로 변경하시겠습니까?${targetStatus === 'PENDING' ? '\n(연차 승인 건의 경우 소진된 연차가 자동으로 복구됩니다.)' : ''}`)) return;
-      
-      await updateDoc(doc(db, collectionName, id), { 
-        status: targetStatus,
-        updatedAt: new Date().toISOString(),
-        updatedBy: userData?.name || '시스템'
-      });
-      alert(`${actionText} 처리가 완료되었습니다.`);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : '상태 업데이트에 실패했습니다.');
-    }
-  };
-
-  // 필터 로직 함수
-  const applyFilters = <T extends ApprovalRequest,>(requests: T[]) => {
-    // 0. 현재 로그인한 사용자의 실시간 최신 권한 확인 (새롭게 임명된 관리자 대응)
-    const currentUserRole = userData?.role;
-
-    return requests.filter(req => {
-      // 1. 상태 필터 (대기/승인/반려/전체)
-      const statusMatch = filter === 'ALL' || 
-                         (filter === 'PENDING' ? (req.status === 'PENDING' || req.status === 'SUB_APPROVED') : req.status === filter);
-      
-      // 2. 월별 필터 (createdAt 기준)
-      const reqDate = req.createdAt ? new Date(req.createdAt) : null;
-      const monthMatch = reqDate ? format(reqDate, 'yyyy-MM') === selectedMonth : true;
-
-      // 3. 조직 필터 (사용자의 현재 소속 매칭)
-      const userProfile = employees.find(e => e.uid === req.userId);
-      const userTeamId = req.teamId || userProfile?.teamId;
-      const userTeam = teams.find(t => t.id === userTeamId);
-      const userDivId = req.divisionId || userProfile?.divisionId || userTeam?.divisionId;
-
-      const divMatch = selectedDivision === 'ALL' || userDivId === selectedDivision;
-      const teamMatch = selectedTeam === 'ALL' || userTeamId === selectedTeam;
-
-      // 4. 부관리자(SUB_ADMIN) 보안 필터링: 본인 본부 내역만 노출
-      if (currentUserRole === 'SUB_ADMIN') {
-        const subAdminDivId = userData?.divisionId;
-        
-        // 본인 본부와 일치하지 않으면 제외
-        if (userDivId !== subAdminDivId) return false;
-      }
-
-      return statusMatch && monthMatch && divMatch && teamMatch;
-    });
-  };
-
+      await updateDoc(doc(db, collectionName, id), { status: targetStatus, updatedAt: new Date().toISOString(), updatedBy: userData?.name || '시스템' });
+      if (sameActor()) window.alert(`${actionText} 처리가 완료되었습니다.`);
+    } catch (failure) { if (sameActor()) window.alert(failure instanceof Error ? failure.message : '상태 업데이트에 실패했습니다.'); }
+    finally { updatingRef.current = false; if (sameActor()) setUpdating(false); }
+  }
+  const applyFilters = <T extends ApprovalRequest,>(requests: T[]) => requests.filter(request => {
+    const statusMatch = filter === 'ALL' || (filter === 'PENDING' ? request.status === 'PENDING' || request.status === 'SUB_APPROVED' : request.status === filter);
+    const date = request.createdAt ? new Date(request.createdAt) : null;
+    const monthMatch = date ? format(date, 'yyyy-MM') === selectedMonth : true;
+    const profile = employees.find(employee => employee.uid === request.userId);
+    const teamId = request.teamId || profile?.teamId;
+    const team = teams.find(unit => unit.id === teamId);
+    const divisionId = request.divisionId || profile?.divisionId || team?.divisionId;
+    if (userData?.role === 'SUB_ADMIN' && divisionId !== userData.divisionId) return false;
+    return statusMatch && monthMatch && (selectedDivision === 'ALL' || divisionId === selectedDivision) && (selectedTeam === 'ALL' || teamId === selectedTeam) &&
+      `${request.userName} ${request.title || ''} ${request.reason || ''}`.toLowerCase().includes(search.trim().toLowerCase());
+  });
   const filteredLeaves = applyFilters(leaveRequests);
   const filteredExpenses = applyFilters(expenseRequests);
   const filteredRequests: ApprovalRequest[] = activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses;
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'APPROVED': return 'bg-emerald-50 text-emerald-600 border-emerald-100';
-      case 'SUB_APPROVED': return 'bg-indigo-50 text-indigo-600 border-indigo-100';
-      case 'REJECTED': return 'bg-rose-50 text-rose-600 border-rose-100';
-      default: return 'bg-amber-50 text-amber-600 border-amber-100';
-    }
+  const selected = activeTab !== 'DOCUMENT' ? filteredRequests.find(request => request.id === selectedRequest?.id) || null : null;
+  const canProcess = (request: ApprovalRequest) => userData?.role === 'SUB_ADMIN' && request.status === 'PENDING' || userData?.role === 'ADMIN' && (request.status === 'PENDING' || request.status === 'SUB_APPROVED');
+  const canRestore = (request: ApprovalRequest) => userData?.role === 'ADMIN' && ['APPROVED', 'REJECTED', 'SUB_APPROVED'].includes(request.status) && !canProcess(request);
+  const organization = (request: ApprovalRequest) => {
+    const profile = employees.find(employee => employee.uid === request.userId);
+    const team = teams.find(unit => unit.id === (request.teamId || profile?.teamId));
+    const division = divisions.find(unit => unit.id === (request.divisionId || team?.divisionId));
+    return [division?.name || '소속 미지정', team?.name || '팀 미지정'].join(' · ');
   };
+  const switchTab = (tab: ApprovalTab) => { if (updatingRef.current) return; setSelectedRequest(null); setActiveTab(tab); };
 
-  if (authLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center bg-slate-50 min-h-screen">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-500 font-black tracking-tight text-lg">결재 서버 연결 중...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 p-4 md:p-10 bg-slate-50 min-h-screen">
-      <div className="max-w-7xl mx-auto space-y-10">
-        {directoryError && <div role="alert" className="rounded-xl bg-amber-50 p-4 text-amber-900 text-sm">{directoryError}<button type="button" className="ml-3 underline font-semibold" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
-        
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
-          <div className="space-y-2">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
-                <ShieldCheck className="w-6 h-6" />
-              </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">전자결재/승인 관리</h1>
-            </div>
-            <p className="text-slate-500 font-medium">부서별, 월별 안건을 고도화된 필터로 한눈에 조회합니다.</p>
-          </div>
-
-          {activeTab !== 'DOCUMENT' && <div className="flex flex-wrap items-center gap-4 bg-white p-2.5 rounded-[2.5rem] premium-shadow border border-slate-100">
-            {(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const).map(f => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-6 py-3 rounded-2xl text-xs font-black transition-all tracking-tight ${
-                   filter === f ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100 scale-105' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
-                }`}
-              >
-                {f === 'PENDING' ? '결재대기' : f === 'APPROVED' ? '최종승인' : f === 'REJECTED' ? '반려건' : '전체보기'}
-              </button>
-            ))}
-          </div>}
-        </div>
-
-        {/* Advanced Filter Bars */}
-        {activeTab !== 'DOCUMENT' && <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
-           {/* Month Selection */}
-           <div className="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 flex flex-col gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <Calendar className="w-3 h-3" /> 조회 기준 월
-              </span>
-              <input 
-                type="month" 
-                value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
-                className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
-              />
-           </div>
-
-           {/* Division Selection */}
-           <div className="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 flex flex-col gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <Building className="w-3 h-3" /> 본부 전체
-              </span>
-              <select 
-                value={selectedDivision}
-                onChange={(e) => { setSelectedDivision(e.target.value); setSelectedTeam('ALL'); }}
-                className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm appearance-none"
-              >
-                <option value="ALL">전체 본부</option>
-                {divisions.map(div => <option key={div.id} value={div.id}>{div.name}</option>)}
-              </select>
-           </div>
-
-           {/* Team Selection */}
-           <div className="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 flex flex-col gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <Users className="w-3 h-3" /> 팀 선택
-              </span>
-              <select 
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                disabled={selectedDivision === 'ALL'}
-                className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm appearance-none disabled:opacity-30 disabled:grayscale"
-              >
-                <option value="ALL">전체 팀</option>
-                {teams.filter(t => t.divisionId === selectedDivision).map(team => (
-                   <option key={team.id} value={team.id}>{team.name}</option>
-                ))}
-              </select>
-           </div>
-
-           {/* Quick Search */}
-           <div className="bg-white p-5 rounded-3xl shadow-xl border border-slate-100 flex flex-col gap-2">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                 <Search className="w-3 h-3" /> 이름 검색
-              </span>
-              <input 
-                type="text" 
-                placeholder="신청자명..." 
-                className="w-full bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all text-sm"
-              />
-           </div>
-        </div>}
-
-        {/* Tab Selection */}
-        <div className="flex flex-wrap p-1.5 bg-slate-200/50 backdrop-blur-md rounded-[2.5rem] w-fit premium-shadow border border-slate-100">
-          <button 
-            onClick={() => setActiveTab('LEAVE')}
-            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'LEAVE' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <Calendar className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'LEAVE' ? 'text-indigo-600' : 'text-slate-400'}`} />
-            휴가 신청 ({filteredLeaves.length})
-          </button>
-          <button 
-            onClick={() => setActiveTab('EXPENSE')}
-            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'EXPENSE' ? 'bg-white text-emerald-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <FileText className={`w-4 h-4 md:w-5 md:h-5 ${activeTab === 'EXPENSE' ? 'text-emerald-600' : 'text-slate-400'}`} />
-            지출 결의 ({filteredExpenses.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('DOCUMENT')}
-            className={`flex items-center gap-3 px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs md:text-sm transition-all duration-500 ${activeTab === 'DOCUMENT' ? 'bg-white text-indigo-700 shadow-xl scale-[1.02]' : 'text-slate-500 hover:text-slate-700'}`}
-          >
-            <FileText className="w-4 h-4 md:w-5 md:h-5" />
-            서류 결재 ({documentCount})
-          </button>
-        </div>
-
-        {activeTab === 'DOCUMENT' ? <DocumentApprovalInbox key={`${userData?.uid}:${userData?.companyId}:${userData?.role}:${userData?.divisionId || ''}`} inbox={documentInbox} /> : <>
-        {/* Desktop Table View */}
-        <div className="hidden md:block bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden min-h-[500px]">
-           <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
-                 <thead>
-                    <tr className="bg-slate-50/50 border-b border-slate-100">
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">요청 정보 / 신청자</th>
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">항목 / 사유</th>
-                       <th className="px-8 py-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{activeTab === 'LEAVE' ? '기간 / 소진일' : '지출 금액'}</th>
-                       <th className="px-8 py-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">진행 상태</th>
-                       <th className="px-8 py-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">상세 / 관리</th>
-                    </tr>
-                 </thead>
-                 <tbody className="divide-y divide-slate-100">
-                    {filteredRequests.map(req => {
-                       const userProf = employees.find(e => e.uid === req.userId);
-                       const userTeam = teams.find(t => t.id === (req.teamId || userProf?.teamId));
-                       const userDiv = divisions.find(d => d.id === (req.divisionId || userTeam?.divisionId));
-
-                       return (
-                        <tr key={req.id} className="group hover:bg-slate-50/80 transition-all duration-300">
-                           <td className="px-8 py-7">
-                              <div className="flex items-center gap-4">
-                                 <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 group-hover:rotate-6 transition-all shadow-sm">
-                                    <User className="w-5.5 h-5.5" />
-                                 </div>
-                                 <div className="space-y-1">
-                                    <div className="text-sm font-black text-slate-800 tracking-tight">{req.userName}</div>
-                                    <div className="flex items-center gap-1.5">
-                                       <span className="text-[9px] font-black text-indigo-600/70 uppercase tracking-tighter bg-indigo-50/50 px-1.5 py-0.5 rounded">
-                                          {userDiv?.name || '소속미지정'}
-                                       </span>
-                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter bg-slate-100 px-1.5 py-0.5 rounded">
-                                          {userTeam?.name || '팀 미지정'}
-                                       </span>
-                                    </div>
-                                    <div className="text-[10px] font-bold text-slate-300">
-                                       {req.createdAt ? format(new Date(req.createdAt), 'yyyy.MM.dd HH:mm') : '-'}
-                                    </div>
-                                 </div>
-                              </div>
-                           </td>
-
-                           <td className="px-8 py-7">
-                              <div className="space-y-1.5">
-                                 <span className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-black tracking-widest uppercase bg-slate-100 text-slate-500 border border-slate-200">
-                                    {activeTab === 'LEAVE' ? (req.type === 'annual' ? '연차' : req.type === 'half' ? '반차' : req.type === 'sick' ? '병가' : '기타') : req.category}
-                                 </span>
-                                 <div className="text-sm font-black text-slate-700 line-clamp-1 max-w-[200px]">
-                                    {activeTab === 'LEAVE' ? req.reason : req.title}
-                                 </div>
-                              </div>
-                           </td>
-
-                           <td className="px-8 py-7">
-                              {activeTab === 'LEAVE' ? (
-                                 <div className="space-y-1">
-                                    <div className="text-sm font-black text-slate-800 tracking-tight">{req.startDate} ~ {req.endDate}</div>
-                                    <div className="text-[10px] font-black text-rose-500 flex items-center gap-1">
-                                       <Clock className="w-3 h-3" /> 소진 {req.requestDays}일
-                                    </div>
-                                 </div>
-                              ) : (
-                                 <div className="space-y-1">
-                                    <div className="text-lg font-black text-slate-900 tracking-tighter block italic">₩ {Number(req.amount).toLocaleString()}</div>
-                                    <div className="text-[10px] font-bold text-slate-400">{req.date} 지출</div>
-                                 </div>
-                              )}
-                           </td>
-
-                           <td className="px-8 py-7">
-                              <div className="flex flex-col items-center gap-2">
-                                 <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all ${getStatusStyle(req.status)}`}>
-                                    {req.status === 'APPROVED' ? <CheckCircle className="w-3 h-3" /> : 
-                                     req.status === 'SUB_APPROVED' ? <ShieldCheck className="w-3 h-3" /> :
-                                     req.status === 'REJECTED' ? <XCircle className="w-3 h-3" /> : 
-                                     <Clock className="w-3 h-3 animate-spin-slow" />}
-                                    {req.status === 'APPROVED' ? '최종승인' : 
-                                     req.status === 'SUB_APPROVED' ? '1차 승인' :
-                                     req.status === 'REJECTED' ? '반려됨' : '결재대기'}
-                                 </span>
-                                 {/* 미니 타임라인 인디케이터 */}
-                                 <div className="flex items-center gap-0.5">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                                    <div className={`w-3 h-0.5 ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-indigo-500 shadow-sm shadow-indigo-200' : 'bg-slate-200'}`}></div>
-                                    <div className={`w-3 h-0.5 ${req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
-                                    <div className={`w-1.5 h-1.5 rounded-full ${req.status === 'APPROVED' ? 'bg-emerald-500 shadow-lg shadow-emerald-200' : 'bg-slate-200'}`}></div>
-                                 </div>
-                              </div>
-                           </td>
-
-                           <td className="px-8 py-7 text-right">
-                              <div className="flex items-center justify-end gap-2.5">
-                                 <button 
-                                    onClick={() => setSelectedRequest(req)}
-                                    className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-md active:scale-95"
-                                 >
-                                    Review
-                                 </button>
-                                 {/* 신청 유형별/권한별 처리 버튼 */}
-                                 {((userData?.role === 'SUB_ADMIN' && req.status === 'PENDING') || 
-                                   (userData?.role === 'ADMIN' && (req.status === 'PENDING' || req.status === 'SUB_APPROVED'))) ? (
-                                    <div className="flex items-center gap-1.5">
-                                       <button 
-                                          onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, userData?.role === 'ADMIN' ? 'APPROVED' : 'SUB_APPROVED')}
-                                          className={`p-2 rounded-xl transition-all shadow-sm border ${
-                                            userData?.role === 'ADMIN' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-600 hover:text-white' : 'bg-indigo-50 text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
-                                          }`}
-                                          title={userData?.role === 'ADMIN' ? "최종 승인" : "1차 승인"}
-                                       >
-                                          {userData?.role === 'ADMIN' ? <CheckCircle className="w-5 h-5" /> : <Check className="w-5 h-5" />}
-                                       </button>
-                                       <button 
-                                          onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, 'REJECTED')}
-                                          className="p-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm"
-                                          title="반려"
-                                       >
-                                          <X className="w-5 h-5" />
-                                       </button>
-                                    </div>
-                                 ) : (
-                                    <div className="flex items-center gap-1.5">
-                                       {userData?.role === 'ADMIN' && (req.status === 'APPROVED' || req.status === 'REJECTED' || req.status === 'SUB_APPROVED') && (
-                                          <button 
-                                             onClick={() => handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', req.id, 'PENDING')}
-                                             className="p-2 bg-amber-50 text-amber-600 border border-amber-100 rounded-xl hover:bg-amber-600 hover:text-white transition-all group/undo"
-                                             title="복구"
-                                          >
-                                             <RotateCcw className="w-4 h-4 group-hover/undo:-rotate-45 transition-transform" />
-                                          </button>
-                                       )}
-                                    </div>
-                                 )}
-                              </div>
-                           </td>
-                        </tr>
-                       );
-                    })}
-                    {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).length === 0 && (
-                       <tr>
-                          <td colSpan={5} className="py-32 text-center">
-                              <div className="flex flex-col items-center gap-4">
-                                 <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100">
-                                    <Filter className="w-8 h-8 text-slate-200" />
-                                 </div>
-                                 <p className="text-slate-400 font-black tracking-tight">조건에 맞는 결재 안건이 없습니다.</p>
-                              </div>
-                          </td>
-                       </tr>
-                    )}
-                 </tbody>
-              </table>
-           </div>
-        </div>
-
-        {/* Mobile Card View */}
-        <div className="md:hidden space-y-4 pb-10">
-           {filteredRequests.map(req => (
-              <div 
-                key={req.id} 
-                onClick={() => setSelectedRequest(req)}
-                className="bg-white p-5 rounded-3xl shadow-lg border border-slate-100 active:scale-[0.98] transition-transform"
-              >
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                       <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
-                          <User className="w-5 h-5" />
-                       </div>
-                       <div>
-                          <div className="text-xs font-black text-slate-900 tracking-tight">{req.userName}</div>
-                          <div className="text-[10px] font-bold text-slate-400">
-                            {req.createdAt ? format(new Date(req.createdAt), 'MM.dd HH:mm') : '-'}
-                          </div>
-                       </div>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black border tracking-widest ${getStatusStyle(req.status)}`}>
-                       {req.status === 'APPROVED' ? '최종승인' : 
-                        req.status === 'SUB_APPROVED' ? '1차승인' :
-                        req.status === 'REJECTED' ? '반려' : '대기'}
-                    </span>
-                 </div>
-
-                 <div className="bg-slate-50 p-4 rounded-2xl mb-4 border border-slate-100">
-                    <div className="text-[9px] font-black text-indigo-500 uppercase mb-1 tracking-widest">
-                       {activeTab === 'LEAVE' ? (req.type === 'annual' ? '연차' : '기타휴가') : req.category}
-                    </div>
-                    <div className="text-sm font-black text-slate-700 mb-1">{activeTab === 'LEAVE' ? req.reason : req.title}</div>
-                    <div className="text-xs font-bold text-slate-400 flex items-center gap-2">
-                       {activeTab === 'LEAVE' ? (
-                          <><Calendar className="w-3 h-3" /> {req.startDate} ~ {req.endDate}</>
-                       ) : (
-                          <><DollarSign className="w-3 h-3" /> ₩ {Number(req.amount).toLocaleString()}</>
-                       )}
-                    </div>
-                 </div>
-
-                 <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-1">
-                       <div className={`w-1 h-1 rounded-full ${req.status !== 'PENDING' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                       <div className={`w-2 h-0.5 ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                       <div className={`w-1 h-1 rounded-full ${req.status === 'SUB_APPROVED' || req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
-                       <div className={`w-2 h-0.5 ${req.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-200'}`}></div>
-                       <div className={`w-1 h-1 rounded-full ${req.status === 'APPROVED' ? 'bg-emerald-500' : 'bg-slate-200'}`}></div>
-                    </div>
-                    <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest">Touch to Review Detail</span>
-                 </div>
-              </div>
-           ))}
-           {(activeTab === 'LEAVE' ? filteredLeaves : filteredExpenses).length === 0 && (
-              <div className="bg-white p-10 rounded-3xl text-center border-2 border-dashed border-slate-100">
-                 <p className="text-slate-300 font-black text-xs">안건이 없습니다.</p>
-              </div>
-           )}
-        </div>
-
-        {/* Stats Summary Panel */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-           <div className="bg-indigo-600 p-8 rounded-[2.5rem] text-white shadow-2xl shadow-indigo-200 group relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-125 duration-700"></div>
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Total Monthly Approvals</p>
-              <div className="text-4xl font-black mb-4">
-                 {(filteredLeaves.filter(r => r.status === 'APPROVED').length + filteredExpenses.filter(r => r.status === 'APPROVED').length)}
-                 <span className="text-sm opacity-60 ml-2 uppercase">Cases</span>
-              </div>
-              <div className="flex items-center gap-2 text-indigo-200 text-xs font-black">
-                 <CheckCircle className="w-4 h-4" />
-                 <span>선택된 조건 내 최종 승인 합계</span>
-              </div>
-           </div>
-
-           <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-xl group">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Waitings Task</p>
-               <div className="text-4xl font-black text-slate-900 mb-4 tracking-tighter">
-                  {(leaveRequests.filter(r => r.status === 'PENDING' || r.status === 'SUB_APPROVED').length + 
-                    expenseRequests.filter(r => r.status === 'PENDING' || r.status === 'SUB_APPROVED').length)}
-               </div>
-              <div className="flex items-center gap-2 text-amber-500 text-xs font-black">
-                 <Clock className="w-4 h-4 animate-spin-slow" />
-                 <span>전체 미처리 안건 (실시간)</span>
-              </div>
-           </div>
-
-           <div className="bg-slate-900 p-8 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-40 mb-2">Total Monthly Spendings</p>
-              <div className="text-3xl font-black text-emerald-400 mb-4 italic">
-                 ₩ {filteredExpenses.filter(r => r.status === 'APPROVED').reduce((sum, r) => sum + r.amount, 0).toLocaleString()}
-              </div>
-              <p className="text-[10px] text-slate-500 font-bold tracking-tight">이 달의 부서별 승인 금액 총계</p>
-           </div>
-
-           <div className="bg-rose-500 p-8 rounded-[2.5rem] text-white shadow-xl">
-              <p className="text-[10px] font-black uppercase tracking-widest opacity-60 mb-2">Rejection Rate</p>
-              <div className="text-4xl font-black mb-4 tracking-tighter">
-                 {Math.round(((filteredLeaves.filter(r => r.status === 'REJECTED').length + filteredExpenses.filter(r => r.status === 'REJECTED').length) / (Math.max(1, filteredLeaves.length + filteredExpenses.length))) * 100)}%
-              </div>
-              <div className="flex items-center gap-2 text-rose-100 text-[10px] font-bold">
-                 <XCircle className="w-4 h-4" />
-                 <span>반려 처리된 안건 비율</span>
-              </div>
-           </div>
-        </div>
-        </>}
-      </div>
-
-      {/* 결재 상세 정보 모달 */}
-      {selectedRequest && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500">
-              {/* Modal Header */}
-              <div className="p-10 border-b border-slate-50 flex justify-between items-start">
-                 <div className="space-y-4">
-                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-black text-indigo-600 uppercase tracking-[0.2em]">
-                       Approval Document Detail
-                    </div>
-                    <h2 className="text-3xl font-black text-slate-900 tracking-tighter">
-                       {activeTab === 'LEAVE' ? '휴가 신청 상세서' : '지출결의 상세서'}
-                    </h2>
-                    <div className="flex items-center gap-4 text-slate-400">
-                       <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 rounded-lg text-xs font-bold">
-                          <User className="w-3.5 h-3.5" /> {selectedRequest.userName}
-                       </div>
-                       <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 rounded-lg text-xs font-bold">
-                          <Calendar className="w-3.5 h-3.5" /> {selectedRequest.createdAt ? format(new Date(selectedRequest.createdAt), 'yyyy.MM.dd') : '-'}
-                       </div>
-                    </div>
-                 </div>
-                 <button 
-                  onClick={() => setSelectedRequest(null)}
-                  className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 hover:text-slate-900 transition-all"
-                 >
-                    <X className="w-6 h-6" />
-                 </button>
-              </div>
-
-              {/* Modal Body */}
-              <div className="p-10 space-y-10 max-h-[60vh] overflow-y-auto premium-scrollbar">
-                 <div className="grid grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">신청 분류</span>
-                       <div className="p-4 bg-slate-50 rounded-2xl font-black text-slate-700 border border-slate-100">
-                          {activeTab === 'LEAVE' ? (selectedRequest.type === 'annual' ? '연차 휴가' : selectedRequest.type === 'half' ? '반차 휴가' : '경조사/병가') : selectedRequest.category}
-                       </div>
-                    </div>
-                    <div className="space-y-2">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">{activeTab === 'LEAVE' ? '총 소진 일수' : '최종 결제 금액'}</span>
-                       <div className={`p-4 rounded-2xl font-black border ${activeTab === 'LEAVE' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                          {activeTab === 'LEAVE' ? `${selectedRequest.requestDays} 일` : `₩ ${Number(selectedRequest.amount).toLocaleString()}`}
-                       </div>
-                    </div>
-                 </div>
-
-                 <div className="space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">{activeTab === 'LEAVE' ? '휴가 기간' : '지출 상세 내용'}</span>
-                    <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 min-h-[100px]">
-                       {activeTab === 'LEAVE' ? (
-                          <div className="flex items-center justify-between">
-                             <div className="flex flex-col gap-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">Start Date</span>
-                                <span className="text-xl font-black text-slate-800">{selectedRequest.startDate}</span>
-                             </div>
-                             <div className="w-10 h-px bg-slate-300"></div>
-                             <div className="flex flex-col gap-1 items-end">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase">End Date</span>
-                                <span className="text-xl font-black text-slate-800">{selectedRequest.endDate}</span>
-                             </div>
-                          </div>
-                       ) : (
-                          <p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap">{selectedRequest.description || selectedRequest.title}</p>
-                       )}
-                    </div>
-                 </div>
-
-                 {activeTab === 'LEAVE' && (
-                    <div className="space-y-2">
-                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">상세 사유</span>
-                       <div className="p-6 bg-slate-900 rounded-3xl text-slate-200 border border-slate-800 shadow-xl">
-                          <p className="text-base font-medium leading-relaxed whitespace-pre-wrap italic">"{selectedRequest.reason}"</p>
-                       </div>
-                    </div>
-                 )}
-
-                  <div className="flex items-center gap-4 p-5 bg-indigo-50/50 border border-indigo-100 rounded-[2rem] shadow-sm relative overflow-hidden group/alert">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/5 rounded-full -mr-12 -mt-12 transition-transform group-hover/alert:scale-110"></div>
-                    <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-                       <Clock className="w-6 h-6 text-indigo-600 animate-spin-slow" />
-                    </div>
-                    <div className="space-y-1 relative z-10">
-                        <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">실시간 결재 상태 엔진</p>
-                        <p className="text-xs font-black text-slate-700 leading-tight">
-                          현재 이 문서는 <span className="text-indigo-600 underline underline-offset-4 font-black">{
-                            selectedRequest.status === 'PENDING' ? '1차 검토 대기' : 
-                            selectedRequest.status === 'SUB_APPROVED' ? '최종 승인 대기' : 
-                            selectedRequest.status === 'APPROVED' ? '최종 승인 완료' : '반려됨'
-                          }</span> 상태입니다.
-                        </p>
-                    </div>
-                  </div>
-
-                  {/* 시각적 타임라인 UI */}
-                  <div className="pt-6 space-y-4">
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">Approval Timeline</span>
-                     <div className="flex items-center justify-between px-2">
-                        <div className="flex flex-col items-center gap-2 flex-1">
-                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status !== 'REJECTED' ? 'bg-indigo-600 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
-                              <FileText className="w-5 h-5" />
-                           </div>
-                           <span className="text-[10px] font-black text-slate-800">신청완료</span>
-                        </div>
-                        <div className={`h-1 flex-1 -mt-6 ${selectedRequest.status === 'SUB_APPROVED' || selectedRequest.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-100'}`}></div>
-                        <div className="flex flex-col items-center gap-2 flex-1">
-                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status === 'SUB_APPROVED' || selectedRequest.status === 'APPROVED' ? 'bg-indigo-600 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
-                              <ShieldCheck className="w-5 h-5" />
-                           </div>
-                           <span className="text-[10px] font-black text-slate-800">1차승인</span>
-                        </div>
-                        <div className={`h-1 flex-1 -mt-6 ${selectedRequest.status === 'APPROVED' ? 'bg-indigo-500' : 'bg-slate-100'}`}></div>
-                        <div className="flex flex-col items-center gap-2 flex-1">
-                           <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 ${selectedRequest.status === 'APPROVED' ? 'bg-emerald-500 text-white border-white shadow-lg shadow-emerald-100' : selectedRequest.status === 'REJECTED' ? 'bg-rose-500 text-white border-white shadow-lg' : 'bg-slate-100 text-slate-400 border-white'}`}>
-                              {selectedRequest.status === 'REJECTED' ? <XCircle className="w-5 h-5" /> : <CheckCircle className="w-5 h-5" />}
-                           </div>
-                           <span className="text-[10px] font-black text-slate-800">{selectedRequest.status === 'REJECTED' ? '반려됨' : '최종승인'}</span>
-                        </div>
-                     </div>
-                  </div>
-
-                 {/* 첨부파일 섹션 - 항상 제목은 표시하여 존재감을 인지시킴 */}
-                 <div className="space-y-4 pt-6 border-t border-slate-100">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1">첨부 증빙 자료 (Attachments)</span>
-                    
-                    {(selectedRequest.attachmentPath || selectedRequest.attachmentUrl) ? (
-                       <SecureAttachment category={activeTab === 'EXPENSE' ? 'expenses' : 'leaves'} documentId={selectedRequest.id} name={selectedRequest.attachmentName} preview />
-                    ) : selectedRequest.attachmentName ? (
-                       <div className="flex items-center justify-between p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl group/file">
-                          <div className="flex items-center gap-4">
-                             <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center text-slate-400">
-                                <FileText className="w-6 h-6" />
-                              </div>
-                             <div>
-                                <p className="text-sm font-black text-slate-700 truncate max-w-[300px]">{selectedRequest.attachmentName}</p>
-                                <p className="text-[10px] font-bold text-rose-400">파일 데이터가 존재하지 않는 이전 요청 건입니다.</p>
-                             </div>
-                          </div>
-                       </div>
-                    ) : (
-                       <div className="p-10 border-2 border-slate-100 border-dashed rounded-3xl flex flex-col items-center gap-3 text-slate-300 bg-slate-50/30">
-                          <AlertCircle className="w-8 h-8 opacity-20" />
-                          <p className="text-xs font-bold italic">첨부된 증빙 서류가 없습니다.</p>
-                       </div>
-                    )}
-                 </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="p-10 bg-slate-50 border-t border-slate-100 flex gap-4">
-                 <button 
-                  onClick={() => setSelectedRequest(null)}
-                  className="flex-1 py-5 bg-white border border-slate-200 text-slate-400 font-black rounded-2xl hover:bg-slate-100 transition-all uppercase tracking-[0.2em] text-xs"
-                 >
-                    Close
-                 </button>
-                 {(selectedRequest.status === 'PENDING' || (selectedRequest.status === 'SUB_APPROVED' && userData?.role === 'ADMIN')) && (
-                    <>
-                       <button 
-                        onClick={() => { handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selectedRequest.id); setSelectedRequest(null); }}
-                        className="flex-[1.5] py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-95 uppercase tracking-[0.2em] text-xs"
-                       >
-                          {userData?.role === 'SUB_ADMIN' ? '1차 승인' : '최종 승인'}
-                       </button>
-                    </>
-                 )}
-              </div>
-           </div>
-        </div>
-      )}
+  if (authLoading) return <div className="wf-approvals wf-loading" role="status"><Loader2 className="animate-spin" size={22} />결재함을 불러오는 중입니다.</div>;
+  return <div className="wf-approvals">
+    <header className="wf-page-heading"><div><h1>결재/승인 관리함</h1><p>요청 문서를 검토하고 승인·확인 이력을 관리하세요.</p></div></header>
+    {directoryError && <div role="alert" className="wf-approval-alert">{directoryError}<button type="button" className="wf-btn" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
+    <div className="wf-approval-tabs" role="tablist" aria-label="결재 종류">
+      <button type="button" role="tab" aria-selected={activeTab === 'LEAVE'} disabled={updating} onClick={() => switchTab('LEAVE')}><Calendar size={17} />휴가 신청 <span>{filteredLeaves.length}</span></button>
+      <button type="button" role="tab" aria-selected={activeTab === 'EXPENSE'} disabled={updating} onClick={() => switchTab('EXPENSE')}><FileText size={17} />지출 결의 <span>{filteredExpenses.length}</span></button>
+      <button type="button" role="tab" aria-selected={activeTab === 'DOCUMENT'} disabled={updating} onClick={() => switchTab('DOCUMENT')}><FileText size={17} />서류 결재 <span>{documentCount}</span></button>
     </div>
-  );
-};
+    {activeTab === 'DOCUMENT' ? <DocumentApprovalInbox key={`${userData?.uid}:${userData?.companyId}:${userData?.role}:${userData?.divisionId || ''}:${userData?.teamId || ''}`} inbox={documentInbox} /> : <>
+      <div className="wf-panel wf-approval-filters">
+        <label className="wf-field">조회 기준 월<input type="month" className="wf-input" value={selectedMonth} disabled={updating} onChange={event => setSelectedMonth(event.target.value)} /></label>
+        <label className="wf-field">본부<select className="wf-input" value={selectedDivision} disabled={updating} onChange={event => { setSelectedDivision(event.target.value); setSelectedTeam('ALL'); }}><option value="ALL">전체 본부</option>{divisions.map(division => <option key={division.id} value={division.id}>{division.name}</option>)}</select></label>
+        <label className="wf-field">팀<select className="wf-input" value={selectedTeam} onChange={event => setSelectedTeam(event.target.value)} disabled={updating || selectedDivision === 'ALL'}><option value="ALL">전체 팀</option>{teams.filter(team => team.divisionId === selectedDivision).map(team => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
+        <label className="wf-field">검색<span className="wf-approval-search"><Search size={17} /><input className="wf-input" placeholder="제목 또는 신청자 검색" value={search} disabled={updating} onChange={event => setSearch(event.target.value)} /></span></label>
+      </div>
+      <div className="wf-approval-grid">
+        <section className="wf-panel wf-approval-list" aria-label={activeTab === 'LEAVE' ? '휴가 신청 목록' : '지출 결의 목록'}>
+          <div className="wf-approval-statuses" aria-label="결재 상태 필터">{(['PENDING', 'APPROVED', 'REJECTED', 'ALL'] as const).map(value => <button type="button" key={value} aria-pressed={filter === value} disabled={updating} onClick={() => setFilter(value)}>{value === 'ALL' ? '전체' : value === 'PENDING' ? '결재 대기' : value === 'APPROVED' ? '최종 승인' : '반려'}</button>)}</div>
+          {!filteredRequests.length && <p className="wf-approval-empty">선택한 조건의 안건이 없습니다.</p>}
+          {filteredRequests.map(request => <button type="button" key={request.id} className="wf-approval-row" aria-pressed={selected?.id === request.id} disabled={updating} onClick={() => setSelectedRequest(request)}><span className="wf-approval-row-top"><span>{activeTab === 'LEAVE' ? request.type === 'annual' ? '연차' : request.type === 'half' ? '반차' : '휴가' : request.category || '지출결의'}</span><span className={`wf-status ${statusClass(request.status)}`}>{statusLabels[request.status]}</span></span><strong>{activeTab === 'LEAVE' ? request.reason || '휴가 신청' : request.title}</strong><span>{request.userName} · {organization(request)}</span><span>{activeTab === 'LEAVE' ? `${request.startDate} ~ ${request.endDate} · ${request.requestDays}일` : `${Number(request.amount).toLocaleString()}원 · ${request.date}`}</span><time>{displayDate(request.createdAt, true)}</time></button>)}
+        </section>
+        <section className="wf-panel wf-approval-detail" aria-label="선택한 결재 상세">
+          {!selected ? <div className="wf-approval-empty"><FileText size={28} /><h2>검토할 안건을 선택하세요</h2><p>내용과 첨부자료를 확인한 뒤 승인하거나 반려할 수 있습니다.</p></div> : <>
+            <div className="wf-approval-detail-head"><div className="wf-approval-row-top"><span className={`wf-status ${statusClass(selected.status)}`}>{statusLabels[selected.status]}</span><button type="button" className="wf-btn wf-approval-close" aria-label="상세 닫기" disabled={updating} onClick={() => setSelectedRequest(null)}><X size={17} /></button></div><h2>{activeTab === 'LEAVE' ? '휴가 신청' : selected.title || '지출결의'}</h2><p>{selected.userName} · {organization(selected)}</p><time>{displayDate(selected.createdAt, true)}</time></div>
+            <div className="wf-approval-detail-body"><dl className="wf-approval-metadata"><div><dt>신청 분류</dt><dd>{activeTab === 'LEAVE' ? selected.type === 'annual' ? '연차 휴가' : selected.type === 'half' ? '반차 휴가' : '경조사/병가' : selected.category}</dd></div><div><dt>{activeTab === 'LEAVE' ? '사용 일수' : '지출 금액'}</dt><dd>{activeTab === 'LEAVE' ? `${selected.requestDays}일` : `${Number(selected.amount).toLocaleString()}원`}</dd></div><div><dt>{activeTab === 'LEAVE' ? '휴가 기간' : '지출일'}</dt><dd>{activeTab === 'LEAVE' ? `${selected.startDate} ~ ${selected.endDate}` : selected.date}</dd></div><div><dt>현재 상태</dt><dd>{statusLabels[selected.status]}</dd></div></dl>
+              <section className="wf-approval-section"><h3>{activeTab === 'LEAVE' ? '상세 사유' : '지출 상세 내용'}</h3><p className="wf-approval-content">{activeTab === 'LEAVE' ? selected.reason : selected.description || selected.title}</p></section>
+              <section className="wf-approval-section"><h3>결재 진행</h3><ol className="wf-approval-steps"><li className="is-complete"><Check size={16} /><span>신청 완료</span></li><li className={selected.status === 'SUB_APPROVED' || selected.status === 'APPROVED' ? 'is-complete' : ''}><Check size={16} /><span>1차 승인</span></li><li className={selected.status === 'APPROVED' ? 'is-complete' : ''}><Check size={16} /><span>{selected.status === 'REJECTED' ? '반려됨' : '최종 승인'}</span></li></ol></section>
+              <section className="wf-approval-section"><h3>첨부 증빙 자료</h3>{selected.attachmentPath || selected.attachmentUrl ? <SecureAttachment key={`${activeTab}:${selected.id}:${selected.attachmentPath || ''}`} category={activeTab === 'EXPENSE' ? 'expenses' : 'leaves'} documentId={selected.id} name={selected.attachmentName} version={selected.attachmentPath} preview /> : <p className="wf-muted">{selected.attachmentName ? `${selected.attachmentName} · 파일 데이터가 없는 이전 요청입니다.` : '첨부된 증빙 서류가 없습니다.'}</p>}</section>
+            </div>
+            <footer className="wf-approval-detail-footer"><p><Clock size={16} />{selected.status === 'PENDING' ? '요청 내용을 확인한 뒤 처리하세요.' : statusLabels[selected.status]}</p><div>{canRestore(selected) && <button type="button" className="wf-btn" disabled={updating} onClick={() => void handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selected.id, 'PENDING')}><RotateCcw size={16} />승인 취소·복구</button>}{canProcess(selected) && <><button type="button" className="wf-btn wf-approval-reject" disabled={updating} onClick={() => void handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selected.id, 'REJECTED')}>반려</button><button type="button" className="wf-btn wf-btn-primary" disabled={updating} onClick={() => void handleUpdateStatus(activeTab === 'LEAVE' ? 'leaves' : 'expenses', selected.id)}>{updating ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{userData?.role === 'SUB_ADMIN' ? '1차 승인' : '최종 승인'}</button></>}</div></footer>
+          </>}
+        </section>
+      </div>
+      <section className="wf-approval-statistics" aria-label="선택 조건의 결재 요약"><div className="wf-panel"><span>최종 승인</span><strong>{filteredLeaves.filter(request => request.status === 'APPROVED').length + filteredExpenses.filter(request => request.status === 'APPROVED').length}<small>건</small></strong></div><div className="wf-panel"><span>전체 미처리 안건</span><strong>{leaveRequests.filter(request => request.status === 'PENDING' || request.status === 'SUB_APPROVED').length + expenseRequests.filter(request => request.status === 'PENDING' || request.status === 'SUB_APPROVED').length}<small>건</small></strong></div><div className="wf-panel"><span>승인 지출 합계</span><strong>{filteredExpenses.filter(request => request.status === 'APPROVED').reduce((sum, request) => sum + request.amount, 0).toLocaleString()}<small>원</small></strong></div><div className="wf-panel"><span>반려 비율</span><strong>{Math.round((filteredLeaves.filter(request => request.status === 'REJECTED').length + filteredExpenses.filter(request => request.status === 'REJECTED').length) / Math.max(1, filteredLeaves.length + filteredExpenses.length) * 100)}<small>%</small></strong></div></section>
+    </>}
+  </div>;
+}

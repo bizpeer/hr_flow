@@ -78,6 +78,13 @@ function fixture(file, { values = {}, profile = {}, company = {}, failAuth = fal
       if (name.endsWith('/services/accountSecurityService')) return { accountSecurity: { async changePassword() { calls.push({ type: 'passwordChange' }); } } };
       if (name === 'react-router-dom') return { HashRouter: 'HashRouter', Routes: 'Routes', Route: 'Route', Navigate: 'Navigate', useLocation: () => ({ pathname: values.path || '/dashboard' }), useNavigate: () => noop };
       if (name.endsWith('/utils/leaveCalculator')) return { calculateLeaveEntitlement: () => ({ totalEntitlement: 0 }) };
+      if (name.endsWith('/utils/errors')) {
+        const helperPath = path.resolve(__dirname, '../../client/src/utils/errors.ts');
+        const helperCode = ts.transpileModule(fs.readFileSync(helperPath, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+        const helper = { exports: {} };
+        vm.runInNewContext(helperCode, { module: helper, exports: helper.exports }, { filename: helperPath });
+        return helper.exports;
+      }
       if (name.startsWith('./') || name.startsWith('../')) { const key = name.split('/').at(-1); return { [key]: key }; }
       throw new Error(`unexpected module ${name}`);
     },
@@ -101,7 +108,7 @@ test('administrator UI security and lifecycle regressions', async t => {
     for (const subscriptionStatus of ['TRIAL', 'EXPIRED']) {
       const f = fixture('App.tsx', { capture: false, profile: { mustChangePassword: true }, company: { subscriptionStatus }, values: { store: { sessionReady: false } } });
       const mounted = types(f.result);
-      assert.ok(mounted.includes('LoginModal')); assert.ok(!mounted.includes('Sidebar')); assert.ok(!mounted.includes('Routes'));
+      assert.ok(mounted.includes('LoginModal')); assert.ok(!mounted.includes('Sidebar')); assert.ok(!mounted.includes('WorkspaceShell')); assert.ok(!mounted.includes('Routes'));
     }
   });
   await t.test('expired account without pending password retains subscription route and blocks business routes', () => {
@@ -115,7 +122,7 @@ test('administrator UI security and lifecycle regressions', async t => {
   await t.test('loading and session errors mount no business pages', () => {
     for (const store of [{ loading: true }, { authError: 'local offline failure', sessionReady: false }]) {
       const f = fixture('App.tsx', { capture: false, values: { store } });
-      const mounted = types(f.result); assert.ok(!mounted.includes('Sidebar')); assert.ok(!mounted.includes('AttendanceDashboard'));
+      const mounted = types(f.result); assert.ok(!mounted.includes('Sidebar')); assert.ok(!mounted.includes('WorkspaceShell')); assert.ok(!mounted.includes('AttendanceDashboard'));
     }
   });
   await t.test('protected business route rejects unready account while subscription keeps its role requirement', () => {

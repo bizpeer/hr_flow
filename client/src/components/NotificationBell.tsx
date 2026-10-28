@@ -11,6 +11,7 @@ import type { OfficialNotification } from '../services/officialNotificationServi
 interface NotificationBellProps {
   currentUserId: string;
   onNavigate?: () => void;
+  appearance?: 'default' | 'workflow';
 }
 
 interface InboxState {
@@ -48,7 +49,7 @@ function notificationDate(value: string): string {
   }).format(date);
 }
 
-function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate }: NotificationBellProps & {
+function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate, appearance = 'default' }: NotificationBellProps & {
   companyId: string; recipientRole: OfficialNotification['recipientRole'];
 }) {
   const navigate = useNavigate();
@@ -172,7 +173,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
         ref={anchor}
         type="button"
         onClick={() => { updatePosition(); setOpen(value => !value); }}
-        className="relative shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+        className={`relative shrink-0 rounded-full p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white ${appearance === 'workflow' ? 'workflow-bell' : ''}`}
         aria-label={accessibleLabel}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
@@ -195,7 +196,7 @@ function NotificationInbox({ currentUserId, companyId, recipientRole, onNavigate
           role="dialog"
           aria-label="서류 결재 알림"
           tabIndex={-1}
-          className="fixed z-[200] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl outline-none"
+          className={`fixed z-[200] flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl outline-none ${appearance === 'workflow' ? 'workflow-theme workflow-notifications' : ''}`}
           style={position}
         >
           <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">

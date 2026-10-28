@@ -12,6 +12,7 @@ import type { UserData } from '../store/authStore';
 import { calculateNetPay, getDeductionCounts, MEAL_ALLOWANCE_DEFAULT } from '../utils/payroll';
 import type { TaxTable } from '../utils/payroll';
 import type { Timestamp } from 'firebase/firestore';
+import './SalaryManagement.css';
 
 interface Division {
   id: string;
@@ -287,62 +288,56 @@ export const SalaryManagement: React.FC = () => {
     window.print();
   };
 
-  if (loading) return <div className="flex-1 flex items-center justify-center min-h-screen bg-slate-50"><Loader2 className="w-10 h-10 animate-spin text-indigo-600" /></div>;
+  if (loading) return <div className="salary-screen salary-loading" role="status"><Loader2 size={22} className="animate-spin" />급여 정보를 불러오는 중입니다.</div>;
 
   return (
-    <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans print:p-0 print:bg-white overflow-hidden">
-      <div className="max-w-7xl mx-auto space-y-6 print:hidden">
+    <div className="salary-screen flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans print:p-0 print:bg-white overflow-hidden">
+      <div className="salary-workspace max-w-7xl mx-auto space-y-6 print:hidden">
         
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-6 border-b border-slate-200/60">
-          <div className="flex items-center gap-5">
-            <div className="p-4 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl text-white shadow-xl shadow-indigo-100 ring-4 ring-white">
-               <Banknote className="w-8 h-8" />
-            </div>
+        <div className="salary-page-head">
             <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight mb-1">급여 체계 관리</h1>
-              <p className="text-slate-400 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="w-3.5 h-3.5 text-indigo-400" />
+              <h1 className="wf-title">급여관리</h1>
+              <p className="salary-page-description">
                 2026년 근로소득 간이세액표 적용 · 자녀 공제는 공제대상인 8~20세 자녀만 입력하세요. 기존 저장값도 확인이 필요합니다.
               </p>
             </div>
-          </div>
 
-          <div className="flex items-center gap-4">
+          <div className="salary-head-actions">
             <button 
               onClick={() => setShowHistory(true)}
-              className="flex items-center gap-2 px-6 py-3.5 bg-white border border-slate-100 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+              className="wf-btn"
             >
               <Info className="w-4 h-4 text-indigo-500" />
               과거 승인 내역
             </button>
-            <div className="relative group w-full lg:w-80">
+            <div className="salary-search relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
               <input 
-                type="text" placeholder="검색..."
+                type="search" placeholder="직원 이름 검색" aria-label="급여 대상 직원 검색"
                 value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-6 py-3.5 bg-white rounded-2xl shadow-sm border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-bold text-slate-800"
+                className="wf-input"
               />
             </div>
           </div>
         </div>
 
         {/* Period & Summary Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="salary-summary-grid">
            {/* Period Selector */}
-           <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
+           <div className="salary-period wf-panel">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                  <Filter className="w-4 h-4" />
                  <span className="text-[10px] font-black uppercase tracking-widest">지출 대상 기간 선택</span>
               </div>
               <div className="flex gap-3">
-                 <select 
+                 <select aria-label="급여 대상 연도"
                    value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                  >
                     {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
                  </select>
-                 <select 
+                 <select aria-label="급여 대상 월"
                    value={selectedMonth} onChange={(e) => setSelectedMonth(Number(e.target.value))}
                    className="flex-1 bg-slate-50 border-none rounded-xl px-4 py-3 font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-100 transition-all"
                  >
@@ -353,12 +348,9 @@ export const SalaryManagement: React.FC = () => {
            </div>
 
            {/* Summary Stats */}
-           <div className="lg:col-span-2 bg-gradient-to-br from-indigo-600 to-violet-600 rounded-[2rem] p-6 text-white shadow-xl shadow-indigo-100 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 opacity-10">
-                 <PieChart className="w-32 h-32" />
-              </div>
+           <div className="salary-totals wf-panel">
               
-              <div className="flex-1 grid grid-cols-3 gap-6 relative z-10 w-full">
+              <div className="salary-total-values">
                  <div className="space-y-1">
                     <p className="text-[9px] font-black text-indigo-200 uppercase tracking-widest">총 지급액 (Gross)</p>
                     <p className="text-xl font-black">{totals.gross.toLocaleString()}<span className="text-xs ml-1 opacity-60">원</span></p>
@@ -377,7 +369,7 @@ export const SalaryManagement: React.FC = () => {
                  <button 
                    onClick={handleApprovePayroll}
                    disabled={isApproving}
-                   className="w-full md:w-48 py-4 bg-white text-indigo-600 rounded-2xl font-black text-sm shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2"
+                   className="wf-btn wf-btn-primary salary-approve"
                  >
                     {isApproving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Banknote className="w-5 h-5" /> 지출 승인 및 저장</>}
                  </button>
@@ -386,10 +378,10 @@ export const SalaryManagement: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-           <div className="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm flex items-center gap-3 hover:border-indigo-200 transition-colors">
+        <div className="salary-filters wf-panel">
+           <div className="salary-organization-filter">
               <Building className="w-5 h-5 text-indigo-400" />
-              <select 
+              <select aria-label="급여 조회 본부"
                 value={selectedDivision} onChange={(e) => {setSelectedDivision(e.target.value); setSelectedTeam('ALL');}}
                 className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none cursor-pointer"
               >
@@ -397,9 +389,9 @@ export const SalaryManagement: React.FC = () => {
                   {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
            </div>
-           <div className="bg-white p-4 rounded-[1.25rem] border border-slate-100 shadow-sm flex items-center gap-3 hover:border-emerald-200 transition-colors">
+           <div className="salary-organization-filter">
               <Filter className="w-5 h-5 text-emerald-400" />
-              <select 
+              <select aria-label="급여 조회 팀"
                 value={selectedTeam} onChange={(e) => setSelectedTeam(e.target.value)}
                 disabled={selectedDivision === 'ALL'}
                 className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-xs appearance-none disabled:opacity-30 cursor-pointer"
@@ -408,12 +400,11 @@ export const SalaryManagement: React.FC = () => {
                   {teams.filter(t => t.divisionId === selectedDivision).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
            </div>
-           <div className="md:col-span-2 premium-card p-4 bg-slate-900 text-white shadow-indigo-900/10 flex items-center justify-between px-8 border-none overflow-hidden relative">
+           <div className="salary-standard-note">
               <div className="relative z-10 flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">Standard Update</span>
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400">산출 기준</span>
                 <span className="text-sm font-black">2026.03 개정 세법 및 4.75% 연금율 적용</span>
               </div>
-              <PieChart className="w-10 h-10 text-white/5 absolute -right-2 -bottom-2" />
            </div>
         </div>
 
@@ -421,7 +412,7 @@ export const SalaryManagement: React.FC = () => {
         <div className="space-y-4">
            
            {/* Desktop Table View */}
-           <div className="hidden lg:block premium-card overflow-hidden">
+           <div className="salary-table-panel hidden lg:block premium-card overflow-hidden">
               <div className="overflow-x-auto">
                  <table className="w-full min-w-[1200px]">
                     <thead>
@@ -469,16 +460,19 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')}
+                                              aria-pressed={data.salaryType === 'ANNUAL'}
                                               className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.salaryType === 'ANNUAL' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
                                             >연봉</button>
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')}
+                                              aria-pressed={data.salaryType === 'MONTHLY'}
                                               className={`px-4 py-1.5 text-[9px] font-black rounded-lg transition-all ${data.salaryType === 'MONTHLY' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-100' : 'text-slate-400 hover:text-slate-600'}`}
                                             >월급</button>
                                          </div>
                                          <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', false)}
+                                              aria-pressed={!data.isSeveranceIncluded}
                                               title={data.salaryType === 'MONTHLY'
                                                 ? '퇴직급여 별도: 입력한 월급을 12배하여 연 환산액을 계산합니다.'
                                                 : '퇴직급여 별도: 입력한 연봉을 12개월로 나누어 월 지급액을 계산합니다.'}
@@ -486,6 +480,7 @@ export const SalaryManagement: React.FC = () => {
                                             >별도</button>
                                             <button 
                                               onClick={() => handleUpdateField(emp.uid, 'isSeveranceIncluded', true)}
+                                              aria-pressed={data.isSeveranceIncluded}
                                               title={data.salaryType === 'MONTHLY'
                                                 ? '퇴직급여 포함: 입력한 월급을 13배하여 연 환산액을 계산합니다.'
                                                 : '퇴직급여 포함: 입력한 연봉을 13등분하여 월 지급액을 계산합니다.'}
@@ -498,6 +493,7 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="relative group/input">
                                             <input 
                                               type="text" 
+                                              aria-label={`${emp.name} 급여 금액`}
                                               value={(data.salaryType === 'MONTHLY' 
                                                 ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
                                                 : (data.annualSalary || 0)
@@ -537,23 +533,24 @@ export const SalaryManagement: React.FC = () => {
                                          <div className="flex-1 space-y-2">
                                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1" title="본인과 공제 요건을 충족하는 가족을 포함합니다.">공제대상 가족 (본인 포함) <Info className="w-3 h-3 text-slate-200" /></div>
                                             <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
-                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max((data.childrenUnder20 || 0) + 1, (data.dependents || 1) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
+                                               <button aria-label={`${emp.name} 공제대상 가족 감소`} onClick={() => handleUpdateField(emp.uid, 'dependents', Math.max((data.childrenUnder20 || 0) + 1, (data.dependents || 1) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
                                                <span className="flex-1 text-center text-xs font-black text-slate-700">{data.dependents || 1}</span>
-                                               <button onClick={() => handleUpdateField(emp.uid, 'dependents', (data.dependents || 1) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
+                                               <button aria-label={`${emp.name} 공제대상 가족 증가`} onClick={() => handleUpdateField(emp.uid, 'dependents', (data.dependents || 1) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
                                             </div>
                                          </div>
                                          <div className="flex-1 space-y-2">
                                             <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest" title="공제대상 가족에 포함된 8세 이상 20세 이하 자녀만 입력합니다.">8~20세 자녀 수</div>
                                             <div className="flex items-center bg-slate-50 rounded-xl p-1 border border-transparent hover:border-slate-100 transition-all">
-                                               <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', Math.max(0, (data.childrenUnder20 || 0) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
+                                               <button aria-label={`${emp.name} 공제대상 자녀 감소`} onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', Math.max(0, (data.childrenUnder20 || 0) - 1))} className="p-2 hover:bg-white rounded-lg shadow-sm"><Minus className="w-3 h-3 text-slate-400" /></button>
                                                <span className="flex-1 text-center text-xs font-black text-slate-700">{data.childrenUnder20 || 0}</span>
-                                               <button onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', (data.childrenUnder20 || 0) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
+                                               <button aria-label={`${emp.name} 공제대상 자녀 증가`} onClick={() => handleUpdateField(emp.uid, 'childrenUnder20', (data.childrenUnder20 || 0) + 1)} className="p-2 hover:bg-white rounded-lg shadow-sm"><Plus className="w-3 h-3 text-slate-400" /></button>
                                             </div>
                                          </div>
                                       </div>
                                       <div className="space-y-2">
                                          <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비과세액 (월)</div>
                                          <input 
+                                           aria-label={`${emp.name} 비과세액`}
                                            type="text" value={(data.nonTaxable !== undefined ? data.nonTaxable : MEAL_ALLOWANCE_DEFAULT).toLocaleString()}
                                            onChange={(e) => {
                                              const val = parseInt(e.target.value.replace(/,/g, '')) || 0;
@@ -595,6 +592,8 @@ export const SalaryManagement: React.FC = () => {
                                       
                                       <button 
                                         onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
+                                        aria-label={`${emp.name} 급여 관리 메뉴`}
+                                        aria-expanded={activeMenuId === emp.uid}
                                         className={`p-3 rounded-2xl transition-all ${activeMenuId === emp.uid ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-400 hover:bg-slate-100'}`}
                                       >
                                          <MoreVertical className="w-4 h-4" />
@@ -629,7 +628,7 @@ export const SalaryManagement: React.FC = () => {
            </div>
 
            {/* Mobile Card View */}
-           <div className="lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+           <div className="salary-mobile-list lg:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredEmployees.map(emp => {
                   const data = editingData[emp.uid] || {};
                   const res = calculateNetPay({ ...emp, currentVal: data.annualSalary, ...data }, taxTable);
@@ -643,7 +642,7 @@ export const SalaryManagement: React.FC = () => {
                   });
 
                   return (
-                     <div key={emp.uid} className="premium-card p-6 flex flex-col gap-6">
+                     <div key={emp.uid} className="salary-mobile-card premium-card p-6 flex flex-col gap-6">
                         <div className="flex items-center justify-between">
                            <div className="flex items-center gap-3">
                                <div 
@@ -657,7 +656,7 @@ export const SalaryManagement: React.FC = () => {
                                   <p className="text-[10px] font-bold text-slate-400 uppercase">{getRoleDisplayName(emp, companyData ?? undefined)}</p>
                                </div>
                            </div>
-                           <button onClick={() => setSelectedDetails(emp)} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Calculator className="w-5 h-5" /></button>
+                           <button onClick={() => setSelectedDetails(emp)} aria-label={`${emp.name} 급여 상세 내역`} className="p-2 bg-slate-50 rounded-xl text-slate-400"><Calculator className="w-5 h-5" /></button>
                         </div>
 
                         <div className="space-y-4">
@@ -665,6 +664,7 @@ export const SalaryManagement: React.FC = () => {
                               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-2 block">급여 금액 (원)</label>
                               <input 
                                 type="text"
+                                aria-label={`${emp.name} 급여 금액`}
                                 value={(data.salaryType === 'MONTHLY' 
                                   ? Math.floor((data.annualSalary || 0) / (data.isSeveranceIncluded ? 13 : 12))
                                   : (data.annualSalary || 0)
@@ -677,8 +677,8 @@ export const SalaryManagement: React.FC = () => {
                                 className="w-full px-5 py-3.5 bg-slate-50 border-2 border-transparent rounded-2xl font-black text-slate-800 outline-none focus:border-indigo-500 transition-all font-mono"
                               />
                               <div className="flex gap-2 mt-2">
-                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'ANNUAL' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>연봉</button>
-                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'MONTHLY' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>월급</button>
+                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'ANNUAL')} aria-pressed={data.salaryType === 'ANNUAL'} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'ANNUAL' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>연봉</button>
+                                 <button onClick={() => handleUpdateField(emp.uid, 'salaryType', 'MONTHLY')} aria-pressed={data.salaryType === 'MONTHLY'} className={`flex-1 py-2 rounded-xl text-[10px] font-black border transition-all ${data.salaryType === 'MONTHLY' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>월급</button>
                               </div>
                            </div>
 
@@ -701,22 +701,23 @@ export const SalaryManagement: React.FC = () => {
                   );
                })}
            </div>
+          {!filteredEmployees.length && <p role="status" className="salary-empty wf-panel">선택한 조건의 직원이 없습니다. 검색어와 본부·팀 필터를 확인하세요.</p>}
         </div>
       </div>
 
       {/* Details & Print Modal */}
       {selectedDetails && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 print:relative print:p-0 print:bg-white">
+        <div className="salary-modal-overlay fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300 print:relative print:p-0 print:bg-white" role="dialog" aria-modal="true" aria-label="급여 산출 명세서">
           {(() => {
             const draft = editingData[selectedDetails.uid] || {};
             const res = calculateNetPay({ ...selectedDetails, currentVal: draft.annualSalary, ...draft }, taxTable);
             if (!res) return null;
 
             return (
-              <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none">
+              <div className="salary-detail-modal bg-white rounded-[2rem] shadow-2xl w-full max-w-xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 print:shadow-none print:border-none print:w-full print:max-w-none print:rounded-none">
                 
                 {/* Modal Header */}
-                <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white print:bg-transparent print:text-black print:p-4 print:border-b-2 print:border-black">
+                <div className="salary-modal-head p-8 border-b border-slate-100 flex justify-between items-center bg-slate-900 text-white print:bg-transparent print:text-black print:p-4 print:border-b-2 print:border-black">
                   <div className="flex items-center gap-3">
                     <Calculator className="w-6 h-6 text-indigo-400 print:hidden" />
                     <div>
@@ -727,12 +728,12 @@ export const SalaryManagement: React.FC = () => {
                     </div>
                   </div>
               <div className="flex items-center gap-2 print:hidden">
-                 <button onClick={handlePrint} className="p-3 bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all"><Printer className="w-5 h-5" /></button>
-                 <button onClick={() => setSelectedDetails(null)} className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><X className="w-5 h-5" /></button>
+                 <button onClick={handlePrint} aria-label="급여 명세서 인쇄" className="p-3 bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-all"><Printer className="w-5 h-5" /></button>
+                 <button onClick={() => setSelectedDetails(null)} aria-label="급여 명세서 닫기" className="p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-all"><X className="w-5 h-5" /></button>
               </div>
             </div>
             
-                <div className="p-8 space-y-8 print:p-4 print:space-y-6">
+                <div className="salary-modal-body p-8 space-y-8 print:p-4 print:space-y-6">
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 print:border-2 print:border-slate-200">
@@ -838,9 +839,9 @@ export const SalaryManagement: React.FC = () => {
 
       {/* History Modal */}
       {showHistory && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-           <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl border border-slate-100 flex flex-col max-h-[90vh]">
-              <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
+        <div className="salary-modal-overlay fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300" role="dialog" aria-modal="true" aria-label="급여 지출 승인 이력">
+           <div className="salary-history-modal bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl border border-slate-100 flex flex-col max-h-[90vh]">
+              <div className="salary-modal-head p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50 flex-shrink-0">
                  <div className="flex items-center gap-3">
                     <PieChart className="w-6 h-6 text-indigo-600" />
                     <div>
@@ -848,10 +849,10 @@ export const SalaryManagement: React.FC = () => {
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">지정된 기간 내의 급여 지출 승인 내역을 표시합니다.</p>
                     </div>
                  </div>
-                 <button onClick={() => setShowHistory(false)} className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm"><X className="w-5 h-5 text-slate-400" /></button>
+                 <button onClick={() => setShowHistory(false)} aria-label="급여 승인 이력 닫기" className="p-3 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 transition-all shadow-sm"><X className="w-5 h-5 text-slate-400" /></button>
               </div>
               
-              <div className="p-6 border-b border-slate-100 bg-white flex flex-wrap gap-4 items-end flex-shrink-0">
+              <div className="salary-history-range p-6 border-b border-slate-100 bg-white flex flex-wrap gap-4 items-end flex-shrink-0">
                 <div>
                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">시작 연/월</label>
                    <div className="flex gap-2">
@@ -883,8 +884,8 @@ export const SalaryManagement: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-8 overflow-y-auto">
-                 <div className="overflow-hidden border border-slate-100 rounded-2xl">
+              <div className="salary-history-body p-8 overflow-y-auto">
+                 <div className="salary-history-table overflow-hidden border border-slate-100 rounded-2xl">
                     <table className="w-full">
                        <thead className="bg-slate-50">
                           <tr>

@@ -97,32 +97,28 @@ function IssuedDocuments({ uid }: { uid: string }) {
   };
 
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm md:p-7" aria-label="내 발급 서류">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><h2 className="flex items-center gap-2 text-lg font-bold text-slate-900"><FileCheck2 className="h-5 w-5 text-indigo-600" />내 발급 서류</h2><p className="mt-1 text-sm text-slate-500">승인·발행된 PDF를 다운로드해 외부 PDF 프로그램에서 인쇄합니다.</p></div>
-        <div className="flex items-center gap-3"><Link to="/documents" className="text-sm font-bold text-indigo-600 hover:underline">서류발급</Link><button type="button" disabled={state.loading} onClick={refresh} aria-label="내 발급 서류 새로고침" className="rounded-xl border border-slate-200 p-2 text-slate-500 hover:bg-slate-50 disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${state.loading ? 'animate-spin' : ''}`} /></button></div>
+    <section className="wf-panel wf-issued-documents" aria-label="내 발급 서류">
+      <div className="wf-panel-head">
+        <div><h2><FileCheck2 size={18} />내 발급 서류</h2><p className="wf-issued-description">승인·발행된 PDF를 다운로드해 외부 PDF 프로그램에서 인쇄합니다.</p></div>
+        <div className="wf-issued-head-actions"><Link to="/documents" className="wf-issued-link">서류발급</Link><button type="button" disabled={state.loading} onClick={refresh} aria-label="내 발급 서류 새로고침" className="wf-btn wf-issued-refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button></div>
       </div>
-      <form className="mt-5 grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap" aria-label="내 발급 서류 기간 조회" noValidate onSubmit={event => { event.preventDefault(); applyRange(draftRange); }}>
-        <label className="col-span-2 flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 sm:col-span-1">시작일
-          <input type="date" min="1900-01-01" required value={draftRange.startDate} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 sm:w-auto" />
-        </label>
-        <label className="col-span-2 flex min-w-0 flex-col gap-1 text-xs font-semibold text-slate-600 sm:col-span-1">종료일
-          <input type="date" min="1900-01-01" required value={draftRange.endDate} onChange={event => { setDraftRange(previous => ({ ...previous, endDate: event.target.value })); setRangeError(''); }} className="min-w-0 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 sm:w-auto" />
-        </label>
-        <button type="submit" className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-bold text-white hover:bg-indigo-700">조회</button>
-        <button type="button" onClick={() => { const recent = recent30DayRange(); setDraftRange(recent); applyRange(recent); }} className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50">최근 30일</button>
+      <form className="wf-issued-date-filter" aria-label="내 발급 서류 기간 조회" noValidate onSubmit={event => { event.preventDefault(); applyRange(draftRange); }}>
+        <label className="wf-field">시작일<input type="date" min="1900-01-01" required value={draftRange.startDate} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
+        <label className="wf-field">종료일<input type="date" min="1900-01-01" required value={draftRange.endDate} onChange={event => { setDraftRange(previous => ({ ...previous, endDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
+        <button type="submit" className="wf-btn wf-btn-primary">조회</button>
+        <button type="button" onClick={() => { const recent = recent30DayRange(); setDraftRange(recent); applyRange(recent); }} className="wf-btn">최근 30일</button>
       </form>
-      <p className="mt-3 text-xs text-slate-500">발행일 기준 (한국 시간) · {appliedRange.startDate} ~ {appliedRange.endDate}{!state.loading && !state.error ? ` · ${state.letters.length}건` : ''}</p>
-      {rangeError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">{rangeError}</p>}
-      {downloadError && <div role="alert" className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 p-3 text-sm text-rose-700"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{downloadError}</div>}
-      {state.loading ? <p role="status" className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" />내 발급 서류를 불러오는 중입니다.</p> : state.error ? (
-        <div role="alert" className="mt-4 rounded-xl bg-rose-50 p-4 text-sm text-rose-700">{state.error}<button type="button" onClick={refresh} className="mt-2 block font-bold underline">다시 시도</button></div>
-      ) : state.letters.length === 0 ? <p className="py-10 text-center text-sm text-slate-500">선택한 기간에 발행 완료된 내 서류가 없습니다.</p> : (
-        <ul aria-label="내 발급 서류 목록" className="mt-4 grid max-h-[32rem] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      <p className="wf-issued-period">발행일 기준 (한국 시간) · {appliedRange.startDate} ~ {appliedRange.endDate}{!state.loading && !state.error ? ` · ${state.letters.length}건` : ''}</p>
+      {rangeError && <p role="alert" className="wf-issued-error">{rangeError}</p>}
+      {downloadError && <div role="alert" className="wf-issued-error"><AlertCircle size={16} />{downloadError}</div>}
+      {state.loading ? <p role="status" className="wf-issued-empty"><Loader2 size={18} className="animate-spin" />내 발급 서류를 불러오는 중입니다.</p> : state.error ? (
+        <div role="alert" className="wf-issued-error">{state.error}<button type="button" onClick={refresh}>다시 시도</button></div>
+      ) : state.letters.length === 0 ? <p className="wf-issued-empty">선택한 기간에 발행 완료된 내 서류가 없습니다.</p> : (
+        <ul aria-label="내 발급 서류 목록" className="wf-issued-grid">
           {state.letters.map(letter => (
-            <li key={letter.id} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-              <div className="min-w-0"><p className="text-xs font-semibold text-indigo-600">{letter.documentType === 'DRAFTING' ? draftingKindLabel(letter.draftingKind) : letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</p><Link to={`/${letter.documentType === 'DRAFTING' ? 'drafting' : 'documents'}?letter=${encodeURIComponent(letter.id)}`} className="mt-2 block break-words text-sm font-bold text-slate-800 hover:text-indigo-600">{letter.title}</Link>{letter.number && <p className="mt-3 break-all text-xs font-semibold text-slate-600">{letter.number}</p>}<p className="mt-1 text-xs text-slate-500">발행일 {letter.issueDate || '-'}</p></div>
-              <button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="mt-auto inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-indigo-700 ring-1 ring-indigo-100 hover:bg-indigo-50 disabled:opacity-50">{downloading === letter.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}PDF 다운로드</button>
+            <li key={letter.id} className="wf-issued-document">
+              <div><p className="wf-issued-kind">{letter.documentType === 'DRAFTING' ? draftingKindLabel(letter.draftingKind) : letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</p><Link to={`/${letter.documentType === 'DRAFTING' ? 'drafting' : 'documents'}?letter=${encodeURIComponent(letter.id)}`} className="wf-issued-document-title">{letter.title}</Link>{letter.number && <p className="wf-issued-number">{letter.number}</p>}<p className="wf-issued-date">발행일 {letter.issueDate || '-'}</p></div>
+              <button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="wf-btn wf-issued-download">{downloading === letter.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}<span>PDF 다운로드</span></button>
             </li>
           ))}
         </ul>

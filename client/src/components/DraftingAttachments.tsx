@@ -31,12 +31,12 @@ export function DraftingAttachments({ documentId, revision, files, historyId, di
     } catch (failure) { viewer?.close(); if (active.current && isCurrent()) setError(failure instanceof Error ? failure.message : '첨부자료를 열지 못했습니다.'); }
     finally { requests.current.delete(controller); if (active.current) setBusy(''); }
   }
-  return <div className="space-y-2" aria-label={historyId ? '이전 개정 첨부자료' : '저장된 첨부자료'}>
-    {files.map(file => <div key={file.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-      <FileText size={18} className="shrink-0 text-indigo-600" /><span className="min-w-0 flex-1 break-all"><strong>{file.name}</strong><span className="ml-2 text-xs text-slate-500">{draftingFileSize(file.size)}</span></span>
-      <button type="button" disabled={disabled || !!busy} className="ol-button" onClick={() => void open(file, false)}>{busy === file.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}보기</button>
-      <button type="button" disabled={disabled || !!busy} className="ol-button" onClick={() => void open(file, true)}><Download size={14} />다운로드</button>
+  return <div className="drafting-attachment-list" aria-label={historyId ? '이전 개정 첨부자료' : '저장된 첨부자료'}>
+    {files.map(file => <div key={file.id} className="drafting-attachment-row">
+      <FileText size={18} className="drafting-attachment-icon" /><span className="drafting-attachment-copy"><strong>{file.name}</strong><span>{draftingFileSize(file.size)}</span></span>
+      <div className="drafting-attachment-actions"><button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, false)}>{busy === file.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}보기</button>
+      <button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, true)}><Download size={14} />다운로드</button></div>
     </div>)}
-    {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {error && <p role="alert" className="drafting-attachment-error">{error}</p>}
   </div>;
 }

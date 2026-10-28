@@ -1,0 +1,137 @@
+.workflow-theme .wf-approvals { min-width: 0; padding: 24px; color: var(--wf-text); container-type: inline-size; }
+.workflow-theme .wf-approvals .wf-page-heading { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.workflow-theme .wf-approvals .wf-page-heading h1 { margin: 0; color: var(--wf-strong); font-size: 26px; font-weight: 600; line-height: 1.35; letter-spacing: -.8px; }
+.workflow-theme .wf-approvals .wf-page-heading p { margin: 8px 0 0; font-size: 14px; color: var(--wf-muted); }
+.workflow-theme .wf-approvals.wf-loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 240px; }
+.workflow-theme .wf-approval-alert, .workflow-theme .wf-approval-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 16px; margin-bottom: 16px; border-radius: 8px; background: var(--wf-error-bg); line-height: 1.6; }
+.workflow-theme .wf-approval-notice { background: var(--wf-success-bg); }
+.workflow-theme .wf-approval-tabs { display: flex; gap: 24px; margin-bottom: 20px; border-bottom: 1px solid var(--wf-border); }
+.workflow-theme .wf-approval-tabs > button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--wf-muted); font-size: 14px; white-space: nowrap; cursor: pointer; }
+.workflow-theme .wf-approval-tabs > button[aria-selected=true] { color: var(--wf-primary-800); border-bottom-color: var(--wf-primary-800); font-weight: 600; }
+.workflow-theme .wf-approval-tabs > button > span { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 5px; background: var(--wf-subtle); color: var(--wf-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.workflow-theme .wf-approval-tabs > button[aria-selected=true] > span { background: var(--wf-primary-100); color: var(--wf-primary-900); }
+.workflow-theme .wf-approval-filters, .workflow-theme .wf-document-filters { display: grid; grid-template-columns: minmax(140px,.9fr) minmax(110px,.8fr) minmax(110px,.8fr) minmax(180px,1.5fr); gap: 12px; align-items: end; padding: 16px 18px; margin-bottom: 20px; }
+.workflow-theme .wf-document-filters { grid-template-columns: minmax(145px,.8fr) minmax(135px,.8fr) minmax(180px,1.5fr) auto; }
+.workflow-theme .wf-document-filters .wf-field:first-child { position: relative; }
+.workflow-theme .wf-document-filters .wf-field small { position: absolute; top: -1px; right: 0; font-size: 11px; font-weight: 400; color: var(--wf-muted); }
+.workflow-theme .wf-approval-search { position: relative; display: block; }
+.workflow-theme .wf-approval-search > svg { position: absolute; left: 11px; top: 12px; color: var(--wf-muted); pointer-events: none; }
+.workflow-theme .wf-approval-search > input { padding-left: 35px; }
+.workflow-theme .wf-approval-grid { display: grid; grid-template-columns: minmax(245px,.9fr) minmax(0,1.6fr); gap: 18px; align-items: start; }
+.workflow-theme .wf-approval-list, .workflow-theme .wf-approval-detail { min-width: 0; overflow: hidden; }
+.workflow-theme .wf-approval-statuses { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 12px 18px; border-bottom: 1px solid var(--wf-border); }
+.workflow-theme .wf-approval-statuses > button { min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--wf-muted); font-size: 13px; cursor: pointer; }
+.workflow-theme .wf-approval-statuses > button[aria-pressed=true] { color: var(--wf-primary-800); font-weight: 600; }
+.workflow-theme .wf-approval-row { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-width: 0; padding: 17px 18px 17px 15px; border: 0; border-left: 3px solid transparent; border-bottom: 1px solid var(--wf-border); background: var(--wf-panel); color: var(--wf-text); font: inherit; text-align: left; cursor: pointer; }
+.workflow-theme .wf-approval-row:last-child { border-bottom: 0; }
+.workflow-theme .wf-approval-row:hover:not(:disabled) { background: var(--wf-subtle); }
+.workflow-theme .wf-approval-row[aria-pressed=true] { border-left-color: var(--wf-primary-500); background: var(--wf-primary-50); }
+.workflow-theme .wf-approval-row > strong { display: block; color: var(--wf-strong); font-size: 15px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-row > span:not(:first-child), .workflow-theme .wf-approval-row > time { color: var(--wf-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-row > time { font-variant-numeric: tabular-nums; }
+.workflow-theme .wf-approval-row-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-width: 0; margin-bottom: 3px; font-size: 12px; }
+.workflow-theme .wf-approval-row-top > span:first-child { color: var(--wf-primary-800); overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 190px; margin: 0; padding: 28px 20px; color: var(--wf-muted); font-size: 13px; text-align: center; line-height: 1.7; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-empty > svg { color: var(--wf-primary-800); }
+.workflow-theme .wf-approval-empty h2 { margin: 0; color: var(--wf-strong); font-size: 17px; font-weight: 600; }
+.workflow-theme .wf-approval-empty p { margin: 0; }
+.workflow-theme .wf-approval-detail-head { padding: 22px 24px 20px; border-bottom: 1px solid var(--wf-border); }
+.workflow-theme .wf-approval-detail-head > .wf-approval-row-top { margin-bottom: 12px; }
+.workflow-theme .wf-approval-detail-head > .wf-approval-row-top > .wf-btn { min-height: 34px; padding: 6px 9px; font-size: 12px; }
+.workflow-theme .wf-approval-detail-head h2 { margin: 0; color: var(--wf-strong); font-size: 21px; font-weight: 600; line-height: 1.5; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-detail-head p { margin: 12px 0 4px; color: var(--wf-muted); font-size: 13px; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-detail-head time { color: var(--wf-muted); font-size: 12px; }
+.workflow-theme .wf-approval-detail-head .wf-approval-close { padding: 7px; }
+.workflow-theme .wf-approval-detail-body { padding: 20px 24px 24px; }
+.workflow-theme .wf-approval-metadata { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 18px; margin: 20px 0; padding: 18px 0; border-block: 1px solid var(--wf-border); }
+.workflow-theme .wf-approval-metadata:first-child { margin-top: 0; border-top: 0; padding-top: 0; }
+.workflow-theme .wf-approval-metadata > div { display: grid; grid-template-columns: 64px minmax(0,1fr); gap: 8px; min-width: 0; font-size: 13px; line-height: 1.6; }
+.workflow-theme .wf-approval-metadata dt { color: var(--wf-muted); }
+.workflow-theme .wf-approval-metadata dd { margin: 0; color: var(--wf-text); overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-section { margin: 22px 0 0; min-width: 0; }
+.workflow-theme .wf-approval-section:first-child { margin-top: 0; }
+.workflow-theme .wf-approval-section h3 { margin: 0 0 12px; color: var(--wf-strong); font-size: 14px; font-weight: 600; }
+.workflow-theme .wf-approval-section .wf-panel-head { margin-bottom: 12px; }
+.workflow-theme .wf-approval-section .wf-panel-head h3 { margin: 0; }
+.workflow-theme .wf-approval-content { margin: 0; color: var(--wf-text); font-size: 14px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-section > .wf-muted { margin: 10px 0 0; font-size: 13px; }
+.workflow-theme .wf-approval-steps, .workflow-theme .wf-document-steps { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.workflow-theme .wf-approval-steps li, .workflow-theme .wf-document-steps li { display: flex; flex-direction: column; gap: 7px; min-width: 0; padding: 12px 10px; border: 1px solid var(--wf-border); border-radius: 8px; background: var(--wf-subtle); color: var(--wf-muted); font-size: 12px; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-steps li.is-complete > svg, .workflow-theme .wf-document-steps li.is-complete small > svg { color: var(--wf-primary-800); }
+.workflow-theme .wf-document-steps { grid-template-columns: repeat(auto-fit,minmax(116px,1fr)); }
+.workflow-theme .wf-document-steps li.is-current { background: var(--wf-primary-50); border-color: var(--wf-primary-100); }
+.workflow-theme .wf-document-steps li.is-current > span, .workflow-theme .wf-document-steps li.is-current small { color: var(--wf-primary-800); }
+.workflow-theme .wf-document-steps strong { color: var(--wf-strong); font-size: 14px; font-weight: 600; }
+.workflow-theme .wf-document-steps small { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 11px; line-height: 1.6; }
+.workflow-theme .wf-document-steps small > svg { flex-shrink: 0; }
+.workflow-theme .wf-approval-detail-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 18px 24px; border-top: 1px solid var(--wf-border); background: var(--wf-subtle); }
+.workflow-theme .wf-approval-detail-footer > p { display: flex; align-items: center; gap: 7px; margin: 0; color: var(--wf-primary-800); font-size: 12px; line-height: 1.6; }
+.workflow-theme .wf-approval-detail-footer > p > svg { flex-shrink: 0; }
+.workflow-theme .wf-approval-detail-footer > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.workflow-theme .wf-approvals .wf-approval-reject { border-color: transparent; background: var(--wf-error-bg); color: var(--wf-text); }
+.workflow-theme .wf-approvals .wf-approval-reject:hover:not(:disabled) { background: var(--wf-error-bg); border-color: var(--wf-border-strong); }
+.workflow-theme .wf-approval-statistics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 14px; margin-top: 20px; }
+.workflow-theme .wf-approval-statistics > div { padding: 16px 18px; }
+.workflow-theme .wf-approval-statistics span { display: block; color: var(--wf-muted); font-size: 12px; }
+.workflow-theme .wf-approval-statistics strong { display: block; margin-top: 10px; color: var(--wf-strong); font-size: 22px; line-height: 1.4; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.workflow-theme .wf-approval-statistics small { margin-left: 5px; color: var(--wf-muted); font-size: 12px; font-weight: 400; }
+.workflow-theme .wf-document-intro { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 0 0 16px; }
+.workflow-theme .wf-document-intro > p { margin: 0; color: var(--wf-muted); font-size: 13px; line-height: 1.7; }
+.workflow-theme .wf-document-intro > button { flex-shrink: 0; }
+.workflow-theme .wf-document-reject-form { display: grid; gap: 12px; padding: 18px 24px; border-top: 1px solid var(--wf-border); background: var(--wf-subtle); }
+.workflow-theme .wf-document-reject-form > div { display: flex; justify-content: flex-end; gap: 8px; }
+.workflow-theme .wf-approvals .drafting-attachment-list { display: flex; flex-direction: column; gap: 8px; }
+.workflow-theme .wf-approvals .drafting-attachment-row { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding: 12px; border: 1px solid var(--wf-border); border-radius: 8px; }
+.workflow-theme .wf-approvals .drafting-attachment-icon { flex-shrink: 0; color: var(--wf-primary-800); }
+.workflow-theme .wf-approvals .drafting-attachment-copy { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 90px; }
+.workflow-theme .wf-approvals .drafting-attachment-copy strong { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.workflow-theme .wf-approvals .drafting-attachment-copy > span { color: var(--wf-muted); font-size: 11px; }
+.workflow-theme .wf-approvals .drafting-attachment-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.workflow-theme .wf-approvals .drafting-attachment-actions .wf-btn { min-height: 34px; padding: 6px 9px; font-size: 12px; }
+.workflow-theme .wf-approvals .drafting-attachment-error { padding: 12px; border-radius: 8px; background: var(--wf-error-bg); font-size: 13px; }
+.workflow-theme .wf-approvals [aria-label="보안 첨부파일"] { font-weight: 400; }
+.workflow-theme .wf-approvals [aria-label="보안 첨부파일"] .text-indigo-500 { color: var(--wf-primary-800); }
+.workflow-theme .wf-approvals [aria-label="보안 첨부파일"] button { min-height: 40px; border: 1px solid var(--wf-border-strong); border-radius: 8px; background: var(--wf-panel); color: var(--wf-text); font-size: 12px; font-weight: 500; }
+.workflow-theme .wf-approvals [aria-label="보안 첨부파일"] button:has(img) { border-color: var(--wf-border); }
+.workflow-theme .wf-approvals [aria-label="보안 첨부파일"] [role=alert] { background: var(--wf-error-bg); color: var(--wf-text); }
+@container (max-width: 920px) {
+  .workflow-theme .wf-approval-filters, .workflow-theme .wf-document-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .workflow-theme .wf-document-filters > .wf-field:nth-child(3) { grid-column: 1 / -1; }
+  .workflow-theme .wf-document-filters > .wf-btn { grid-column: 2; justify-self: end; }
+  .workflow-theme .wf-approval-grid { grid-template-columns: minmax(220px,.85fr) minmax(0,1.4fr); gap: 14px; }
+  .workflow-theme .wf-approval-detail-head { padding: 20px; }
+  .workflow-theme .wf-approval-detail-body { padding: 18px 20px 20px; }
+  .workflow-theme .wf-approval-detail-footer, .workflow-theme .wf-document-reject-form { padding: 16px 20px; }
+  .workflow-theme .wf-approval-metadata { grid-template-columns: minmax(0,1fr); }
+}
+@container (max-width: 700px) {
+  .workflow-theme .wf-approval-grid { grid-template-columns: minmax(0,1fr); }
+  .workflow-theme .wf-approval-tabs { gap: 14px; margin-bottom: 16px; }
+  .workflow-theme .wf-approval-tabs > button { gap: 6px; min-height: 44px; font-size: 13px; }
+  .workflow-theme .wf-approval-tabs > button > svg { display: none; }
+  .workflow-theme .wf-approval-filters, .workflow-theme .wf-document-filters { padding: 14px; margin-bottom: 16px; }
+  .workflow-theme .wf-approval-row { padding-block: 14px; }
+  .workflow-theme .wf-approval-detail-head { padding: 18px; }
+  .workflow-theme .wf-approval-detail-head h2 { font-size: 20px; }
+  .workflow-theme .wf-approval-detail-body { padding: 18px; }
+  .workflow-theme .wf-approval-detail-footer, .workflow-theme .wf-document-reject-form { padding: 16px 18px; }
+  .workflow-theme .wf-approval-detail-footer > p, .workflow-theme .wf-approval-detail-footer > div { width: 100%; }
+  .workflow-theme .wf-approval-detail-footer > div > button { flex: 1; min-height: 44px; }
+  .workflow-theme .wf-approval-statistics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .workflow-theme .wf-approval-statistics strong { font-size: 20px; }
+  .workflow-theme .wf-document-intro { align-items: flex-start; }
+  .workflow-theme .wf-approvals .drafting-attachment-actions .wf-btn, .workflow-theme .wf-approvals [aria-label="보안 첨부파일"] button, .workflow-theme .wf-approval-statuses > button, .workflow-theme .wf-approval-detail-head > .wf-approval-row-top > .wf-btn { min-height: 44px; }
+}
+@media (max-width: 767px) {
+  .workflow-theme .wf-approvals { padding: 20px 16px; }
+  .workflow-theme .wf-approvals .wf-page-heading h1 { font-size: 23px; }
+}
+@media (max-width: 400px) {
+  .workflow-theme .wf-approvals .wf-page-heading h1 { font-size: 23px; }
+  .workflow-theme .wf-approval-tabs { gap: 12px; }
+  .workflow-theme .wf-approval-tabs > button { font-size: 12px; }
+  .workflow-theme .wf-approval-filters, .workflow-theme .wf-document-filters { grid-template-columns: minmax(0,1fr); }
+  .workflow-theme .wf-document-filters > .wf-field:nth-child(3), .workflow-theme .wf-document-filters > .wf-btn { grid-column: auto; }
+  .workflow-theme .wf-document-intro { flex-wrap: wrap; }
+  .workflow-theme .wf-approval-detail-head > .wf-approval-row-top > span:first-child { flex-basis: 100%; }
+}

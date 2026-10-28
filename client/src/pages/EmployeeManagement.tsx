@@ -15,6 +15,7 @@ import { useAuthStore } from '../store/authStore';
 import { getRoleDisplayName } from '../utils/roleDisplay';
 import { getErrorCode, getErrorMessage } from '../utils/errors';
 import { calculateLeaveEntitlement } from '../utils/leaveCalculator';
+import './EmployeeManagement.css';
 
 interface Employee {
   uid: string;
@@ -299,62 +300,62 @@ export const EmployeeManagement: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 p-4 md:p-8 bg-slate-50 min-h-screen font-sans">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="personnel-screen">
+      <div className="personnel-content">
         
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="personnel-heading">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
+              <div className="personnel-heading-icon">
                 <Users className="w-6 h-6" />
               </div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tight">전체 구성원 관리</h1>
+              <h1 className="wf-title">전체 구성원 관리</h1>
             </div>
-            <p className="text-slate-500 font-medium whitespace-pre-wrap">직원의 근태 조회, 퇴사 처리 및 보안 설정을 통합 관리합니다.</p>
+            <p className="personnel-description">직원의 근태 조회, 퇴사 처리 및 보안 설정을 통합 관리합니다.</p>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="personnel-heading-tools">
             {loading && (
-              <div className="flex items-center gap-2 text-indigo-500 bg-indigo-50 px-4 py-2 rounded-xl animate-pulse">
+              <div className="personnel-loading">
                 <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-xs font-black uppercase tracking-tighter">Syncing...</span>
+                <span className="text-xs font-black uppercase tracking-tighter">불러오는 중</span>
               </div>
             )}
-            <div className="relative group w-full lg:w-96">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            <div className="personnel-search">
+            <Search className="personnel-search-icon" />
             <input 
               type="text" 
               placeholder="이름 또는 로그인 ID(이메일)로 검색..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-6 py-4 bg-white rounded-2xl shadow-sm border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100 transition-all font-bold text-slate-800"
+              className="wf-input" aria-label="직원 이름 또는 로그인 ID 검색"
             />
           </div>
         </div>
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Building className="w-5 h-5" /></div>
+        <div className="wf-panel personnel-filters">
+          <div className="personnel-filter">
+            <div className="personnel-filter-icon"><Building className="w-5 h-5" /></div>
             <select 
               value={selectedDivision}
               onChange={(e) => { setSelectedDivision(e.target.value); setSelectedTeam('ALL'); }}
-              className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-sm appearance-none cursor-pointer"
+              className="wf-input" aria-label="본부 필터"
             >
               <option value="ALL">전체 본부</option>
               {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
             </select>
           </div>
 
-          <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Filter className="w-5 h-5" /></div>
+          <div className="personnel-filter">
+            <div className="personnel-filter-icon"><Filter className="w-5 h-5" /></div>
             <select 
               value={selectedTeam}
               onChange={(e) => setSelectedTeam(e.target.value)}
               disabled={selectedDivision === 'ALL'}
-              className="flex-1 bg-transparent border-none outline-none font-black text-slate-700 text-sm appearance-none cursor-pointer disabled:opacity-30"
+              className="wf-input" aria-label="팀 필터"
             >
               <option value="ALL">본부 내 전체 팀</option>
               {teams.filter(t => t.divisionId === selectedDivision).map(t => (
@@ -363,8 +364,8 @@ export const EmployeeManagement: React.FC = () => {
             </select>
           </div>
 
-          <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-xl flex items-center justify-between px-6">
-             <span className="text-[10px] font-black uppercase tracking-widest opacity-70">Total Members</span>
+          <div className="personnel-total">
+             <span className="text-[10px] font-black uppercase tracking-widest opacity-70">조회된 구성원</span>
              <span className="text-2xl font-black">{filteredEmployees.length} 명</span>
           </div>
         </div>
@@ -373,9 +374,9 @@ export const EmployeeManagement: React.FC = () => {
         <div className="space-y-4">
           
           {/* Desktop Table: Hidden on small screens */}
-          <div className="hidden xl:block premium-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1000px]">
+          <div className="wf-panel personnel-desktop">
+            <div className="personnel-table-scroll">
+              <table className="personnel-table">
                 <thead>
                   <tr className="bg-slate-50/50 border-b border-slate-200/40">
                     <th className="px-8 py-5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">직원 정보 / 소속</th>
@@ -393,8 +394,8 @@ export const EmployeeManagement: React.FC = () => {
                     return (
                       <tr key={emp.uid} className={`group hover:bg-indigo-50/30 transition-all ${isResigned ? 'opacity-60' : ''}`}>
                         <td className="px-8 py-6">
-                          <div className="flex items-center gap-4 cursor-pointer" onClick={() => handleOpenDetail(emp)}>
-                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl font-black shadow-sm group-hover:rotate-6 transition-all shrink-0 ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-indigo-100'}`}>
+                          <div className="personnel-person" onClick={() => handleOpenDetail(emp)}>
+                            <div className={`personnel-avatar ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-indigo-100'}`}>
                               {emp.name[0]}
                             </div>
                             <div className="min-w-0">
@@ -438,20 +439,21 @@ export const EmployeeManagement: React.FC = () => {
                           <div className="flex items-center justify-end gap-3">
                             <button 
                               onClick={() => handleOpenDetail(emp)}
-                              className="px-4 py-2 bg-slate-900 border border-slate-800 text-white rounded-xl text-[11px] font-black hover:bg-indigo-600 transition-all shadow-sm"
+                              className="wf-btn personnel-detail-button"
                             >
                               상세보기
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
-                              className={`p-2 rounded-xl transition-all ${activeMenuId === emp.uid ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 text-slate-400'}`}
+                              aria-label={`${emp.name} 관리 메뉴`}
+                              className={`wf-btn personnel-menu-toggle ${activeMenuId === emp.uid ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 text-slate-400'}`}
                             >
                               <MoreVertical className="w-4 h-4" />
                             </button>
                             
                             {/* Contextual Menu */}
                             {activeMenuId === emp.uid && (
-                              <div className="absolute right-8 top-16 w-48 bg-white rounded-2xl shadow-2xl border border-slate-100 z-50 p-2 animate-in fade-in zoom-in-95 duration-200">
+                              <div className="personnel-context-menu">
                                 <button onClick={() => handleInitializePassword(emp)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-slate-600 text-[11px] font-bold rounded-xl transition-colors">
                                   <Key className="w-3.5 h-3.5 text-indigo-500" /> 비밀번호 초기화
                                 </button>
@@ -476,19 +478,19 @@ export const EmployeeManagement: React.FC = () => {
           </div>
 
           {/* Mobile Card View: Visible on small screens */}
-          <div className="xl:hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="personnel-cards">
             {filteredEmployees.map(emp => {
               const div = divisions.find(d => d.id === emp.divisionId)?.name || '기타';
               const team = teams.find(t => t.id === emp.teamId)?.name || '팀 없음';
               const isResigned = emp.status === 'RESIGNED';
               
               return (
-                <div key={emp.uid} className="premium-card p-6 flex flex-col gap-6 relative overflow-hidden">
+                <div key={emp.uid} className="wf-panel personnel-card">
                   {isResigned && <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-bl-full flex items-start justify-end p-2"><UserX className="w-4 h-4 text-rose-400" /></div>}
                   
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black shrink-0 ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'}`}>
+                      <div className={`personnel-avatar ${isResigned ? 'bg-slate-200 text-slate-400' : 'bg-indigo-600 text-white shadow-lg shadow-indigo-100'}`}>
                         {emp.name[0]}
                       </div>
                       <div className="min-w-0">
@@ -506,8 +508,8 @@ export const EmployeeManagement: React.FC = () => {
                       </div>
                     </div>
                     <button 
-                      onClick={() => setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid)}
-                      className="p-2 bg-slate-50 rounded-xl text-slate-400 hover:bg-slate-100 transition-all"
+                      onClick={(event) => { event.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
+                      className="wf-btn personnel-menu-toggle" aria-label={`${emp.name} 관리 메뉴`}
                     >
                       <MoreVertical className="w-5 h-5" />
                     </button>
@@ -526,14 +528,14 @@ export const EmployeeManagement: React.FC = () => {
 
                   <button 
                     onClick={() => handleOpenDetail(emp)}
-                    className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs hover:bg-indigo-600 transition-all active:scale-[0.98]"
+                    className="wf-btn personnel-card-detail"
                   >
                     상세 정보 및 인사 수정
                   </button>
 
                   {/* Mobile Context Menu */}
                   {activeMenuId === emp.uid && (
-                    <div className="absolute inset-x-0 bottom-0 top-0 bg-white/95 backdrop-blur-md z-20 p-6 flex flex-col justify-center gap-2 animate-in slide-in-from-bottom-5 duration-300">
+                    <div className="personnel-card-menu">
                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 border-b border-slate-100 pb-2">{emp.name} 관리</h4>
                        <button onClick={() => handleInitializePassword(emp)} className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl text-xs font-black text-slate-700 active:bg-indigo-50">
                           <Key className="w-5 h-5 text-indigo-500" /> 임시 비밀번호 발급
@@ -555,15 +557,15 @@ export const EmployeeManagement: React.FC = () => {
       </div>
 
       {selectedEmpRecords && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-2xl border border-slate-100 overflow-hidden animate-in zoom-in-95 duration-500 flex flex-col max-h-[90vh]">
-            <div className="p-10 border-b border-slate-50 flex justify-between items-start shrink-0">
+        <div className="personnel-overlay" role="dialog" aria-modal="true" aria-labelledby="personnel-detail-title">
+          <div className="personnel-modal">
+            <div className="personnel-modal-head">
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                   <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-black text-indigo-600 uppercase tracking-widest">Management Console</div>
-                   {selectedEmpRecords.emp.status === 'RESIGNED' && <span className="px-3 py-1 bg-rose-50 text-rose-500 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">Resigned</span>}
+                   <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-black text-indigo-600 uppercase tracking-widest">인사 정보</div>
+                   {selectedEmpRecords.emp.status === 'RESIGNED' && <span className="px-3 py-1 bg-rose-50 text-rose-500 text-[10px] font-black rounded-full border border-rose-100 uppercase tracking-widest">퇴사</span>}
                 </div>
-                <h2 className="text-3xl font-black text-slate-900 tracking-tighter">{selectedEmpRecords.emp.name}님의 상세 정보</h2>
+                <h2 className="personnel-modal-title" id="personnel-detail-title">{selectedEmpRecords.emp.name}님의 상세 정보</h2>
                 <div 
                   onClick={() => handleCopyEmail(selectedEmpRecords.emp.email)}
                   className="inline-flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-600 rounded-xl text-xs font-bold text-slate-700 transition-colors cursor-pointer border border-slate-200 w-fit"
@@ -581,7 +583,7 @@ export const EmployeeManagement: React.FC = () => {
               </div>
               
               {/* Leave Dashboard Widget */}
-              <div className="flex bg-slate-50 border border-slate-100 rounded-2xl p-2 gap-2 shadow-sm">
+              <div className="personnel-leave-summary">
                  {(() => {
                    const baseLeave = selectedEmpRecords.emp.joinDate ? calculateLeaveEntitlement(new Date(selectedEmpRecords.emp.joinDate)) : 0;
                    const totalLeave = baseLeave + (selectedEmpRecords.emp.additionalLeave || 0);
@@ -609,65 +611,70 @@ export const EmployeeManagement: React.FC = () => {
                  })()}
               </div>
 
-              <button onClick={() => setSelectedEmpRecords(null)} className="p-3 bg-slate-50 rounded-2xl text-slate-400 hover:text-slate-900 transition-all"><X className="w-6 h-6" /></button>
+              <button onClick={() => setSelectedEmpRecords(null)} className="wf-btn personnel-modal-close" aria-label="인사 상세 닫기"><X className="w-6 h-6" /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-10 premium-scrollbar">
+            <div className="personnel-modal-body">
               <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-300">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="personnel-form-grid">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">주민등록번호</label>
+                        <label htmlFor="personnel-rrn" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">주민등록번호</label>
                         <input 
                           type="text"
+                          id="personnel-rrn"
                           value={editingInfo.rrn}
                           onChange={(e) => setEditingInfo({...editingInfo, rrn: e.target.value})}
                           disabled={!isAdmin}
                           placeholder="예: 800101-*******"
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-60"
+                          className="wf-input"
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">개인 이메일</label>
+                        <label htmlFor="personnel-personalEmail" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">개인 이메일</label>
                         <input 
                           type="email"
+                          id="personnel-personalEmail"
                           value={editingInfo.personalEmail}
                           onChange={(e) => setEditingInfo({...editingInfo, personalEmail: e.target.value})}
                           disabled={!isAdmin}
                           placeholder="personal@email.com"
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-60"
+                          className="wf-input"
                         />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비상 연락처 (전화번호)</label>
+                        <label htmlFor="personnel-phone" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비상 연락처 (전화번호)</label>
                         <input 
                           type="text"
+                          id="personnel-phone"
                           value={editingInfo.phone}
                           onChange={(e) => setEditingInfo({...editingInfo, phone: e.target.value})}
                           disabled={!isAdmin}
                           placeholder="010-0000-0000"
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-60"
+                          className="wf-input"
                         />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">상세 주소</label>
+                        <label htmlFor="personnel-address" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">상세 주소</label>
                         <textarea 
                           rows={2}
+                          id="personnel-address"
                           value={editingInfo.address}
                           onChange={(e) => setEditingInfo({...editingInfo, address: e.target.value})}
                           disabled={!isAdmin}
                           placeholder="상세 주소를 입력하세요"
-                          className="w-full px-5 py-4 bg-slate-50 border-2 border-transparent rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold disabled:opacity-60 resize-none"
+                          className="wf-input"
                         />
                     </div>
                     {isAdmin && (
                       <div className="space-y-2 md:col-span-2">
-                        <label className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">추가 연차 부여 (일수)</label>
-                        <div className="flex items-center gap-4 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                        <label htmlFor="personnel-additionalLeave" className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">추가 연차 부여 (일수)</label>
+                        <div className="personnel-leave-addition">
                           <input 
                             type="number"
-                            value={editingInfo.additionalLeave}
+                            id="personnel-additionalLeave"
+                          value={editingInfo.additionalLeave}
                             onChange={(e) => setEditingInfo({...editingInfo, additionalLeave: Number(e.target.value)})}
-                            className="w-24 px-4 py-2 bg-white border border-indigo-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-300 font-black text-center text-indigo-700"
+                            className="wf-input"
                             min="0"
                             step="0.5"
                           />
@@ -683,7 +690,7 @@ export const EmployeeManagement: React.FC = () => {
                     <button 
                       onClick={handleSavePersonalInfo}
                       disabled={isSaving}
-                      className="w-full py-5 bg-indigo-600 text-white font-black rounded-2xl shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="wf-btn wf-btn-primary personnel-save"
                     >
                       {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldAlert className="w-5 h-5" />}
                       인사 정보 저장하기
@@ -691,7 +698,7 @@ export const EmployeeManagement: React.FC = () => {
                   )}
                   
                   {!isAdmin && (
-                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 flex items-center gap-3">
+                    <div className="personnel-readonly">
                       <ShieldAlert className="w-5 h-5 text-amber-500" />
                         <p className="text-xs font-bold text-amber-600">이 정보는 회사 관리자(SUPER_ADMIN 또는 ADMIN)만 수정할 수 있습니다.</p>
                     </div>
@@ -704,14 +711,14 @@ export const EmployeeManagement: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmEmp && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-xl animate-in fade-in">
-          <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden text-center p-12 space-y-8 animate-in zoom-in-95">
-             <div className="w-20 h-20 bg-rose-50 rounded-[2rem] flex items-center justify-center text-rose-500 mx-auto shadow-inner">
+        <div className="personnel-overlay personnel-delete-overlay" role="dialog" aria-modal="true" aria-labelledby="personnel-delete-title">
+          <div className="personnel-delete-modal">
+             <div className="personnel-delete-icon">
                 <ShieldAlert className="w-10 h-10" />
              </div>
              
              <div className="space-y-2">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight italic">데이터 영구 삭제</h3>
+                <h3 className="personnel-modal-title" id="personnel-delete-title">데이터 영구 삭제</h3>
                 <p className="text-slate-500 font-medium text-sm leading-relaxed">
                   <span className="text-rose-600 font-black">{deleteConfirmEmp.name}</span>님의 모든 데이터(출퇴근, 휴가, 지출결의)가 <span className="underline decoration-rose-200 decoration-w-2">영구적으로 삭제</span>되며 복구할 수 없습니다.
                 </p>
@@ -725,21 +732,21 @@ export const EmployeeManagement: React.FC = () => {
                     placeholder="관리자 비밀번호를 입력하세요"
                     value={adminPassword}
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full pl-12 pr-6 py-4 bg-slate-50 rounded-2xl border-2 border-slate-100 outline-none focus:border-indigo-500 transition-all font-bold"
+                    className="wf-input personnel-delete-password" aria-label="삭제 확인 관리자 비밀번호"
                   />
                 </div>
                 
                 <div className="flex gap-3">
                    <button 
                     onClick={() => { setDeleteConfirmEmp(null); setAdminPassword(''); }}
-                    className="flex-1 py-4 bg-slate-100 text-slate-500 font-black rounded-2xl hover:bg-slate-200 transition-all"
+                    className="wf-btn"
                    >
                      취소
                    </button>
                    <button 
                     onClick={handleDeleteAll}
                     disabled={!adminPassword || isProcessing}
-                    className="flex-2 px-10 py-4 bg-rose-600 text-white font-black rounded-2xl shadow-xl shadow-rose-100 hover:bg-rose-700 transition-all disabled:opacity-30 flex items-center justify-center gap-2"
+                    className="wf-btn wf-btn-danger"
                    >
                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                      데이터 삭제 승인

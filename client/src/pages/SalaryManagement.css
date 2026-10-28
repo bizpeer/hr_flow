@@ -1,0 +1,117 @@
+/* Screen presentation only: retain the existing payslip print layout. */
+@media screen {
+  .workflow-theme .salary-screen { min-width: 0; min-height: 100%; padding: 24px; background: var(--wf-bg); color: var(--wf-text); font-family: inherit; }
+  .workflow-theme .salary-loading { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 240px; color: var(--wf-muted); }
+  .workflow-theme .salary-workspace { display: grid; gap: 20px; max-width: none; }
+  .workflow-theme .salary-workspace > * { margin-block: 0; min-width: 0; }
+  .workflow-theme .salary-page-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .workflow-theme .salary-page-description { margin: 8px 0 0; max-width: 650px; color: var(--wf-muted); font-size: 13px; line-height: 1.7; }
+  .workflow-theme .salary-head-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .workflow-theme .salary-search { width: 220px; min-width: 0; }
+  .workflow-theme .salary-search .wf-input { padding-left: 39px; }
+  .workflow-theme .salary-summary-grid { display: grid; grid-template-columns: minmax(220px,.8fr) minmax(0,2.2fr); gap: 16px; }
+  .workflow-theme .salary-period { padding: 18px 20px; }
+  .workflow-theme .salary-period > p { margin-top: 12px; }
+  .workflow-theme .salary-period > div:first-child { margin-bottom: 14px; color: var(--wf-muted); }
+  .workflow-theme .salary-totals { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; padding: 20px; }
+  .workflow-theme .salary-total-values { flex: 1; min-width: 300px; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+  .workflow-theme .salary-total-values > div { min-width: 0; border: 0; padding: 0; }
+  .workflow-theme .salary-total-values > div > p:first-child { margin-bottom: 8px; color: var(--wf-muted); font-size: 12px; letter-spacing: 0; }
+  .workflow-theme .salary-total-values p:last-child { color: var(--wf-strong); font-size: 23px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .workflow-theme .salary-total-values p:last-child span { font-size: 12px; font-weight: 400; opacity: 1; color: var(--wf-muted); }
+  .workflow-theme .salary-approve { width: 100%; white-space: nowrap; }
+  .workflow-theme .salary-filters { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1.5fr); align-items: center; gap: 16px; padding: 16px 18px; }
+  .workflow-theme .salary-organization-filter { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .workflow-theme .salary-organization-filter > svg { flex-shrink: 0; width: 18px; color: var(--wf-muted); }
+  .workflow-theme .salary-standard-note { padding-left: 18px; border-left: 1px solid var(--wf-border); color: var(--wf-muted); font-size: 12px; line-height: 1.6; }
+  .workflow-theme .salary-standard-note > div { gap: 3px; }
+  .workflow-theme .salary-standard-note span:last-child { font-size: 12px; font-weight: 400; }
+  .workflow-theme .salary-screen :is(.premium-card,[class~="rounded-[2rem]"]) { background: var(--wf-panel); border: 1px solid var(--wf-border); border-radius: 12px; box-shadow: none; }
+  .workflow-theme .salary-screen :is([class*="shadow"],[class*="ring-"]) { box-shadow: none; }
+  .workflow-theme .salary-screen :is(.rounded-2xl,.rounded-xl) { border-radius: 8px; }
+  .workflow-theme .salary-screen :is(.font-black,.font-extrabold,.font-bold) { font-weight: 500; }
+  .workflow-theme .salary-screen :is(h1,h2,h3) { font-weight: 600; }
+  .workflow-theme .salary-screen :is(.uppercase,.tracking-widest) { text-transform: none; letter-spacing: 0; }
+  .workflow-theme .salary-screen :is([class~="text-[8px]"],[class~="text-[9px]"],[class~="text-[10px]"],[class~="text-[11px]"]) { font-size: 12px; line-height: 1.6; }
+  .workflow-theme .salary-screen :is(.text-slate-300,.text-slate-400,.text-slate-500,.text-slate-600) { color: var(--wf-muted); }
+  .workflow-theme .salary-screen :is(.text-slate-700,.text-slate-800,.text-slate-900) { color: var(--wf-text); }
+  .workflow-theme .salary-screen :is(.text-indigo-200,.text-indigo-400,.text-indigo-500,.text-indigo-600,.text-emerald-400,.text-emerald-500,.text-emerald-600,.text-emerald-300,.text-sky-500) { color: var(--wf-primary-800); }
+  .workflow-theme .salary-screen :is(.text-rose-400,.text-rose-500) { color: var(--color-error-fg); }
+  .workflow-theme .salary-screen :is(.bg-slate-50,.bg-slate-100,[class~="bg-slate-50/50"]) { background: var(--wf-subtle); }
+  .workflow-theme .salary-screen .bg-indigo-50 { background: var(--wf-primary-50); }
+  .workflow-theme .salary-screen :is(.bg-indigo-600,.bg-slate-800,.bg-slate-900) { background: var(--wf-primary-800); color: var(--wf-on-primary); }
+  .workflow-theme .salary-screen :is(.bg-indigo-600,.bg-slate-800,.bg-slate-900) :is(.text-indigo-200,.text-slate-400,[class~="text-white/50"]) { color: inherit; }
+  .workflow-theme .salary-screen :is(.border-slate-100,.border-slate-200) { border-color: var(--wf-border); }
+  .workflow-theme .salary-screen button { min-height: 36px; min-width: 32px; font-family: inherit; cursor: pointer; }
+  .workflow-theme .salary-screen button:hover { transform: none; }
+  .workflow-theme .salary-screen button:disabled { opacity: .5; cursor: not-allowed; }
+  .workflow-theme .salary-screen :is(input,select) { min-width: 0; min-height: 40px; padding-block: 8px; border: 1px solid var(--wf-field-border); border-radius: 8px; background: var(--wf-panel); color: var(--wf-text); font-family: inherit; font-size: 14px; font-weight: 400; box-shadow: none; }
+  .workflow-theme .salary-screen select { padding-inline: 10px 22px; }
+  .workflow-theme .salary-screen select:disabled { background: var(--wf-subtle); opacity: .6; }
+  .workflow-theme .salary-screen :is(input,select):focus { outline: 2px solid var(--wf-secondary); outline-offset: 2px; }
+  .workflow-theme .salary-table-panel table { font-size: 13px; }
+  .workflow-theme .salary-table-panel :is(th,td) { padding: 16px; }
+  .workflow-theme .salary-table-panel th { background: var(--wf-subtle); color: var(--wf-muted); font-size: 12px; font-weight: 500; }
+  .workflow-theme .salary-table-panel td { vertical-align: top; }
+  .workflow-theme .salary-table-panel .text-3xl { font-size: 25px; font-weight: 600; }
+  .workflow-theme .salary-table-panel [class~="space-y-4"] > :not(:last-child) { margin-bottom: 12px; }
+  .workflow-theme .salary-table-panel [class~="gap-6"] { gap: 12px; }
+  .workflow-theme .salary-table-panel button { padding: 7px 10px; }
+  .workflow-theme .salary-table-panel [class~="text-[8px]"] { min-height: 30px; }
+  .workflow-theme .salary-table-panel [class*="hover:rotate"], .workflow-theme .salary-mobile-card [class*="hover:scale"] { transform: none; }
+  .workflow-theme .salary-mobile-card { gap: 18px; padding: 18px; min-width: 0; }
+  .workflow-theme .salary-mobile-card h3 { font-size: 16px; }
+  .workflow-theme .salary-mobile-card .text-2xl { font-weight: 600; overflow-wrap: anywhere; }
+  .workflow-theme .salary-modal-overlay { padding: 24px; background: var(--wf-overlay); backdrop-filter: none; }
+  .workflow-theme .salary-detail-modal { max-height: calc(100dvh - 48px); overflow-y: auto; }
+  .workflow-theme .salary-screen .salary-modal-head { gap: 12px; padding: 20px 24px; background: var(--wf-panel); color: var(--wf-text); }
+  .workflow-theme .salary-modal-head > div:first-child { min-width: 0; }
+  .workflow-theme .salary-modal-head h2 { font-size: 18px; line-height: 1.5; overflow-wrap: anywhere; }
+  .workflow-theme .salary-modal-head p { font-style: normal; }
+  .workflow-theme .salary-modal-head > div:last-child, .workflow-theme .salary-modal-head > button { flex-shrink: 0; }
+  .workflow-theme .salary-modal-body { padding: 20px 24px; }
+  .workflow-theme .salary-modal-body > :is(.grid,.space-y-6) { min-width: 0; }
+  .workflow-theme .salary-modal-body .text-3xl { font-size: 25px; overflow-wrap: anywhere; }
+  .workflow-theme .salary-modal-body .text-2xl { font-size: 22px; overflow-wrap: anywhere; }
+  .workflow-theme .salary-history-range { padding: 16px 24px; gap: 12px; }
+  .workflow-theme .salary-history-body { padding: 20px 24px; }
+  .workflow-theme .salary-history-table { overflow-x: auto; border-radius: 8px; }
+  .workflow-theme .salary-history-table table { min-width: 680px; }
+  .workflow-theme .salary-history-table :is(th,td) { padding: 14px; white-space: nowrap; }
+  .workflow-theme .salary-empty { padding: 24px; text-align: center; color: var(--wf-muted); font-size: 14px; }
+}
+@media screen and (max-width: 1100px) {
+  .workflow-theme .salary-summary-grid { grid-template-columns: minmax(0,1fr); }
+  .workflow-theme .salary-head-actions { width: 100%; }
+  .workflow-theme .salary-search { flex: 1; max-width: 320px; }
+  .workflow-theme .salary-total-values { min-width: 0; flex-basis: 100%; }
+}
+@media screen and (max-width: 767px) {
+  .workflow-theme .salary-screen { padding: 20px 16px; }
+  .workflow-theme .salary-workspace { gap: 16px; }
+  .workflow-theme .salary-head-actions { align-items: stretch; }
+  .workflow-theme .salary-head-actions > button { width: 100%; }
+  .workflow-theme .salary-search { flex-basis: 100%; width: 100%; max-width: none; }
+  .workflow-theme .salary-period, .workflow-theme .salary-totals { padding: 16px; }
+  .workflow-theme .salary-totals { gap: 16px; }
+  .workflow-theme .salary-total-values { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .workflow-theme .salary-total-values > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .workflow-theme .salary-total-values p:first-child { margin: 0; }
+  .workflow-theme .salary-total-values p:last-child { font-size: 22px; text-align: right; }
+  .workflow-theme .salary-totals > div:last-child { width: 100%; }
+  .workflow-theme .salary-filters { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; padding: 14px; }
+  .workflow-theme .salary-standard-note { grid-column: 1 / -1; padding: 12px 0 0; border: 0; border-top: 1px solid var(--wf-border); }
+  .workflow-theme .salary-screen :is(button,input,select) { min-height: 44px; }
+  .workflow-theme .salary-screen :is(input,select) { font-size: 16px; }
+  .workflow-theme .salary-organization-filter > svg { display: none; }
+  .workflow-theme .salary-modal-overlay { padding: 12px; }
+  .workflow-theme .salary-detail-modal, .workflow-theme .salary-history-modal { max-height: calc(100dvh - 24px); }
+  .workflow-theme .salary-modal-head { flex-wrap: wrap; padding: 16px; }
+  .workflow-theme .salary-modal-head > div:last-child { margin-left: auto; }
+  .workflow-theme .salary-modal-body, .workflow-theme .salary-history-body, .workflow-theme .salary-history-range { padding: 16px; }
+  .workflow-theme .salary-modal-body > .grid:first-child { grid-template-columns: minmax(0,1fr); }
+  .workflow-theme .salary-modal-body .p-6 { padding: 16px; }
+  .workflow-theme .salary-modal-body .grid-cols-3 { grid-template-columns: minmax(0,1fr); gap: 8px; }
+  .workflow-theme .salary-modal-body .grid-cols-3 > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .workflow-theme .salary-history-range > div { min-width: 0; }
+}

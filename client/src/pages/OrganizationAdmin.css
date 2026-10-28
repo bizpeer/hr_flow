@@ -1,0 +1,131 @@
+.workflow-theme .organization-screen { padding:24px; min-width:0; min-height:0; color:var(--wf-text); background:var(--wf-bg); }
+.workflow-theme .organization-screen *, .workflow-theme .organization-screen *::before, .workflow-theme .organization-screen *::after { min-width:0; }
+.workflow-theme .organization-content { max-width:none; display:grid; gap:20px; container-type:inline-size; }
+.workflow-theme .organization-content > * { margin-block:0; }
+.workflow-theme .organization-screen .font-black, .workflow-theme .organization-screen .font-bold { font-weight:500; }
+.workflow-theme .organization-screen :is(.tracking-widest,.tracking-tight,.tracking-\[0\.2em\]) { letter-spacing:normal; }
+.workflow-theme .organization-screen .uppercase { text-transform:none; }
+.workflow-theme .organization-screen .italic { font-style:normal; }
+.workflow-theme .organization-screen :is(.shadow-2xl,.shadow-xl,.shadow-lg,.shadow-sm,.shadow-inner,.premium-shadow) { box-shadow:none; }
+.workflow-theme .organization-screen :is(.text-slate-900,.text-slate-800,.text-slate-700,.text-slate-600) { color:var(--wf-text); }
+.workflow-theme .organization-screen :is(.text-slate-500,.text-slate-400,.text-slate-300,.text-slate-200) { color:var(--wf-muted); }
+.workflow-theme .organization-screen :is(.text-indigo-300,.text-indigo-400,.text-indigo-500,.text-indigo-600,.text-indigo-700,.text-emerald-600) { color:var(--wf-primary-800); }
+.workflow-theme .organization-screen :is(.text-rose-500,.text-rose-600,.text-amber-900) { color:var(--wf-text); }
+.workflow-theme .organization-screen :is(.rounded-2xl,.rounded-3xl,.rounded-\[2rem\],.rounded-\[1\.5rem\]) { border-radius:8px; }
+.workflow-theme .organization-screen :is(.rounded-\[2\.5rem\],.rounded-\[3rem\]) { border-radius:12px; }
+.workflow-theme .organization-screen :is(.border-slate-100,.border-slate-50,.border-indigo-100,.border-amber-100) { border-color:var(--wf-border); }
+.workflow-theme .organization-screen :is(.bg-slate-50,.bg-slate-100) { background:var(--wf-subtle); }
+.workflow-theme .organization-screen :is(.bg-indigo-50,.bg-emerald-50) { background:var(--wf-primary-50); }
+.workflow-theme .organization-screen .bg-indigo-500 { background:var(--wf-primary-500); }
+.workflow-theme .organization-screen .bg-emerald-500 { background:var(--color-success-fg); }
+.workflow-theme .organization-screen .bg-slate-300 { background:var(--wf-border-strong); }
+.workflow-theme .organization-page-head { display:flex; flex-direction:row; align-items:flex-start; justify-content:space-between; gap:20px; flex-wrap:wrap; }
+.workflow-theme .organization-page-head h1 { font-size:26px; line-height:1.3; font-weight:600; letter-spacing:-.7px; color:var(--wf-strong); }
+.workflow-theme .organization-title-icon { display:none; }
+.workflow-theme .organization-page-head p { margin-top:7px; font-size:13px; line-height:1.65; color:var(--wf-muted); }
+.workflow-theme .organization-header-actions { flex-wrap:wrap; gap:10px; }
+.workflow-theme .organization-history-search { display:flex; }
+.workflow-theme .organization-history-search input { width:230px; padding:9px 12px 9px 35px; }
+.workflow-theme .organization-history-search > svg { width:16px; height:16px; left:11px; }
+.workflow-theme .organization-screen button { cursor:pointer; }
+.workflow-theme .organization-screen button:not(:disabled):hover { filter:none; }
+.workflow-theme .organization-screen button:disabled { opacity:.5; cursor:not-allowed; }
+.workflow-theme .organization-screen :is(button,select,input):focus-visible { outline:2px solid var(--wf-secondary); outline-offset:3px; }
+.workflow-theme .organization-screen button[class*="p-"], .workflow-theme .organization-screen button[class*="py-"] { min-height:36px; padding:8px 11px; border-radius:8px; font-size:14px; font-weight:500; box-shadow:none; transform:none; }
+.workflow-theme .organization-screen button.organization-primary, .workflow-theme .organization-screen button.bg-indigo-600 { min-height:40px; padding:8px 14px; background:var(--wf-primary-800); color:var(--wf-on-primary); border:1px solid var(--wf-primary-800); gap:7px; }
+.workflow-theme .organization-screen button.organization-primary:hover, .workflow-theme .organization-screen button.bg-indigo-600:hover { background:var(--wf-primary-900); }
+.workflow-theme .organization-screen button.organization-primary svg { width:17px; height:17px; transform:none; }
+.workflow-theme .organization-screen input, .workflow-theme .organization-screen select { min-height:40px; border:1px solid var(--wf-field-border); border-radius:8px; background:var(--wf-panel); color:var(--wf-text); padding:8px 11px; font-size:14px; font-weight:400; width:100%; }
+.workflow-theme .organization-screen select { appearance:auto; }
+.workflow-theme .organization-screen input:disabled, .workflow-theme .organization-screen select:disabled { background:var(--wf-subtle); }
+.workflow-theme .organization-screen .organization-history-search input { padding-left:35px; }
+.workflow-theme .organization-layout { display:grid; grid-template-columns:minmax(230px,.8fr) minmax(0,2fr); gap:20px; align-items:start; }
+.workflow-theme .organization-divisions,.workflow-theme .organization-teams { grid-column:auto; }
+.workflow-theme .organization-panel, .workflow-theme .organization-history-panel { border:1px solid var(--wf-border); border-radius:12px; background:var(--wf-panel); box-shadow:none; }
+.workflow-theme .organization-panel-head { padding:18px 20px; gap:12px; background:var(--wf-panel); border-color:var(--wf-border); }
+.workflow-theme .organization-panel-head h2 { font-size:18px; line-height:1.4; font-weight:600; }
+.workflow-theme .organization-panel-head p { font-size:12px; color:var(--wf-muted); margin-top:4px; }
+.workflow-theme .organization-panel-head > div > div:has(>svg) { display:none; }
+.workflow-theme .organization-division-list { padding:12px; display:grid; gap:10px; }
+.workflow-theme .organization-division-list > * { margin-block:0; }
+.workflow-theme .organization-all-divisions { padding:9px 10px; text-align:left; font-size:13px; color:var(--wf-muted); background:var(--wf-subtle); border:1px solid var(--wf-border); border-radius:8px; min-height:40px; }
+.workflow-theme .organization-all-divisions[aria-pressed=true] { color:var(--wf-primary-800); background:var(--wf-primary-50); border-color:var(--wf-primary-100); }
+.workflow-theme .organization-division { padding:12px; border:1px solid var(--wf-border); border-radius:8px; background:var(--wf-panel); box-shadow:none; transform:none; }
+.workflow-theme .organization-division.is-selected { background:var(--wf-primary-50); border-color:var(--wf-primary-100); }
+.workflow-theme .organization-division .text-white { color:var(--wf-primary-800); }
+.workflow-theme .organization-division [class*="bg-white/5"] { background:var(--wf-panel); border-color:var(--wf-border); }
+.workflow-theme .organization-division > div > div:first-child > div > div { width:30px; height:30px; background:var(--wf-subtle); color:var(--wf-primary-800); }
+.workflow-theme .organization-division-name { text-align:left; font-size:15px; font-weight:600; overflow-wrap:anywhere; }
+.workflow-theme .organization-division select { width:100%; min-height:34px; padding:5px 6px; font-size:13px; border-color:var(--wf-border-strong); }
+.workflow-theme .organization-division .uppercase { font-size:12px; white-space:nowrap; }
+.workflow-theme .organization-division button:has(>svg) { padding:6px; min-width:32px; }
+.workflow-theme .organization-team-panel { min-height:320px; }
+.workflow-theme .organization-team-grid { padding:18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.workflow-theme .organization-team-card { border:1px solid var(--wf-border); border-radius:8px; padding:0; background:var(--wf-subtle); box-shadow:none; }
+.workflow-theme .organization-team-card > div { padding:16px; }
+.workflow-theme .organization-team-card h4 { font-size:18px; line-height:1.5; font-weight:600; overflow-wrap:anywhere; }
+.workflow-theme .organization-team-card > div > div:first-child { margin-bottom:16px; }
+.workflow-theme .organization-team-card > div > div:nth-child(2) { display:grid; gap:14px; }
+.workflow-theme .organization-team-card > div > div:nth-child(2) > * { margin-block:0; }
+.workflow-theme .organization-team-card [class*="group/leader"] { padding:10px; gap:10px; flex-wrap:wrap; }
+.workflow-theme .organization-team-card [class*="group/leader"] > div { gap:6px; }
+.workflow-theme .organization-team-card [class*="group/leader"] > div > div { width:24px; height:24px; background:var(--wf-primary-50); }
+.workflow-theme .organization-team-card [class*="group/leader"] select { flex:1; min-width:95px; padding:6px 8px; min-height:36px; }
+.workflow-theme .organization-team-card .uppercase { font-size:12px; }
+.workflow-theme .organization-members { grid-template-columns:minmax(0,1fr); gap:8px; }
+.workflow-theme .organization-member { padding:10px 12px; gap:8px; overflow:visible; border-radius:8px; }
+.workflow-theme .organization-member > div:first-child { flex:1; gap:8px; }
+.workflow-theme .organization-member > div:first-child > div:first-child { flex-shrink:0; }
+.workflow-theme .organization-member button { font-size:13px; overflow-wrap:anywhere; }
+.workflow-theme .organization-member p { font-size:11px; margin-top:2px; }
+.workflow-theme .organization-member-actions { opacity:1; flex-shrink:0; }
+.workflow-theme .organization-member-actions button { display:inline-grid; place-items:center; width:30px; height:32px; color:var(--wf-muted); border-radius:6px; }
+.workflow-theme .organization-member-actions button:hover { background:var(--wf-primary-50); }
+.workflow-theme .organization-unassigned { grid-column:1/-1; padding:16px; border-width:1px; background:var(--wf-warning-bg); }
+.workflow-theme .organization-unassigned .bg-amber-100 { background:var(--wf-warning-bg); color:var(--wf-text); }
+.workflow-theme .organization-unassigned > div:first-child { display:none; }
+.workflow-theme .organization-unassigned h4 { font-size:16px; font-weight:600; }
+.workflow-theme .organization-unassigned > div:nth-child(2) { margin-bottom:12px; }
+.workflow-theme .organization-unassigned button { padding:8px 11px; }
+.workflow-theme .organization-history-panel > div:first-child { padding:18px 20px; }
+.workflow-theme .organization-history-panel h2 { font-size:18px; font-weight:600; }
+.workflow-theme .organization-history-panel table { min-width:700px; font-size:13px; }
+.workflow-theme .organization-history-panel :is(th,td) { padding:12px 16px; font-size:13px; }
+.workflow-theme .organization-history-panel th { background:var(--wf-subtle); color:var(--wf-muted); }
+.workflow-theme .organization-screen > .fixed { padding:16px; }
+.workflow-theme .organization-screen > .fixed[class*="bg-slate-"] { padding:0; background:var(--wf-overlay); backdrop-filter:none; }
+.workflow-theme .organization-screen [role=dialog] { padding:24px; max-height:calc(100dvh - 32px); overflow-y:auto; background:var(--wf-panel); border:1px solid var(--wf-border); border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,.12); animation:none; }
+.workflow-theme .organization-screen [role=dialog] h2 { font-size:22px; line-height:1.4; font-weight:600; margin-bottom:0; }
+.workflow-theme .organization-screen [role=dialog] > div:first-child { margin-bottom:20px; }
+.workflow-theme .organization-screen [role=dialog] > h2 { margin-bottom:20px; }
+.workflow-theme .organization-screen [role=dialog] :is(form,.space-y-6) { display:grid; gap:16px; }
+.workflow-theme .organization-screen [role=dialog] :is(form,.space-y-6) > * { margin-block:0; }
+.workflow-theme .organization-screen [role=dialog] .p-5 { padding:12px; }
+.workflow-theme .organization-screen [role=dialog] .text-xs { font-size:12px; }
+.workflow-theme .organization-screen [role=dialog] button.bg-rose-600 { background:var(--wf-error-bg); color:var(--wf-text); border:1px solid var(--wf-border-strong); }
+.workflow-theme .organization-screen [role=dialog] input[type=password] { margin-block:16px; }
+.workflow-theme .organization-loading { min-height:260px; }
+.workflow-theme .organization-loading .w-16 { width:28px; height:28px; border-width:3px; border-color:var(--wf-primary-100); border-top-color:var(--wf-primary-800); }
+.workflow-theme .organization-loading p { font-size:14px; font-weight:400; }
+@container (max-width:1000px) { .workflow-theme .organization-team-grid { grid-template-columns:minmax(0,1fr); } }
+@container (max-width:740px) { .workflow-theme .organization-layout { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:767px) {
+  .workflow-theme .organization-screen { padding:20px 16px; }
+  .workflow-theme .organization-page-head h1 { font-size:23px; }
+  .workflow-theme .organization-page-head { gap:16px; }
+  .workflow-theme .organization-header-actions { width:100%; }
+  .workflow-theme .organization-history-search { flex:1 1 100%; }
+  .workflow-theme .organization-history-search input { flex:1; width:100%; }
+  .workflow-theme .organization-header-actions > button { width:100%; }
+  .workflow-theme .organization-panel-head { padding:16px; }
+  .workflow-theme .organization-panel-head > button { flex-shrink:0; }
+  .workflow-theme .organization-team-grid { padding:14px; gap:14px; }
+  .workflow-theme .organization-team-card > div { padding:14px; }
+  .workflow-theme .organization-screen button,.workflow-theme .organization-screen button[class*="p-"],.workflow-theme .organization-screen button[class*="py-"], .workflow-theme .organization-screen :is(input,select) { min-height:44px; }
+  .workflow-theme .organization-screen input,.workflow-theme .organization-screen select { font-size:16px; }
+  .workflow-theme .organization-division select { font-size:14px; }
+  .workflow-theme .organization-member-actions button { width:36px; }
+  .workflow-theme .organization-screen [role=dialog] { padding:20px; }
+  .workflow-theme .organization-screen [role=dialog] .grid-cols-2 { grid-template-columns:minmax(0,1fr); }
+  .workflow-theme .organization-screen [role=dialog] h2 { font-size:20px; }
+}
