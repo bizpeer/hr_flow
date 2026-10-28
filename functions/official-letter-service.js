@@ -2,6 +2,7 @@ const { HttpsError } = require('firebase-functions/v2/https');
 const { createHash } = require('node:crypto');
 const { authorizeContext, recentAuthentication } = require('./security-context');
 const { createDraftingWorkflow } = require('./drafting-workflow');
+const { createDraftingAttachments } = require('./drafting-attachments');
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -103,6 +104,7 @@ function contentInput(data, type, today) {
 /** All official-letter writes go through this service, including ADMIN writes. */
 function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Date() }) {
   const drafting = createDraftingWorkflow({ db, now });
+  const draftingAttachments = createDraftingAttachments({ db, bucket, now });
   const read = (reader, ref) => reader === db ? ref.get() : reader.get(ref);
   const settingsRef = companyId => db.collection('officialLetterSettings').doc(companyId);
   const letterRef = letterId => db.collection('officialLetters').doc(id(letterId));
@@ -383,6 +385,9 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           [...(d.notificationRecipientIds || []), ...(d.participantIds || []), d.creatorId]).filter(uid =>
           typeof uid === 'string' && uid.length > 0 && uid.length <= 128 && !uid.includes('/') && !['.', '..'].includes(uid)));
         await bucket.deleteFiles({ prefix: `companies/${user.companyId}/official-pdfs/${ref.id}/`, force: false });
+        if (current.documentType === 'DRAFTING' && current.status !== 'DELETED') {
+          await bucket.deleteFiles({ prefix: draftingAttachments.prefixFor(user, { ...current, id: ref.id }), force: false });
+        }
         const recipients = [...uids];
         // History remains until every inbox is cleaned, preserving historical
         // recipient IDs for an authorized retry after a partial failure.
@@ -588,9 +593,16 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
           const route = input.draftingRoute ?? current?.drafting?.route;
           const resolved = await drafting.resolve(user, route, tx, current);
           content.reference = resolved.reference;
+          const attachmentContext = current ? { ...current, id: ref.id } : null;
+          const attachmentScope = draftingAttachments.scope(user, attachmentContext, input.requestId);
+          content.attachmentFiles = await draftingAttachments.resolve(user, attachmentContext, input.requestId,
+            input.content?.attachmentFiles === undefined ? (current?.content?.attachmentFiles || []) : input.content.attachmentFiles);
           if (!current) {
             const request = drafting.requestRef(user, input.requestId);
-            const fingerprint = drafting.hash([contentInput(input.content || {}, documentType, koreaDate(now())), resolved.route]);
+            const fingerprintContent = contentInput(input.content || {}, documentType, koreaDate(now()));
+            // Preserve retries for pre-attachment drafts whose fingerprint had no file list.
+            if (content.attachmentFiles.length) fingerprintContent.attachmentFiles = content.attachmentFiles;
+            const fingerprint = drafting.hash([fingerprintContent, resolved.route]);
             const previous = (await tx.get(request)).data();
             if (previous) {
               if (previous.fingerprint !== fingerprint) fail('already-exists', '같은 요청 식별자로 다른 기안을 생성할 수 없습니다.');
@@ -617,11 +629,11 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
               participantIds: [...new Set([user.uid, ...resolved.line.map(step => step.uid)])], approvalLine: resolved.line, content,
               divisionId: resolved.org.division.id, teamId: resolved.org.team?.id || '', revision: 1, number,
               drafting: { draftDate, yearMonth, sequence, divisionName: resolved.org.division.name,
-                teamName: resolved.org.team?.name || '', route: resolved.route },
+                teamName: resolved.org.team?.name || '', route: resolved.route, attachmentScope },
               status: 'DRAFT', everIssued: false, pdfReady: false, createdAt: timestamp, updatedAt: timestamp, updatedBy: user.uid });
           } else {
             const changed = { ...current, content, revision: current.revision + 1, status: 'DRAFT',
-              drafting: { ...current.drafting, route: resolved.route, submittedAt: null, submittedBy: null, submittedByName: null },
+              drafting: { ...current.drafting, route: resolved.route, attachmentScope, submittedAt: null, submittedBy: null, submittedByName: null },
               participantIds: [...new Set([current.creatorId, ...resolved.line.map(step => step.uid)])], approvalLine: resolved.line,
               approvedRevision: null, approvedAt: null, approvedBy: null, approvedByName: '',
               pdf: null, pdfReady: false, automaticApproval: false, rejectionReason: '', updatedAt: timestamp, updatedBy: user.uid };
@@ -712,6 +724,7 @@ function createOfficialLetterService({ db, bucket, renderPdf, now = () => new Da
             if (user.uid !== current.creatorId && user.role !== 'ADMIN') fail('permission-denied', '기안자 또는 회사 관리자만 결재 요청할 수 있습니다.');
             if (!['DRAFT', 'REJECTED'].includes(current.status)) fail('failed-precondition', '작성 또는 반려 상태에서 결재 요청할 수 있습니다.');
             contentInput(current.content, 'DRAFTING', koreaDate(now()));
+            await draftingAttachments.resolve(user, { ...current, id: ref.id }, undefined, current.content.attachmentFiles || []);
             const resolved = await drafting.validateLine(user, current, tx);
             const changed = { ...current, status: 'PENDING', branding: { companyName: user.companyName },
               content: { ...current.content, reference: resolved.reference },

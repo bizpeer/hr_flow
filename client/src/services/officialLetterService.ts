@@ -29,12 +29,14 @@ export interface CertificateContent {
   contactPhone: string;
 }
 export interface DocumentApprover { uid: string; name: string; divisionId?: string | null; divisionName?: string }
+export interface DraftingAttachment { id: string; name: string; contentType: string; size: number }
 export interface LetterContent {
   recipient: string;
   reference: string;
   title: string;
   body: string;
   attachments: string;
+  attachmentFiles?: DraftingAttachment[];
   cooperationNote?: string;
   certificate?: CertificateContent;
 }

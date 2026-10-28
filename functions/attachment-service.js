@@ -1,9 +1,7 @@
 const { randomUUID } = require('node:crypto');
 const { authorizeContext, fail } = require('./security-context');
-const MAX_BYTES = 10 * 1024 * 1024;
-const TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'application/pdf': 'pdf' };
+const { createDraftingAttachments, MAX_BYTES, TYPES, filename, fileType } = require('./drafting-attachments');
 const origins = new Set(['https://hr-flow.pages.dev', 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5176', 'http://127.0.0.1:5176']);
-const filename = value => String(value || '첨부파일').replace(/[\\/\u0000-\u001f\u007f]/g, '_').slice(0, 240);
 function legacyAttachmentPath(url, bucketName) {
   try {
     const parsed = new URL(url);
@@ -12,16 +10,9 @@ function legacyAttachmentPath(url, bucketName) {
     return parsed.pathname.startsWith(prefix) ? decodeURIComponent(parsed.pathname.slice(prefix.length)) : null;
   } catch { return null; }
 }
-function fileType(bytes) {
-  if (bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return 'image/png';
-  if (bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255) return 'image/jpeg';
-  if (['GIF87a', 'GIF89a'].includes(bytes.toString('ascii', 0, 6))) return 'image/gif';
-  if (bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP') return 'image/webp';
-  if (bytes.toString('ascii', 0, 5) === '%PDF-') return 'application/pdf';
-  return null;
-}
 function createAttachmentService({ db, auth, bucket, now = () => new Date(), uuid = randomUUID }) {
   const authorize = request => authorizeContext({ db, request, now });
+  const drafting = createDraftingAttachments({ db, bucket, now, uuid });
   async function identity(req) {
     const match = /^Bearer ([^\s]+)$/.exec(req.get('Authorization') || '');
     if (!match) fail('unauthenticated', '로그인이 필요합니다.');
@@ -46,7 +37,7 @@ function createAttachmentService({ db, auth, bucket, now = () => new Date(), uui
   }
   function categoryInput(req) {
     const category = req.query.category;
-    if (!['expenses', 'leaves', 'notices'].includes(category)) fail('invalid-argument', '첨부 구분을 확인해 주세요.');
+    if (!['expenses', 'leaves', 'notices', 'drafting'].includes(category)) fail('invalid-argument', '첨부 구분을 확인해 주세요.');
     return category;
   }
   async function recordAccess(request, category, documentId) {
@@ -62,7 +53,7 @@ function createAttachmentService({ db, auth, bucket, now = () => new Date(), uui
     return { user, data, path };
   }
   function errorResponse(error, res) {
-    const status = { unauthenticated: 401, 'permission-denied': 403, 'failed-precondition': 403, 'not-found': 404, 'invalid-argument': 400, 'resource-exhausted': 413 }[error.code] || (error.code === 404 ? 404 : 500);
+    const status = { unauthenticated: 401, 'permission-denied': 403, 'failed-precondition': 403, 'not-found': 404, 'invalid-argument': 400, 'resource-exhausted': 413, aborted: 409 }[error.code] || (error.code === 404 ? 404 : 500);
     if (status === 500) console.error('[AttachmentError]', error.code || 'internal');
     res.status(status).json({ error: status === 500 ? '첨부파일을 처리하지 못했습니다.' : '첨부파일 접근 권한, 파일 형식 또는 크기를 확인해 주세요.' });
   }
@@ -78,6 +69,10 @@ function createAttachmentService({ db, auth, bucket, now = () => new Date(), uui
         if (!type || req.get('Content-Type')?.split(';')[0] !== type) fail('invalid-argument', '지원하지 않는 파일입니다.');
         let name;
         try { name = filename(decodeURIComponent(req.get('X-File-Name') || '')); } catch { fail('invalid-argument', '파일 이름을 확인해 주세요.'); }
+        if (category === 'drafting') {
+          res.status(200).json(await drafting.upload(request, req.query, bytes, req.get('Content-Type'), name));
+          return;
+        }
         const path = `companies/${user.companyId}/${category}/${category === 'notices' ? '' : `${user.uid}/`}${uuid()}.${TYPES[type]}`;
         const file = bucket.file(path);
         await file.save(bytes, { resumable: false, preconditionOpts: { ifGenerationMatch: 0 }, metadata: { contentType: type, cacheControl: 'private, no-store',
@@ -94,6 +89,13 @@ function createAttachmentService({ db, auth, bucket, now = () => new Date(), uui
       try {
         const request = await identity(req), category = categoryInput(req), documentId = req.query.documentId;
         if (typeof documentId !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(documentId)) fail('invalid-argument', '신청 기록을 확인해 주세요.');
+        if (category === 'drafting') {
+          const result = await drafting.download(request, req.query);
+          res.set('Content-Type', result.contentType);
+          res.set('Content-Disposition', `attachment; filename="attachment.${TYPES[result.contentType]}"; filename*=UTF-8''${encodeURIComponent(result.name)}`);
+          res.status(200).send(result.bytes);
+          return;
+        }
         const initial = await recordAccess(request, category, documentId), file = bucket.file(initial.path);
         const [metadata] = await file.getMetadata();
         if (!TYPES[metadata.contentType] || !Number(metadata.size) || Number(metadata.size) > MAX_BYTES) fail('invalid-argument', '지원하지 않는 파일입니다.');

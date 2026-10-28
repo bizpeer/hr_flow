@@ -8,7 +8,7 @@
     "server:dev": "npm --prefix server run dev",
     "deploy": "npm run client:build && firebase deploy",
     "emulators": "firebase emulators:start",
-    "test:official-letters": "node --test --experimental-test-coverage --test-coverage-include=functions/official-letter-*.js --test-coverage-include=functions/drafting-*.js functions/tests/official-letters.test.js functions/tests/drafting.test.js",
+    "test:official-letters": "node --test --experimental-test-coverage --test-coverage-include=functions/official-letter-*.js --test-coverage-include=functions/drafting-*.js functions/tests/official-letters.test.js functions/tests/drafting.test.js functions/tests/drafting-attachments-integration.test.js functions/tests/drafting-filename.test.js",
     "test:members": "node --test --experimental-test-coverage --test-coverage-include=functions/member-service.js functions/tests/members.test.js",
     "test:rules": "node scripts/security-rules.test.mjs",
     "test:security-api": "node --test --experimental-test-coverage --test-coverage-include=functions/*security*.js --test-coverage-include=functions/attachment-service.js functions/tests/account-security.test.js functions/tests/admin-security.test.js functions/tests/attachment-security.test.js functions/tests/tenant-security-migration.test.js",

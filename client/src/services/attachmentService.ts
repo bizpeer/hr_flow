@@ -1,11 +1,19 @@
 import { auth, functions } from '../firebase';
 import { useAuthStore } from '../store/authStore';
+import type { DraftingAttachment } from './officialLetterService';
 
 export type AttachmentCategory = 'expenses' | 'leaves' | 'notices';
 export interface PrivateAttachment { path: string; name: string }
 export interface AttachmentDownload { blob: Blob; name: string }
 const maxBytes = 10 * 1024 * 1024;
 const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function validateDraftingFile(file: File): void {
+  if (!file.size || file.size > maxBytes || !allowedTypes.includes(file.type)) throw new Error('10MB 이하 PNG, JPEG, WebP, GIF 또는 PDF 파일을 선택해 주세요.');
+  const extensions: Record<string, string[]> = { 'application/pdf': ['pdf'], 'image/png': ['png'], 'image/jpeg': ['jpg', 'jpeg'], 'image/webp': ['webp'], 'image/gif': ['gif'] };
+  if (!extensions[file.type]?.includes(file.name.toLowerCase().split('.').at(-1) || '')) throw new Error('파일 확장자와 형식이 일치하는 PDF 또는 이미지 파일을 선택해 주세요.');
+}
 
 export function attachmentSessionKey(): string {
   const profile = useAuthStore.getState().userData;
@@ -13,7 +21,11 @@ export function attachmentSessionKey(): string {
     profile?.divisionId, profile?.status, profile?.mustChangePassword]);
 }
 function filename(value: string): string {
-  return Array.from(value.replace(/[\\/]/g, '_')).map(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 ? '_' : character).join('').slice(0, 240) || '첨부파일';
+  const characters = Array.from(value.replace(/[\\/]/g, '_')).map(character => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127 ? '_' : character);
+  if (!characters.length) return '첨부파일';
+  if (characters.length <= 240) return characters.join('');
+  const suffix = /\.(?:pdf|png|jpe?g|webp|gif)$/i.exec(characters.join(''))?.[0] || '';
+  return characters.slice(0, 240 - Array.from(suffix).length).join('') + suffix;
 }
 async function request<T>(endpoint: string, query: URLSearchParams, init: RequestInit, read: (response: Response) => Promise<T>, signal?: AbortSignal): Promise<T> {
   const user = auth.currentUser;
@@ -77,5 +89,37 @@ export async function downloadCompanyAttachment(category: AttachmentCategory, do
   const plain = /filename="([^"]+)"/i.exec(disposition)?.[1];
   let name = plain || '첨부파일';
   if (encoded) { try { name = decodeURIComponent(encoded); } catch { /* Keep the safe fallback. */ } }
+  return { blob, name: filename(name) };
+}
+
+export async function uploadDraftingAttachment(file: File, context: { requestId?: string; documentId?: string; revision?: number }, signal?: AbortSignal): Promise<DraftingAttachment> {
+  validateDraftingFile(file);
+  const query = new URLSearchParams({ category: 'drafting' });
+  if (context.documentId) {
+    if (!/^[a-zA-Z0-9_-]{1,128}$/.test(context.documentId) || !Number.isInteger(context.revision) || Number(context.revision) < 1) throw new Error('첨부할 기안서의 최신 개정을 확인해 주세요.');
+    query.set('documentId', context.documentId); query.set('revision', String(context.revision));
+  } else {
+    if (!uuid.test(context.requestId || '')) throw new Error('새 기안서의 생성 요청을 확인해 주세요.');
+    query.set('requestId', context.requestId!);
+  }
+  const data = await request('uploadCompanyAttachment', query, {
+    method: 'POST', headers: { 'Content-Type': file.type, 'X-File-Name': encodeURIComponent(file.name) }, body: file,
+  }, response => response.json() as Promise<DraftingAttachment>, signal);
+  if (!uuid.test(data.id) || typeof data.name !== 'string' || !allowedTypes.includes(data.contentType) || data.contentType !== file.type || data.size !== file.size) throw new Error('첨부자료 저장 결과를 확인하지 못했습니다. 다시 시도해 주세요.');
+  return { id: data.id, name: filename(data.name), contentType: data.contentType, size: data.size };
+}
+
+export async function downloadDraftingAttachment(input: { documentId: string; revision: number; attachmentId: string; historyId?: string }, signal?: AbortSignal): Promise<AttachmentDownload> {
+  if (!/^[a-zA-Z0-9_-]{1,128}$/.test(input.documentId) || !Number.isInteger(input.revision) || input.revision < 1 || !uuid.test(input.attachmentId) || input.historyId !== undefined && !/^[a-zA-Z0-9_-]{1,128}$/.test(input.historyId)) throw new Error('기안서와 첨부자료를 다시 선택해 주세요.');
+  const query = new URLSearchParams({ category: 'drafting', documentId: input.documentId, revision: String(input.revision), attachmentId: input.attachmentId });
+  if (input.historyId) query.set('historyId', input.historyId);
+  const { blob, disposition } = await request('downloadCompanyAttachment', query, { method: 'GET' }, async response => {
+    if (Number(response.headers.get('Content-Length') || 0) > maxBytes) throw new Error('첨부자료는 10MB 이하여야 합니다.');
+    return { blob: await response.blob(), disposition: response.headers.get('Content-Disposition') || '' };
+  }, signal);
+  if (!blob.size || blob.size > maxBytes || !allowedTypes.includes(blob.type.split(';')[0])) throw new Error('첨부자료의 형식 또는 크기를 확인하지 못했습니다.');
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  let name = /filename="([^"]+)"/i.exec(disposition)?.[1] || '첨부자료';
+  if (encoded) { try { name = decodeURIComponent(encoded); } catch { /* Keep a safe fallback. */ } }
   return { blob, name: filename(name) };
 }

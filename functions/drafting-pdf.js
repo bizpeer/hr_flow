@@ -177,7 +177,18 @@ async function renderDraftingPdf(letter) {
       if (text(content.attachments)) {
         pdf.moveDown(0.8);
         ensureSpace(30);
-        write(`첨부 : ${content.attachments}`, innerLeft, pdf.y, innerWidth, 10);
+        write(`이전 첨부 설명 : ${content.attachments}`, innerLeft, pdf.y, innerWidth, 10);
+      }
+      if (Array.isArray(content.attachmentFiles) && content.attachmentFiles.length) {
+        pdf.moveDown(0.8);
+        ensureSpace(42);
+        write(`첨부자료 (${content.attachmentFiles.length}건)`, innerLeft, pdf.y, innerWidth, 10, true);
+        for (const [index, file] of content.attachmentFiles.entries()) {
+          pdf.moveDown(0.4);
+          ensureSpace(24);
+          const size = Number.isFinite(file.size) ? ` · ${(file.size / 1024 / 1024).toFixed(2)}MB` : '';
+          write(`${index + 1}. ${text(file.name)}${size}`, innerLeft, pdf.y, innerWidth, 9.5);
+        }
       }
       pdf.moveDown(0.8);
       ensureSpace(24);
