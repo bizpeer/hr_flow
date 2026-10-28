@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { 
   Plus, Minus, Printer, X, Users, MoreVertical, Banknote, AlertCircle, Info, Calculator, Loader2, Search, Building, Filter, PieChart, Trash2
@@ -297,23 +298,23 @@ export const SalaryManagement: React.FC = () => {
         {/* Header */}
         <div className="salary-page-head">
             <div>
-              <h1 className="wf-title">급여관리</h1>
+              <PageTitle className="wf-title">급여관리</PageTitle>
               <p className="salary-page-description">
                 2026년 근로소득 간이세액표 적용 · 자녀 공제는 공제대상인 8~20세 자녀만 입력하세요. 기존 저장값도 확인이 필요합니다.
               </p>
             </div>
 
           <div className="salary-head-actions">
-            <button 
+            <Button
               onClick={() => setShowHistory(true)}
               className="wf-btn"
             >
               <Info className="w-4 h-4 text-indigo-500" />
               과거 승인 내역
-            </button>
+            </Button>
             <div className="salary-search relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-              <input 
+              <Input
                 type="search" placeholder="직원 이름 검색" aria-label="급여 대상 직원 검색"
                 value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
                 className="wf-input"
@@ -325,7 +326,7 @@ export const SalaryManagement: React.FC = () => {
         {/* Period & Summary Section */}
         <div className="salary-summary-grid">
            {/* Period Selector */}
-           <div className="salary-period wf-panel">
+           <Panel className="salary-period wf-panel">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                  <Filter className="w-4 h-4" />
                  <span className="text-[10px] font-black uppercase tracking-widest">지출 대상 기간 선택</span>
@@ -345,10 +346,10 @@ export const SalaryManagement: React.FC = () => {
                  </select>
               </div>
               <p className="text-[10px] font-bold text-slate-400">지출액 저장 시 해당 연도/월로 기록됩니다.</p>
-           </div>
+           </Panel>
 
            {/* Summary Stats */}
-           <div className="salary-totals wf-panel">
+           <Panel className="salary-totals wf-panel">
               
               <div className="salary-total-values">
                  <div className="space-y-1">
@@ -366,19 +367,19 @@ export const SalaryManagement: React.FC = () => {
               </div>
 
               <div className="relative z-10 w-full md:w-auto">
-                 <button 
+                 <Button
                    onClick={handleApprovePayroll}
                    disabled={isApproving}
                    className="wf-btn wf-btn-primary salary-approve"
                  >
                     {isApproving ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Banknote className="w-5 h-5" /> 지출 승인 및 저장</>}
-                 </button>
+                 </Button>
               </div>
-           </div>
+           </Panel>
         </div>
 
         {/* Filters */}
-        <div className="salary-filters wf-panel">
+        <Panel className="salary-filters wf-panel">
            <div className="salary-organization-filter">
               <Building className="w-5 h-5 text-indigo-400" />
               <select aria-label="급여 조회 본부"
@@ -406,7 +407,7 @@ export const SalaryManagement: React.FC = () => {
                 <span className="text-sm font-black">2026.03 개정 세법 및 4.75% 연금율 적용</span>
               </div>
            </div>
-        </div>
+        </Panel>
 
         {/* List Section */}
         <div className="space-y-4">
@@ -701,7 +702,7 @@ export const SalaryManagement: React.FC = () => {
                   );
                })}
            </div>
-          {!filteredEmployees.length && <p role="status" className="salary-empty wf-panel">선택한 조건의 직원이 없습니다. 검색어와 본부·팀 필터를 확인하세요.</p>}
+          {!filteredEmployees.length && <Panel as="p" role="status" className="salary-empty wf-panel">선택한 조건의 직원이 없습니다. 검색어와 본부·팀 필터를 확인하세요.</Panel>}
         </div>
       </div>
 

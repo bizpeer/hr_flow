@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel, Select, StatusBadge, Textarea } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { Calendar, History, Send, Loader2, AlertCircle, UploadCloud } from 'lucide-react';
 import { collection, query, onSnapshot, addDoc, where } from 'firebase/firestore';
@@ -164,30 +165,30 @@ export const LeaveApplication: React.FC = () => {
           <div>
             <div className="request-title-row">
               <Calendar aria-hidden="true" />
-              <h1 className="wf-title">내 휴가 및 근태 관리</h1>
+              <PageTitle className="wf-title">내 휴가 및 근태 관리</PageTitle>
             </div>
             <p className="request-description">휴가를 신청하고 잔여 연차와 승인 현황을 확인하세요.</p>
           </div>
           
           <div className="leave-summary" aria-label="연차 현황">
-            <div className="wf-panel request-stat">
+            <Panel className="wf-panel request-stat">
               <span>총 발생</span>
               <strong>{totalLeave}<small>일</small></strong>
-            </div>
-            <div className="wf-panel request-stat">
+            </Panel>
+            <Panel className="wf-panel request-stat">
               <span>사용 완료</span>
               <strong>{usedLeave}<small>일</small></strong>
-            </div>
-            <div className="wf-panel request-stat request-stat-selected">
+            </Panel>
+            <Panel className="wf-panel request-stat request-stat-selected">
               <span>잔여 연차</span>
               <strong>{remainingLeave}<small>일</small></strong>
-            </div>
+            </Panel>
           </div>
         </header>
 
         <div className="request-main-grid">
           {/* 신청 폼 */}
-          <section className="wf-panel request-form-panel" aria-labelledby="leave-form-title">
+          <Panel as="section" className="wf-panel request-form-panel" aria-labelledby="leave-form-title">
               
               <h2 id="leave-form-title" className="wf-section-title request-section-title">
                 <Send aria-hidden="true" />
@@ -197,7 +198,7 @@ export const LeaveApplication: React.FC = () => {
               <form onSubmit={handleSubmit} className="request-form" aria-busy={submitting}>
                 <div className="wf-field">
                   <label htmlFor="leave-type">휴가 종류</label>
-                  <select 
+                  <Select
                     id="leave-type" className="wf-input"
                     value={formData.type}
                     onChange={(e) => setFormData({...formData, type: e.target.value as typeof formData.type})}
@@ -206,13 +207,13 @@ export const LeaveApplication: React.FC = () => {
                     <option value="half">반차 휴가 (0.5일)</option>
                     <option value="sick">병가 (공가)</option>
                     <option value="other">기타 (경조사 등)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="request-field-grid">
                   <div className="wf-field">
                     <label htmlFor="leave-start-date">시작일</label>
-                    <input 
+                    <Input
                       id="leave-start-date" type="date" className="wf-input"
                       value={formData.startDate}
                       onChange={(e) => setFormData({...formData, startDate: e.target.value})}
@@ -220,7 +221,7 @@ export const LeaveApplication: React.FC = () => {
                   </div>
                   <div className="wf-field">
                     <label htmlFor="leave-end-date">종료일</label>
-                    <input 
+                    <Input
                       id="leave-end-date" type="date"
                       disabled={formData.type === 'half'}
                       className="wf-input"
@@ -232,7 +233,7 @@ export const LeaveApplication: React.FC = () => {
 
                 <div className="wf-field">
                   <label htmlFor="leave-reason">사유</label>
-                  <textarea 
+                  <Textarea
                     id="leave-reason"
                     rows={3}
                     placeholder="사유를 입력해 주세요"
@@ -263,7 +264,7 @@ export const LeaveApplication: React.FC = () => {
                    </label>
                 </div>
 
-                <button 
+                <Button
                   type="submit"
                   disabled={submitting}
                   className="wf-btn wf-btn-primary request-submit"
@@ -274,13 +275,13 @@ export const LeaveApplication: React.FC = () => {
                       <Send aria-hidden="true" />
                     </>
                   )}
-                </button>
+                </Button>
               </form>
-          </section>
+          </Panel>
 
           {/* 신청 내역 */}
           <div className="request-history-column">
-            <section className="wf-panel request-history-panel" aria-labelledby="leave-history-title">
+            <Panel as="section" className="wf-panel request-history-panel" aria-labelledby="leave-history-title">
               <div className="wf-panel-head request-history-head">
                 <h2 id="leave-history-title" className="wf-section-title request-section-title">
                   <History aria-hidden="true" />
@@ -325,14 +326,14 @@ export const LeaveApplication: React.FC = () => {
                           <span>{req.requestDays}일</span>
                         </td>
                         <td data-label="상태">
-                          <span className={`wf-status ${
+                          <StatusBadge className={`wf-status ${
                             req.status === 'APPROVED' ? 'wf-status-success' :
                             req.status === 'REJECTED' ? 'wf-status-error' :
                             'wf-status-warning'
                           }`}>
                             {req.status === 'APPROVED' ? '승인완료' : 
                              req.status === 'REJECTED' ? '반려됨' : '심사중'}
-                          </span>
+                          </StatusBadge>
                         </td>
                       </tr>
                     ))}
@@ -349,16 +350,16 @@ export const LeaveApplication: React.FC = () => {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Panel>
 
             {/* 안내 배너 */}
-            <aside className="wf-panel request-notice">
+            <Panel as="aside" className="wf-panel request-notice">
               <AlertCircle aria-hidden="true" />
                 <div>
                   <h3>연차 산정 기준 안내</h3>
                   <p>당사 근태 규정은 대한민국 근로기준법을 준수합니다. 1년 미만 근속자는 매월 개근 시 1일이 발생하며, 1년 이상 근속 시 연 15일의 연차가 발생합니다. (매 2년 근속 시 1일 가산, 최대 25일 한도)</p>
                 </div>
-            </aside>
+            </Panel>
           </div>
         </div>
       </div>

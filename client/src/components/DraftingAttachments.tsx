@@ -1,3 +1,4 @@
+import { Button } from './ui';
 import { useEffect, useRef, useState } from 'react';
 import { Download, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { downloadDraftingAttachment } from '../services/attachmentService';
@@ -34,8 +35,8 @@ export function DraftingAttachments({ documentId, revision, files, historyId, di
   return <div className="drafting-attachment-list" aria-label={historyId ? '이전 개정 첨부자료' : '저장된 첨부자료'}>
     {files.map(file => <div key={file.id} className="drafting-attachment-row">
       <FileText size={18} className="drafting-attachment-icon" /><span className="drafting-attachment-copy"><strong>{file.name}</strong><span>{draftingFileSize(file.size)}</span></span>
-      <div className="drafting-attachment-actions"><button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, false)}>{busy === file.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}보기</button>
-      <button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, true)}><Download size={14} />다운로드</button></div>
+      <div className="drafting-attachment-actions"><Button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, false)}>{busy === file.id ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}보기</Button>
+      <Button type="button" disabled={disabled || !!busy} className="wf-btn ol-button" onClick={() => void open(file, true)}><Download size={14} />다운로드</Button></div>
     </div>)}
     {error && <p role="alert" className="drafting-attachment-error">{error}</p>}
   </div>;

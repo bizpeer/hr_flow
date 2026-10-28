@@ -1,3 +1,4 @@
+import { Button, Input, Panel } from './ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, Download, FileCheck2, Loader2, RefreshCw } from 'lucide-react';
@@ -97,16 +98,16 @@ function IssuedDocuments({ uid }: { uid: string }) {
   };
 
   return (
-    <section className="wf-panel wf-issued-documents" aria-label="내 발급 서류">
+    <Panel as="section" className="wf-panel wf-issued-documents" aria-label="내 발급 서류">
       <div className="wf-panel-head">
         <div><h2><FileCheck2 size={18} />내 발급 서류</h2><p className="wf-issued-description">승인·발행된 PDF를 다운로드해 외부 PDF 프로그램에서 인쇄합니다.</p></div>
-        <div className="wf-issued-head-actions"><Link to="/documents" className="wf-issued-link">서류발급</Link><button type="button" disabled={state.loading} onClick={refresh} aria-label="내 발급 서류 새로고침" className="wf-btn wf-issued-refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></button></div>
+        <div className="wf-issued-head-actions"><Link to="/documents" className="wf-issued-link">서류발급</Link><Button type="button" disabled={state.loading} onClick={refresh} aria-label="내 발급 서류 새로고침" className="wf-btn wf-issued-refresh"><RefreshCw size={16} className={state.loading ? 'animate-spin' : ''} /></Button></div>
       </div>
       <form className="wf-issued-date-filter" aria-label="내 발급 서류 기간 조회" noValidate onSubmit={event => { event.preventDefault(); applyRange(draftRange); }}>
-        <label className="wf-field">시작일<input type="date" min="1900-01-01" required value={draftRange.startDate} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
-        <label className="wf-field">종료일<input type="date" min="1900-01-01" required value={draftRange.endDate} onChange={event => { setDraftRange(previous => ({ ...previous, endDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
-        <button type="submit" className="wf-btn wf-btn-primary">조회</button>
-        <button type="button" onClick={() => { const recent = recent30DayRange(); setDraftRange(recent); applyRange(recent); }} className="wf-btn">최근 30일</button>
+        <label className="wf-field">시작일<Input type="date" min="1900-01-01" required value={draftRange.startDate} onChange={event => { setDraftRange(previous => ({ ...previous, startDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
+        <label className="wf-field">종료일<Input type="date" min="1900-01-01" required value={draftRange.endDate} onChange={event => { setDraftRange(previous => ({ ...previous, endDate: event.target.value })); setRangeError(''); }} className="wf-input" /></label>
+        <Button type="submit" className="wf-btn wf-btn-primary">조회</Button>
+        <Button type="button" onClick={() => { const recent = recent30DayRange(); setDraftRange(recent); applyRange(recent); }} className="wf-btn">최근 30일</Button>
       </form>
       <p className="wf-issued-period">발행일 기준 (한국 시간) · {appliedRange.startDate} ~ {appliedRange.endDate}{!state.loading && !state.error ? ` · ${state.letters.length}건` : ''}</p>
       {rangeError && <p role="alert" className="wf-issued-error">{rangeError}</p>}
@@ -118,12 +119,12 @@ function IssuedDocuments({ uid }: { uid: string }) {
           {state.letters.map(letter => (
             <li key={letter.id} className="wf-issued-document">
               <div><p className="wf-issued-kind">{letter.documentType === 'DRAFTING' ? draftingKindLabel(letter.draftingKind) : letter.documentType === 'EMPLOYMENT' ? '재직증명서' : letter.documentType === 'CAREER' ? '경력증명서' : '공문'}</p><Link to={`/${letter.documentType === 'DRAFTING' ? 'drafting' : 'documents'}?letter=${encodeURIComponent(letter.id)}`} className="wf-issued-document-title">{letter.title}</Link>{letter.number && <p className="wf-issued-number">{letter.number}</p>}<p className="wf-issued-date">발행일 {letter.issueDate || '-'}</p></div>
-              <button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="wf-btn wf-issued-download">{downloading === letter.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}<span>PDF 다운로드</span></button>
+              <Button type="button" onClick={() => void download(letter)} disabled={Boolean(downloading)} className="wf-btn wf-issued-download">{downloading === letter.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}<span>PDF 다운로드</span></Button>
             </li>
           ))}
         </ul>
       )}
-    </section>
+    </Panel>
   );
 }
 

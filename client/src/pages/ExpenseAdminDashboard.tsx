@@ -7,7 +7,6 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 import { format, addMonths, startOfMonth, parseISO } from 'date-fns';
 import { useAuthStore } from '../store/authStore';
-import JSZip from 'jszip';
 import { attachmentSessionKey, downloadCompanyAttachment } from '../services/attachmentService';
 import './ExpenseAdminDashboard.css';
 
@@ -133,12 +132,16 @@ export const ExpenseAdminDashboard: React.FC = () => {
     }
 
     setZipLoading(true);
-    const zip = new JSZip();
     const scope = attachmentSessionKey();
     let included = 0;
     let failed = 0;
 
     try {
+      const { default: JSZip } = await import('jszip').catch(() => {
+        throw new Error('압축 도구를 불러오지 못했습니다. 연결을 확인하고 화면을 새로고침한 뒤 다시 시도해 주세요.');
+      });
+      if (scope !== attachmentSessionKey()) throw new Error('로그인 또는 소속 정보가 변경되었습니다. 다시 시도해 주세요.');
+      const zip = new JSZip();
       for (const item of itemsWithReceipt) {
         try {
           const { blob } = await downloadCompanyAttachment('expenses', item.id);

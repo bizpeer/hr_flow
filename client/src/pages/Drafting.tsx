@@ -1,3 +1,4 @@
+import { Panel } from '../components/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
@@ -8,7 +9,8 @@ import type { UserData } from '../store/authStore';
 import { officialLetters, seoulDate } from '../services/officialLetterService';
 import type { DraftingApprover, DraftingBootstrap, DraftingKind, DraftingRoute, LetterContent, LetterDateRange, LetterHistory, LetterSummary, OfficialLetter } from '../services/officialLetterService';
 import { getErrorMessage } from '../utils/errors';
-import { DeleteIssuedDialog } from './OfficialLetters';
+import { DeleteIssuedDialog } from '../components/DeleteIssuedDialog';
+import { registerDocumentNavigationGuard } from '../utils/documentNavigationGuards';
 import { DraftingAttachments } from '../components/DraftingAttachments';
 import { uploadDraftingAttachment, validateDraftingFile } from '../services/attachmentService';
 import type { DraftingAttachment } from '../services/officialLetterService';
@@ -41,18 +43,6 @@ function routeApprovers(route: DraftingRoute, bootstrap: DraftingBootstrap): Dra
   return [route.teamLeader ? candidates.teamLeader : null,
     ...(route.representative ? [route.divisionHead ? candidates.divisionHead : null, ...cooperation, candidates.representative] : [...cooperation, candidates.divisionHead]),
   ].filter((person): person is DraftingApprover => !!person);
-}
-
-let activeDraftHistoryGuard: ((event: Event) => void) | null = null;
-const dispatchDraftHistory = (event: Event) => activeDraftHistoryGuard?.(event);
-if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', dispatchDraftHistory, true);
-  window.addEventListener('hashchange', dispatchDraftHistory, true);
-  import.meta.hot?.dispose(() => {
-    window.removeEventListener('popstate', dispatchDraftHistory, true);
-    window.removeEventListener('hashchange', dispatchDraftHistory, true);
-    activeDraftHistoryGuard = null;
-  });
 }
 
 function DraftingWorkspace({ profile, scope }: { profile: UserData; scope: string }) {
@@ -157,9 +147,10 @@ function DraftingWorkspace({ profile, scope }: { profile: UserData; scope: strin
       navigationUrl.current = window.location.href;
     };
     window.addEventListener('beforeunload', beforeUnload); document.addEventListener('click', beforeLink, true);
-    window.addEventListener('hr-flow:before-navigation', beforeNavigation); activeDraftHistoryGuard = beforeHistory;
+    window.addEventListener('hr-flow:before-navigation', beforeNavigation);
+    const stopHistoryGuard = registerDocumentNavigationGuard('drafting', beforeHistory);
     return () => { window.removeEventListener('beforeunload', beforeUnload); document.removeEventListener('click', beforeLink, true);
-      window.removeEventListener('hr-flow:before-navigation', beforeNavigation); if (activeDraftHistoryGuard === beforeHistory) activeDraftHistoryGuard = null; };
+      window.removeEventListener('hr-flow:before-navigation', beforeNavigation); stopHistoryGuard(); };
   }, [confirmLeave]);
   useEffect(() => {
     if (pendingLink.current !== null) {
@@ -317,24 +308,24 @@ function DraftingWorkspace({ profile, scope }: { profile: UserData; scope: strin
       </div>
       {selected?.rejectionReason && <p className="drafting-notice drafting-notice-warning">반려 사유: {selected.rejectionReason}</p>}
       <form onSubmit={save} className="drafting-editor-grid">
-        <section className="wf-panel drafting-body-panel">
+        <Panel as="section" className="wf-panel drafting-body-panel">
           <div className="drafting-panel-head"><h2>{selected ? `${kindLabels[kind]} 상세` : isReport ? kindLabels[kind] : '기안서 작성'}</h2><span className="drafting-savehint">필수 항목 <span aria-hidden="true">*</span></span></div>
           <div className="drafting-metadata"><label className="ol-label">{isReport ? '작성일' : '기안일'}<input className="ol-input" readOnly value={selected?.drafting?.draftDate || bootstrap?.draftDate || ''} /></label><label className="ol-label">작성자<input className="ol-input" readOnly value={selected?.creatorName || profile.name || ''} /></label><label className="ol-label drafting-metadata-wide">본부 / 팀<input className="ol-input" readOnly value={[selected?.drafting?.divisionName || bootstrap?.division.name || '', selected?.drafting?.teamName || bootstrap?.team?.name || '미배정'].join(' / ')} /></label>{!isReport && <><label className="ol-label">기안번호<input className="ol-input" readOnly value={selected?.number || '최초 저장 시 자동 부여'} /></label><label className="ol-label">보존년한<input className="ol-input" readOnly value="3년 (자동 삭제 아님)" /></label></>}</div>
           {isReport && <fieldset disabled={locked || !canEdit} className="drafting-date-grid"><label className="ol-label">{kind === 'DAILY' ? '보고일' : '보고 시작일'}<input aria-label={kind === 'DAILY' ? '보고일' : '보고 시작일'} type="date" min="1900-01-01" required className="ol-input" value={reportPeriod.startDate} onChange={event => { const value = event.target.value; setReportPeriod(previous => ({ startDate: value, endDate: kind === 'DAILY' ? value : previous.endDate })); markDirty(); }} /></label>{kind === 'WEEKLY' && <label className="ol-label">보고 종료일<input aria-label="보고 종료일" type="date" min="1900-01-01" required className="ol-input" value={reportPeriod.endDate} onChange={event => { setReportPeriod(previous => ({ ...previous, endDate: event.target.value })); markDirty(); }} /><span className="drafting-field-help">1~7일의 보고 기간을 선택합니다.</span></label>}</fieldset>}
           <fieldset disabled={locked || !canEdit} className="drafting-body-fields"><label className="ol-label">제목<input required maxLength={200} readOnly={isReport} className="ol-input" value={isReport ? kindLabels[kind] : content.title} onChange={event => updateContent('title', event.target.value)} /></label><label className="ol-label">상세 내용<textarea aria-label="상세 내용" required maxLength={20000} rows={12} className="ol-input drafting-body-input" value={content.body} onChange={event => updateContent('body', event.target.value)} /></label>{!isReport && <label className="ol-label">참조 요청사항<textarea aria-label="참조 요청사항" maxLength={3000} rows={3} className="ol-input" value={content.cooperationNote || ''} onChange={event => updateContent('cooperationNote', event.target.value)} /></label>}</fieldset>
           <p className="drafting-field-help drafting-body-help">업무 내용과 첨부자료를 확인한 뒤 {isReport ? '확인' : '결재'} 요청해 주세요.</p>
           <div className="drafting-savebar"><span className="drafting-savehint">{canEdit ? '변경 내용은 저장 후 요청할 수 있습니다.' : '작성자와 회사 관리자만 내용을 변경할 수 있습니다.'}</span>{canEdit && <button className="ol-primary" disabled={locked || !bootstrap || isReport && !reportReady}><Save size={16} />{busy ? '처리 중...' : isReport ? '업무보고 저장' : '기안서 저장'}</button>}</div>
-        </section>
+        </Panel>
         <aside className="drafting-aside" aria-label="결재선 및 첨부자료">
-          <section className="wf-panel drafting-route-panel"><fieldset disabled={locked || !canEdit}>
+          <Panel as="section" className="wf-panel drafting-route-panel"><fieldset disabled={locked || !canEdit}>
             {!isReport && bootstrap && <div className="space-y-4 rounded-xl border border-slate-200 p-4"><h3 className="font-bold">조직 결재선 선택</h3><p className="text-sm leading-6 text-slate-500">본부장 전결은 팀장 → 협조 본부장 → 본부장 순서입니다. 대표 결재는 팀장 → 선택한 본부장 → 협조 본부장 → 대표 순서이며, 선택하지 않은 단계는 생략됩니다.</p><div className="grid gap-3 sm:grid-cols-2">{(['teamLeader', 'divisionHead', 'representative'] as const).map(key => { const person = bootstrap.candidates[key]; const label = key === 'teamLeader' ? '팀장' : key === 'divisionHead' ? '본부장' : '대표 (마지막 결재)'; return <label key={key} className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm"><input type="checkbox" className="mt-1" checked={route[key]} disabled={!person && !route[key] || key === 'divisionHead' && !route.representative} onChange={event => updateRoute({ ...route, [key]: event.target.checked, ...(key === 'representative' && !event.target.checked ? { divisionHead: true } : {}) })} /><span><strong>{label}</strong><span className="mt-1 block text-slate-500">{person ? `${person.name} · ${person.divisionName || bootstrap.companyName}` : '현재 지정된 책임자가 없습니다.'}</span>{key === 'divisionHead' && !route.representative && <span className="mt-1 block text-xs text-indigo-700">본부장 전결 시 필수</span>}</span></label>; })}</div><fieldset className="space-y-2"><legend className="mb-2 text-sm font-bold">협조 본부장 (최대 5개)</legend>{bootstrap.candidates.cooperationHeads.length ? bootstrap.candidates.cooperationHeads.map(person => <label key={person.divisionId} className="flex items-start gap-2 rounded-lg border border-slate-100 p-3 text-sm"><input type="checkbox" className="mt-1" checked={route.cooperationDivisionIds.includes(person.divisionId)} disabled={!route.cooperationDivisionIds.includes(person.divisionId) && route.cooperationDivisionIds.length >= 5} onChange={event => updateRoute({ ...route, cooperationDivisionIds: event.target.checked ? [...route.cooperationDivisionIds, person.divisionId] : route.cooperationDivisionIds.filter(id => id !== person.divisionId) })} /><span>{person.divisionName} · {person.name}</span></label>) : <p className="text-sm text-slate-500">선택할 수 있는 다른 본부의 책임자가 없습니다.</p>}{missingCooperations.map(id => { const previous = selected?.approvalLine.find(step => step.divisionId === id); return <div key={id} role="group" aria-label={`미지정 협조 본부 ${id}`} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"><span><strong>{previous?.divisionName || id}</strong> · {previous?.roleLabel || '협조 본부장'} {previous?.name || ''} · 현재 미지정<span className="mt-1 block break-all text-xs text-amber-800">본부 ID: {id} · 기존 선택을 제거한 뒤 현재 결재자를 선택해 주세요.</span></span><button type="button" aria-label={`미지정 협조 본부 ${id} 제거`} className="ol-button" disabled={locked || !canEdit} onClick={() => { if (!locked && canEdit) updateRoute({ ...route, cooperationDivisionIds: route.cooperationDivisionIds.filter(value => value !== id) }); }}>선택에서 제거</button></div>; })}</fieldset><div className="rounded-lg bg-indigo-50 p-3 text-sm leading-7 text-indigo-900"><strong>선택한 역할 순서</strong><p>{chosen.map(person => `${person.roleLabel} ${person.name}`).join(' → ') || '결재자를 확인해 주세요.'}</p><p className="mt-1 text-xs">겸직자는 저장 시 한 단계로 합쳐집니다. 저장 후 확정 결재선을 확인하세요. 본인이 조직 책임자인 경우에도 직접 승인해야 합니다.</p></div></div>}
           {isReport && <div className="space-y-3 rounded-xl border border-slate-200 p-4"><h3 className="font-bold">업무보고 확인선</h3><p className="text-sm leading-6 text-slate-600">작성자의 소속 팀장 → 소속 본부장이 순서대로 확인합니다. 회사 대표자와 관리자는 언제든지 조회할 수 있으며 확인 차례는 건너뛸 수 없습니다.</p><p className="rounded-lg bg-indigo-50 p-3 text-sm font-semibold text-indigo-900">팀장 {bootstrap?.candidates.teamLeader?.name || '미지정'} → 본부장 {bootstrap?.candidates.divisionHead?.name || '미지정'}</p>{!reportReady && <p role="alert" className="text-sm text-amber-800">소속 팀과 팀장·본부장이 등록되어야 업무보고를 저장할 수 있습니다. 회사 관리자에게 조직 배정과 책임자 등록을 요청해 주세요.</p>}<p className="text-xs text-slate-500">겸직자는 한 단계로 합쳐집니다. 본인이 책임자인 경우에도 직접 확인해야 합니다.</p></div>}
-          </fieldset></section>
-          <section className="wf-panel drafting-files-panel"><fieldset disabled={locked || !canEdit}>
+          </fieldset></Panel>
+          <Panel as="section" className="wf-panel drafting-files-panel"><fieldset disabled={locked || !canEdit}>
             <div className="space-y-3" aria-label="첨부자료 등록"><label className="ol-label">첨부자료<input aria-label="첨부자료" aria-describedby="drafting-attachment-help" type="file" multiple accept="application/pdf,image/png,image/jpeg,image/webp,image/gif,.pdf,.png,.jpg,.jpeg,.webp,.gif" className="ol-input" onChange={event => { chooseFiles(event.target.files); event.target.value = ''; }} /><span id="drafting-attachment-help" className="text-xs font-normal leading-5 text-slate-500">견적서 등 PDF 또는 이미지 파일을 선택하세요. 파일당 10MB, 최대 5개·전체 30MB. 기안서 저장 시 업로드되며, 첨부 변경 후에는 다시 결재해야 합니다.</span></label>{(content.attachmentFiles || []).map(file => <div key={file.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 p-3 text-sm"><span className="min-w-0 break-all">{file.name} <span className="text-xs text-slate-500">{draftingFileSize(file.size)} · 저장됨</span></span><button type="button" aria-label={`${file.name} 첨부 제거`} className="ol-button text-red-700" onClick={() => { setContent(previous => ({ ...previous, attachmentFiles: (previous.attachmentFiles || []).filter(item => item.id !== file.id) })); markDirty(); }}>제거</button></div>)}{pendingFiles.map(entry => <div key={entry.key} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-100 bg-indigo-50 p-3 text-sm"><span className="min-w-0 break-all">{entry.file.name} <span className="text-xs text-indigo-700">{draftingFileSize(entry.file.size)} · 저장 대기</span></span><button type="button" aria-label={`${entry.file.name} 선택 취소`} className="ol-button" onClick={() => { setPendingFiles(previous => previous.filter(item => item.key !== entry.key)); uploadedFiles.current.delete(entry.key); markDirty(); }}>선택 취소</button></div>)}{!(content.attachmentFiles || []).length && !pendingFiles.length && <p className="text-sm text-slate-500">선택한 첨부자료가 없습니다.</p>}{content.attachments && <p className="whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-3 text-sm text-slate-600"><strong>이전 첨부 설명</strong><br />{content.attachments}</p>}</div>
           </fieldset>
             {selected && !deleting && !!selected.content.attachmentFiles?.length && <section className="drafting-saved-files"><h3 className="font-bold">저장된 첨부자료</h3><DraftingAttachments key={`${selected.id}:${selected.revision}`} documentId={selected.id} revision={selected.revision} files={selected.content.attachmentFiles} disabled={locked || dirty} isCurrent={() => current() && !dirtyRef.current && selectedRef.current?.id === selected.id && selectedRef.current.revision === selected.revision && selectedRef.current.status !== 'DELETING'} />{dirty && <p className="text-xs text-amber-700">변경 내용을 저장한 뒤 첨부자료를 열 수 있습니다.</p>}</section>}
-          </section>
+          </Panel>
           <p className="drafting-privacy">작성자·지정 결재자와 회사 관리자만 이 문서와 첨부자료를 열람할 수 있습니다.</p>
         </aside>
       </form>

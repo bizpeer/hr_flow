@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel } from '../components/ui';
 import React, { useRef, useState } from 'react';
 import { CreditCard, CheckCircle, AlertTriangle, ShieldCheck, Zap } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
@@ -52,13 +53,13 @@ const HostedPayPalCheckout: React.FC<{ uid: string; companyId: string }> = ({ ui
     <p className="text-xs text-slate-500 leading-relaxed">PayPal에서 월간 또는 연간 플랜을 선택해 결제한 뒤 이 화면으로 돌아와 주세요. 이미 결제했다면 다시 결제하지 마세요.</p>
     <form onSubmit={submit} className="subscription-claim-form space-y-3" aria-label="PayPal 결제 확인 요청">
       <label htmlFor="paypal-transaction-id" className="wf-field block text-sm font-bold text-slate-700">PayPal 거래 또는 주문번호</label>
-      <input id="paypal-transaction-id" value={orderId} onChange={event => { setOrderId(event.target.value); setError(''); setSubmittedOrder(''); }}
+      <Input id="paypal-transaction-id" value={orderId} onChange={event => { setOrderId(event.target.value); setError(''); setSubmittedOrder(''); }}
         minLength={6} maxLength={80} required disabled={loading} autoComplete="off" spellCheck={false}
         className="wf-input w-full rounded-xl border border-slate-300 px-3 py-2 text-sm disabled:bg-slate-100" placeholder="PayPal 영수증의 거래/주문번호" />
-      <button type="submit" disabled={loading || submittedOrder === orderId.trim()}
+      <Button type="submit" disabled={loading || submittedOrder === orderId.trim()}
         className="wf-btn w-full rounded-xl border border-indigo-300 px-4 py-2 text-sm font-bold text-indigo-700 disabled:opacity-50">
         {loading ? '결제 확인 요청 중...' : error ? '결제 확인 요청 다시 보내기' : '결제 확인 요청 보내기'}
-      </button>
+      </Button>
       {error && <p role="alert" className="subscription-message subscription-error text-xs text-rose-700">{error}</p>}
       {submittedOrder && <p role="status" className="subscription-message subscription-success text-xs text-emerald-700">결제 확인 요청이 접수되었습니다. 플랫폼 관리자의 거래 확인 후 이용 기간이 반영됩니다.</p>}
     </form>
@@ -88,14 +89,14 @@ export const SubscriptionManagement: React.FC = () => {
             <div className="subscription-heading-icon p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-100">
               <CreditCard className="w-6 h-6" />
             </div>
-            <h1 className="wf-title text-3xl font-black text-slate-900 tracking-tight">구독 및 결제 관리</h1>
+            <PageTitle className="wf-title text-3xl font-black text-slate-900 tracking-tight">구독 및 결제 관리</PageTitle>
           </div>
           <p className="text-slate-500 font-medium">서비스 구독 상태와 플랜을 확인하고 결제 확인을 요청합니다.</p>
         </header>
 
         {/* Status Card */}
         <div className="subscription-summary grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className={`subscription-status-card wf-panel ${isActive ? 'is-active' : isExpired ? 'is-expired' : 'is-trial'} bg-white rounded-[2.5rem] p-8 shadow-xl border-2 transition-all ${
+          <Panel className={`subscription-status-card wf-panel ${isActive ? 'is-active' : isExpired ? 'is-expired' : 'is-trial'} bg-white rounded-[2.5rem] p-8 shadow-xl border-2 transition-all ${
             isActive ? 'border-emerald-500 shadow-emerald-50' : 
             isExpired ? 'border-rose-500 shadow-rose-50' : 'border-indigo-100'
           }`}>
@@ -121,9 +122,9 @@ export const SubscriptionManagement: React.FC = () => {
                 </p>
               </div>
             </div>
-          </div>
+          </Panel>
 
-          <div className="subscription-plan-card wf-panel bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white relative overflow-hidden">
+          <Panel className="subscription-plan-card wf-panel bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl text-white relative overflow-hidden">
             <div className="subscription-decoration absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full -mr-16 -mt-16"></div>
             <h2 className="text-sm font-black text-indigo-300 uppercase tracking-widest mb-4">구독 플랜 정보</h2>
             <div className="space-y-4 relative z-10">
@@ -136,11 +137,11 @@ export const SubscriptionManagement: React.FC = () => {
                 <span className="font-black">{companyData.lastPaymentDate ? new Date(companyData.lastPaymentDate).toLocaleDateString() : '-'}</span>
               </div>
             </div>
-          </div>
+          </Panel>
         </div>
 
         {/* Payment Section */}
-        <div className="subscription-payment wf-panel bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
+        <Panel className="subscription-payment wf-panel bg-white rounded-[3rem] shadow-2xl border border-slate-100 overflow-hidden">
           <div className="subscription-payment-grid p-10 md:p-16 flex flex-col md:flex-row items-center gap-12">
             <div className="subscription-benefits flex-1 space-y-6">
               <div className="subscription-benefit-badge inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-xs font-black uppercase tracking-widest">
@@ -182,7 +183,7 @@ export const SubscriptionManagement: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+        </Panel>
 
         {/* Warning for Super Admin */}
         {userData?.role === 'SUPER_ADMIN' && (

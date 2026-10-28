@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
-import readExcelFile from 'read-excel-file/browser';
 import { setDoc } from 'firebase/firestore';
 import { functions, auth } from '../firebase';
 
@@ -266,6 +265,9 @@ export const SuperAdminDashboard: React.FC = () => {
       const reader = new FileReader();
       reader.onload = async (event) => {
         try {
+          const { default: readExcelFile } = await import('read-excel-file/browser').catch(() => {
+            throw new Error('엑셀 도구를 불러오지 못했습니다. 연결을 확인하고 화면을 새로고침한 뒤 다시 시도해 주세요.');
+          });
           const workbook = await readExcelFile(event.target?.result as ArrayBuffer);
           const allBrackets: TaxBracket[] = [];
 

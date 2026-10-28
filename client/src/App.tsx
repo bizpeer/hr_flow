@@ -1,28 +1,31 @@
-import { useEffect } from 'react';
+import { lazy, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { WorkspaceShell } from './components/WorkspaceShell';
-import { OrganizationAdmin } from './pages/OrganizationAdmin';
-import { ExpenseAdminDashboard } from './pages/ExpenseAdminDashboard';
-import { ExpenseForm } from './pages/ExpenseForm';
-import { AttendanceDashboard } from './pages/AttendanceDashboard';
-import { NoticeBoard } from './pages/NoticeBoard';
 import { Login } from './pages/Login';
-import { AdminSettings } from './pages/AdminSettings';
-import { AdminApprovals } from './pages/AdminApprovals';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginModal } from './components/LoginModal';
 import { useAuthStore } from './store/authStore';
-import { LeaveApplication } from './pages/LeaveApplication';
 import { LoadingSplash } from './components/LoadingSplash';
-import { EmployeeManagement } from './pages/EmployeeManagement';
-import { SalaryManagement } from './pages/SalaryManagement';
-import { SuperAdminDashboard } from './pages/SuperAdminDashboard';
 import { LandingPage } from './pages/LandingPage';
-import { SubscriptionManagement } from './pages/SubscriptionManagement';
-import { SubscriptionRequired } from './pages/SubscriptionRequired';
 import { ProfileSetup } from './pages/ProfileSetup';
-import { OfficialLetters } from './pages/OfficialLetters';
-import { Drafting } from './pages/Drafting';
+import { RouteContent } from './components/RouteContent';
+import './utils/documentNavigationGuards';
+
+const WorkspaceShell = lazy(() => import('./components/WorkspaceShell').then(module => ({ default: module.WorkspaceShell })));
+const OrganizationAdmin = lazy(() => import('./pages/OrganizationAdmin').then(module => ({ default: module.OrganizationAdmin })));
+const ExpenseAdminDashboard = lazy(() => import('./pages/ExpenseAdminDashboard').then(module => ({ default: module.ExpenseAdminDashboard })));
+const ExpenseForm = lazy(() => import('./pages/ExpenseForm').then(module => ({ default: module.ExpenseForm })));
+const AttendanceDashboard = lazy(() => import('./pages/AttendanceDashboard').then(module => ({ default: module.AttendanceDashboard })));
+const NoticeBoard = lazy(() => import('./pages/NoticeBoard').then(module => ({ default: module.NoticeBoard })));
+const AdminSettings = lazy(() => import('./pages/AdminSettings').then(module => ({ default: module.AdminSettings })));
+const AdminApprovals = lazy(() => import('./pages/AdminApprovals').then(module => ({ default: module.AdminApprovals })));
+const LeaveApplication = lazy(() => import('./pages/LeaveApplication').then(module => ({ default: module.LeaveApplication })));
+const EmployeeManagement = lazy(() => import('./pages/EmployeeManagement').then(module => ({ default: module.EmployeeManagement })));
+const SalaryManagement = lazy(() => import('./pages/SalaryManagement').then(module => ({ default: module.SalaryManagement })));
+const SuperAdminDashboard = lazy(() => import('./pages/SuperAdminDashboard').then(module => ({ default: module.SuperAdminDashboard })));
+const SubscriptionManagement = lazy(() => import('./pages/SubscriptionManagement').then(module => ({ default: module.SubscriptionManagement })));
+const SubscriptionRequired = lazy(() => import('./pages/SubscriptionRequired').then(module => ({ default: module.SubscriptionRequired })));
+const OfficialLetters = lazy(() => import('./pages/OfficialLetters').then(module => ({ default: module.OfficialLetters })));
+const Drafting = lazy(() => import('./pages/Drafting').then(module => ({ default: module.Drafting })));
 
 function App() {
   const { initAuth, userData, companyData, user, loading, sessionReady, authError, refreshSession, logout } = useAuthStore();
@@ -69,44 +72,46 @@ function App() {
           user ? (userData ? <Navigate to={isSuperAdmin ? '/super-admin' : '/dashboard'} replace /> : <Navigate to="/profile-setup" replace />) : <Login />
         } />
         <Route path="/profile-setup" element={user && !userData ? <ProfileSetup /> : <Navigate to="/" replace />} />
-        <Route path="/subscription-required" element={<SubscriptionRequired />} />
+        <Route path="/subscription-required" element={<RouteContent fullPage><SubscriptionRequired /></RouteContent>} />
         
         <Route path="/*" element={
           !user ? <Navigate to="/login" replace /> : !userData ? <Navigate to="/profile-setup" replace /> : (
+            <RouteContent key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} fullPage>
             <WorkspaceShell key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} profile={userData} company={companyData}>
                   <Routes>
                     {/* SUPER_ADMIN 전용 */}
-                    <Route path="super-admin" element={<ProtectedRoute requireSuperAdmin><SuperAdminDashboard /></ProtectedRoute>} />
+                    <Route path="super-admin" element={<ProtectedRoute requireSuperAdmin><RouteContent><SuperAdminDashboard /></RouteContent></ProtectedRoute>} />
 
                     {/* 구독 관리 (전용) - 블로킹 대상 제외 */}
-                    <Route path="subscription" element={<ProtectedRoute requireAdmin><SubscriptionManagement /></ProtectedRoute>} />
+                    <Route path="subscription" element={<ProtectedRoute requireAdmin><RouteContent><SubscriptionManagement /></RouteContent></ProtectedRoute>} />
 
                     {/* 일반 사용자 및 블로킹 로직 */}
                     {isExpired ? (
                       <Route path="*" element={<Navigate to="/subscription-required" replace />} />
                     ) : (
                       <>
-                        <Route path="/" element={<AttendanceDashboard />} />
-                        <Route path="dashboard" element={<AttendanceDashboard />} />
-                        <Route path="leave" element={<ProtectedRoute><LeaveApplication /></ProtectedRoute>} />
-                        <Route path="drafting" element={<ProtectedRoute><Drafting key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
-                        <Route path="expense" element={<ProtectedRoute><ExpenseForm /></ProtectedRoute>} />
-                        <Route path="documents" element={<ProtectedRoute><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
-                        <Route path="official-letters" element={<ProtectedRoute><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
-                        <Route path="board" element={<ProtectedRoute><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></ProtectedRoute>} />
+                        <Route path="/" element={<RouteContent><AttendanceDashboard /></RouteContent>} />
+                        <Route path="dashboard" element={<RouteContent><AttendanceDashboard /></RouteContent>} />
+                        <Route path="leave" element={<ProtectedRoute><RouteContent><LeaveApplication /></RouteContent></ProtectedRoute>} />
+                        <Route path="drafting" element={<ProtectedRoute><RouteContent><Drafting key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></RouteContent></ProtectedRoute>} />
+                        <Route path="expense" element={<ProtectedRoute><RouteContent><ExpenseForm /></RouteContent></ProtectedRoute>} />
+                        <Route path="documents" element={<ProtectedRoute><RouteContent><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></RouteContent></ProtectedRoute>} />
+                        <Route path="official-letters" element={<ProtectedRoute><RouteContent><OfficialLetters key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></RouteContent></ProtectedRoute>} />
+                        <Route path="board" element={<ProtectedRoute><RouteContent><NoticeBoard userRole={userData?.role || 'MEMBER'} currentUserId={userData?.uid || ''} /></RouteContent></ProtectedRoute>} />
 
-                        <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><OrganizationAdmin /></ProtectedRoute>} />
-                        <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><AdminApprovals key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></ProtectedRoute>} />
-                        <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><ExpenseAdminDashboard /></ProtectedRoute>} />
-                        <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><EmployeeManagement /></ProtectedRoute>} />
-                        <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><SalaryManagement /></ProtectedRoute>} />
-                        <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><AdminSettings /></ProtectedRoute>} />
+                        <Route path="admin/organization" element={<ProtectedRoute requireMasterAdmin><RouteContent><OrganizationAdmin /></RouteContent></ProtectedRoute>} />
+                        <Route path="admin/approvals" element={<ProtectedRoute requireAdmin><RouteContent><AdminApprovals key={`${userData.uid}:${userData.companyId}:${userData.role}:${userData.divisionId || ''}`} /></RouteContent></ProtectedRoute>} />
+                        <Route path="admin/finance-stats" element={<ProtectedRoute requireMasterAdmin><RouteContent><ExpenseAdminDashboard /></RouteContent></ProtectedRoute>} />
+                        <Route path="admin/employees" element={<ProtectedRoute requireMasterAdmin><RouteContent><EmployeeManagement /></RouteContent></ProtectedRoute>} />
+                        <Route path="admin/salary" element={<ProtectedRoute requireMasterAdmin><RouteContent><SalaryManagement /></RouteContent></ProtectedRoute>} />
+                        <Route path="admin/settings" element={<ProtectedRoute requireMasterAdmin><RouteContent><AdminSettings /></RouteContent></ProtectedRoute>} />
                         
                         <Route path="*" element={<Navigate to="/" replace />} />
                       </>
                     )}
                   </Routes>
             </WorkspaceShell>
+            </RouteContent>
           )
         } />
       </Routes>

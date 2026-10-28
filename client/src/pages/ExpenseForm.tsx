@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel, Select, StatusBadge, Textarea } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { 
   UploadCloud, CheckCircle, FileText, History, AlertCircle, Send, Loader2, DollarSign, X, Trash2, Edit, Clock, Calendar 
@@ -249,37 +250,37 @@ export const ExpenseForm: React.FC = () => {
           <div>
             <div className="request-title-row">
               <FileText aria-hidden="true" />
-              <h1 className="wf-title">지출결의 신청</h1>
+              <PageTitle className="wf-title">지출결의 신청</PageTitle>
             </div>
             <p className="request-description">지출 내역과 영수증을 제출하고 처리 상태를 확인하세요.</p>
           </div>
           
-          <div className="wf-panel request-stat request-stat-selected expense-pending">
+          <Panel className="wf-panel request-stat request-stat-selected expense-pending">
             <div>
               <span>승인 대기</span>
               <strong>
                 {requests.filter(r => r.status === 'PENDING').length}<small>건</small>
               </strong>
             </div>
-          </div>
+          </Panel>
         </header>
 
         <div className="request-main-grid">
           
           {/* 신청 폼 */}
-          <section className="wf-panel request-form-panel" aria-label="지출결의 작성">
+          <Panel as="section" className="wf-panel request-form-panel" aria-label="지출결의 작성">
               
               {isSuccess ? (
                 <div className="expense-success" role="status">
                   <CheckCircle aria-hidden="true" />
                   <h2 className="wf-section-title">신청 완료!</h2>
                   <p>재무 담당자가 확인 후 승인 처리됩니다.</p>
-                  <button 
+                  <Button
                     onClick={() => setIsSuccess(false)}
                     className="wf-btn wf-btn-primary"
                   >
                     추가 신청하기
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="request-form" aria-busy={isSubmitting}>
@@ -289,20 +290,20 @@ export const ExpenseForm: React.FC = () => {
                        {isEditing ? '지출 결의서 수정' : '새 결의서 작성'}
                     </h2>
                     {isEditing && (
-                      <button 
+                      <Button
                          type="button"
                          onClick={handleCancelEdit}
                          className="wf-btn wf-btn-quiet expense-cancel-edit"
                       >
                          <X aria-hidden="true" /> 수정 취소
-                      </button>
+                      </Button>
                     )}
                   </div>
 
                   <div className="request-field-grid">
                     <div className="wf-field request-field-full">
                       <label htmlFor="expense-title">지출 항목명 <span aria-hidden="true">*</span></label>
-                      <input 
+                      <Input
                         id="expense-title" type="text" required
                         value={title} onChange={(e) => setTitle(e.target.value)}
                         placeholder="예: 3월 본부 회식비"
@@ -312,7 +313,7 @@ export const ExpenseForm: React.FC = () => {
 
                     <div className="wf-field">
                       <label htmlFor="expense-category">분류</label>
-                      <select 
+                      <Select
                         id="expense-category"
                         value={category} onChange={(e) => setCategory(e.target.value)}
                         className="wf-input"
@@ -322,13 +323,13 @@ export const ExpenseForm: React.FC = () => {
                         <option value="비품/소모품">비품/소모품</option>
                         <option value="접대/미팅비">접대/미팅비</option>
                         <option value="기타">기타 비용</option>
-                      </select>
+                      </Select>
                     </div>
 
                     <div className="wf-field">
                       <label htmlFor="expense-amount">금액 (원) <span aria-hidden="true">*</span></label>
                       <div className="expense-amount-field">
-                        <input 
+                        <Input
                           id="expense-amount" type="number" required min="1"
                           value={amount} onChange={(e) => setAmount(e.target.value)}
                           placeholder="0"
@@ -340,7 +341,7 @@ export const ExpenseForm: React.FC = () => {
 
                     <div className="wf-field request-field-full">
                        <label htmlFor="expense-date">결제일 <span aria-hidden="true">*</span></label>
-                       <input 
+                       <Input
                          id="expense-date" type="date" required
                          value={date} onChange={(e) => setDate(e.target.value)}
                          className="wf-input"
@@ -350,7 +351,7 @@ export const ExpenseForm: React.FC = () => {
 
                   <div className="wf-field">
                     <label htmlFor="expense-description">상세 내역 <span aria-hidden="true">*</span></label>
-                    <textarea 
+                    <Textarea
                       id="expense-description" required rows={3}
                       value={description} onChange={(e) => setDescription(e.target.value)}
                       placeholder="참여자 및 목적을 간단히 적어주세요."
@@ -371,7 +372,7 @@ export const ExpenseForm: React.FC = () => {
                      </label>
                   </div>
 
-                  <button 
+                  <Button
                     type="submit" 
                     disabled={isSubmitting}
                     className="wf-btn wf-btn-primary request-submit"
@@ -382,13 +383,13 @@ export const ExpenseForm: React.FC = () => {
                         <Send aria-hidden="true" />
                       </>
                     )}
-                  </button>
+                  </Button>
                 </form>
               )}
-          </section>
+          </Panel>
 
           {/* 신청 내역 */}
-          <section className="wf-panel request-history-panel" aria-labelledby="expense-history-title">
+          <Panel as="section" className="wf-panel request-history-panel" aria-labelledby="expense-history-title">
                <div className="wf-panel-head request-history-head">
                   <h2 id="expense-history-title" className="wf-section-title request-section-title">
                     <History aria-hidden="true" />
@@ -398,7 +399,7 @@ export const ExpenseForm: React.FC = () => {
                   {/* 월별 필터 UI */}
                   <div className="expense-month-filter">
                     <label htmlFor="expense-filter-month" className="request-sr-only">신청 내역 조회 월</label>
-                    <select 
+                    <Select
                       id="expense-filter-month"
                       value={filterMonth}
                       onChange={(e) => setFilterMonth(e.target.value)}
@@ -407,7 +408,7 @@ export const ExpenseForm: React.FC = () => {
                       {monthOptions.map(opt => (
                         <option key={opt.value} value={opt.value}>{opt.label}</option>
                       ))}
-                    </select>
+                    </Select>
                     <Calendar aria-hidden="true" />
                   </div>
                </div>
@@ -441,14 +442,14 @@ export const ExpenseForm: React.FC = () => {
                                 <span>₩ {req.amount.toLocaleString()}</span>
                              </td>
                              <td data-label="상태">
-                                   <span className={`wf-status ${
+                                   <StatusBadge className={`wf-status ${
                                       req.status === 'APPROVED' ? 'wf-status-success' :
                                       req.status === 'REJECTED' ? 'wf-status-error' :
                                       'wf-status-warning'
                                    }`}>
                                       {req.status === 'APPROVED' ? '승인' : 
                                        req.status === 'REJECTED' ? '반려' : '대기'}
-                                   </span>
+                                   </StatusBadge>
                              </td>
                           </tr>
                        ))}
@@ -465,11 +466,11 @@ export const ExpenseForm: React.FC = () => {
                     </tbody>
                  </table>
                </div>
-          </section>
+          </Panel>
         </div>
 
         {/* 안내 배너 */}
-        <aside className="wf-panel request-notice">
+        <Panel as="aside" className="wf-panel request-notice">
                <AlertCircle aria-hidden="true" />
              <div>
                <h3>
@@ -479,14 +480,14 @@ export const ExpenseForm: React.FC = () => {
                  모든 지출 결의는 전자증빙 첨부가 원칙입니다. 신속한 처리를 위해 결제 후 7일 이내 신청을 권장합니다.
                </p>
              </div>
-        </aside>
+        </Panel>
 
       </div>
 
       {/* 나의 신청 상세 정보 모달 */}
       {selectedRequest && (
         <div className="expense-modal-overlay">
-           <div className="expense-modal wf-panel" role="dialog" aria-modal="true" aria-labelledby="expense-detail-title">
+           <Panel className="expense-modal wf-panel" role="dialog" aria-modal="true" aria-labelledby="expense-detail-title">
               {/* Modal Header */}
               <div className="expense-modal-head">
                  <div>
@@ -496,12 +497,12 @@ export const ExpenseForm: React.FC = () => {
                           <Calendar aria-hidden="true" /> {selectedRequest.createdAt ? format(new Date(selectedRequest.createdAt), 'yyyy.MM.dd') : '-'}
                     </div>
                  </div>
-                 <button 
+                 <Button
                   onClick={() => setSelectedRequest(null)}
                   className="wf-btn expense-modal-close" aria-label="지출결의 상세 닫기"
                  >
                     <X aria-hidden="true" />
-                 </button>
+                 </Button>
               </div>
 
               {/* Modal Body */}
@@ -553,32 +554,32 @@ export const ExpenseForm: React.FC = () => {
 
               {/* Modal Footer */}
               <div className="expense-modal-footer">
-                 <button 
+                 <Button
                   onClick={() => setSelectedRequest(null)}
                   className="wf-btn expense-footer-dismiss"
                  >
                     닫기
-                 </button>
+                 </Button>
                  {selectedRequest.status === 'PENDING' && (
                     <>
-                       <button 
+                       <Button
                         onClick={() => handleDelete(selectedRequest.id, selectedRequest.status)}
                          className="wf-btn wf-btn-danger expense-footer-delete"
                          title="신청 취소" aria-label="지출결의 신청 취소"
                        >
                           <Trash2 aria-hidden="true" />
-                       </button>
-                       <button 
+                       </Button>
+                       <Button
                         onClick={() => handleEdit(selectedRequest)}
                         className="wf-btn wf-btn-primary expense-footer-edit"
                        >
                           <Edit aria-hidden="true" />
                           <span>결의서 수정</span>
-                       </button>
+                       </Button>
                     </>
                  )}
               </div>
-           </div>
+           </Panel>
         </div>
       )}
     </div>

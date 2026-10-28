@@ -42,7 +42,12 @@ function fixture(file, { values = {}, profile = {}, company = {}, failAuth = fal
   } };
   const noop = () => {};
   const element = (type, props) => ({ type, props: props || {} });
-  const react = { useState(initial) { const name = stateNames[stateIndex++]; const value = Object.hasOwn(values, name) ? values[name] : typeof initial === 'function' ? initial() : initial; states[name] = value; return [value, update => { states[name] = typeof update === 'function' ? update(states[name]) : update; }]; }, useEffect(effect) { effects.push(effect); }, useMemo(compute) { return compute(); } };
+  const react = { lazy(loader) {
+    // Keep structural route assertions without evaluating any dynamic page import.
+    const match = /default:\s*[\w$]+\.([\w$]+)/.exec(String(loader));
+    assert.ok(match, 'lazy page must retain an explicit named component binding');
+    return match[1];
+  }, useState(initial) { const name = stateNames[stateIndex++]; const value = Object.hasOwn(values, name) ? values[name] : typeof initial === 'function' ? initial() : initial; states[name] = value; return [value, update => { states[name] = typeof update === 'function' ? update(states[name]) : update; }]; }, useEffect(effect) { effects.push(effect); }, useMemo(compute) { return compute(); } };
   react.default = react;
   const firestore = {
     collection(_db, name) { return { collection: name }; }, doc(_db, collection, id) { return { collection, id }; },

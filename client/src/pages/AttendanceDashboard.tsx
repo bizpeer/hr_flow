@@ -1,3 +1,4 @@
+import { Button, PageTitle, Panel, Select, StatusBadge } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { 
@@ -245,12 +246,12 @@ export const AttendanceDashboard: React.FC = () => {
     <div className="attendance-dashboard wf-page">
       <header className="attendance-page-head">
         <div>
-          <h1 className="wf-title">대시보드</h1>
+          <PageTitle className="wf-title">대시보드</PageTitle>
           <p className="attendance-page-description">{kstDate || '오늘의 업무를 확인하세요.'}{kstTime && <> · <time>{kstTime}</time></>}</p>
           <p className="attendance-user-caption">{userData?.name || '로딩 중...'} · {userData ? getRoleDisplayName(userData, companyData ?? undefined) : 'MEMBER'}</p>
         </div>
         <div className="attendance-page-actions">
-          <button type="button" onClick={openPasswordChange} className="wf-btn"><KeyRound size={16} />보안 설정</button>
+          <Button type="button" onClick={openPasswordChange} className="wf-btn"><KeyRound size={16} />보안 설정</Button>
           <Link to="/drafting" className="wf-btn wf-btn-primary"><Plus size={16} />기안·보고 작성</Link>
         </div>
       </header>
@@ -258,21 +259,21 @@ export const AttendanceDashboard: React.FC = () => {
       {directoryError && <div role="alert" className="attendance-error">{directoryError}<button type="button" onClick={() => setDirectoryRetry(value => value + 1)}>직원 목록 다시 불러오기</button></div>}
 
       <div className="attendance-top-grid">
-        <section className="wf-panel attendance-summary-card" aria-label="오늘 근태">
-          <div className="wf-panel-head"><h2>오늘 근태</h2><span className={`wf-status ${lastStatus?.type === 'IN' ? 'wf-status-success' : ''}`}>{lastStatus?.type === 'IN' ? '근무 중' : hasCheckedOutToday ? '퇴근 완료' : '출근 전'}</span></div>
+        <Panel as="section" className="wf-panel attendance-summary-card" aria-label="오늘 근태">
+          <div className="wf-panel-head"><h2>오늘 근태</h2><StatusBadge className={`wf-status ${lastStatus?.type === 'IN' ? 'wf-status-success' : ''}`}>{lastStatus?.type === 'IN' ? '근무 중' : hasCheckedOutToday ? '퇴근 완료' : '출근 전'}</StatusBadge></div>
           <p className="attendance-label">출근 시각</p>
           <div className="attendance-start-time"><strong>{checkInRecord ? format(new Date(checkInRecord.timestamp), 'HH:mm') : '--:--'}</strong><span>{hasCheckedOutToday ? '오늘 업무를 마쳤습니다.' : hasCheckedInToday ? '오늘도 수고하고 계세요.' : '오늘의 출근을 기록하세요.'}</span></div>
           <div className="attendance-action-buttons">
-            <button type="button" onClick={() => handleAttendance('IN')} disabled={isSubmitting || hasCheckedInToday} className={`wf-btn ${!hasCheckedInToday ? 'wf-btn-primary' : ''}`}>
+            <Button type="button" onClick={() => handleAttendance('IN')} disabled={isSubmitting || hasCheckedInToday} className={`wf-btn ${!hasCheckedInToday ? 'wf-btn-primary' : ''}`}>
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}{hasCheckedInToday ? '출근 완료' : '출근하기'}
-            </button>
-            <button type="button" onClick={() => handleAttendance('OUT')} disabled={isSubmitting || !hasCheckedInToday || hasCheckedOutToday} className={`wf-btn ${hasCheckedInToday && !hasCheckedOutToday ? 'wf-btn-primary' : ''}`}>
+            </Button>
+            <Button type="button" onClick={() => handleAttendance('OUT')} disabled={isSubmitting || !hasCheckedInToday || hasCheckedOutToday} className={`wf-btn ${hasCheckedInToday && !hasCheckedOutToday ? 'wf-btn-primary' : ''}`}>
               {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}{hasCheckedOutToday ? '퇴근 완료' : '퇴근하기'}
-            </button>
+            </Button>
           </div>
-        </section>
+        </Panel>
 
-        <section className="wf-panel attendance-summary-card attendance-timeline-card" aria-label="최근 근태 기록">
+        <Panel as="section" className="wf-panel attendance-summary-card attendance-timeline-card" aria-label="최근 근태 기록">
           <div className="wf-panel-head"><h2>최근 기록</h2><History size={17} className="attendance-muted" /></div>
           <div className="attendance-timeline-feed">
             {loading ? <p role="status" className="attendance-empty"><Loader2 size={18} className="animate-spin" />근태 기록을 불러오는 중입니다.</p> : records.length > 0 ? (
@@ -283,26 +284,26 @@ export const AttendanceDashboard: React.FC = () => {
               </li>)}</ul>
             ) : <p className="attendance-empty"><Clock size={18} />오늘의 근태 기록이 없습니다.</p>}
           </div>
-        </section>
+        </Panel>
 
-        <section className="wf-panel attendance-summary-card" aria-label="연차휴가 요약">
+        <Panel as="section" className="wf-panel attendance-summary-card" aria-label="연차휴가 요약">
           <div className="wf-panel-head"><h2>남은 연차</h2><Link to="/leave" className="attendance-text-link">휴가 신청 <ChevronRight size={14} /></Link></div>
           <div className="attendance-leave-total"><strong>{remainingLeave}</strong><span>일</span></div>
           <dl className="attendance-leave-breakdown"><div><dt>총 연차</dt><dd>{totalLeave}일</dd></div><div><dt>사용</dt><dd>{usedLeave}일</dd></div></dl>
-        </section>
+        </Panel>
       </div>
 
       <MyIssuedDocuments />
 
       <div className="attendance-lower-grid">
-        <section className="wf-panel attendance-calendar-card" aria-label="월별 근태 분석">
+        <Panel as="section" className="wf-panel attendance-calendar-card" aria-label="월별 근태 분석">
           <div className="wf-panel-head attendance-calendar-head">
             <h2><CalendarIcon size={18} />월별 근태</h2>
             <div className="attendance-calendar-controls">
-              {isManagement && <label className="attendance-employee-filter"><span className="sr-only">근태 조회 직원</span><select aria-label="근태 조회 직원" value={selectedUserId} onChange={event => setSelectedUserId(event.target.value)} className="wf-input">
+              {isManagement && <label className="attendance-employee-filter"><span className="sr-only">근태 조회 직원</span><Select aria-label="근태 조회 직원" value={selectedUserId} onChange={event => setSelectedUserId(event.target.value)} className="wf-input">
                 {allUsers.map(employee => <option key={employee.uid} value={employee.uid}>{employee.name}</option>)}
-              </select></label>}
-              <div className="attendance-month-controls"><button type="button" aria-label="이전 달 조회" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="wf-btn"><ChevronLeft size={16} /></button><strong>{format(currentMonth, 'yyyy. MM')}</strong><button type="button" aria-label="다음 달 조회" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="wf-btn"><ChevronRight size={16} /></button></div>
+              </Select></label>}
+              <div className="attendance-month-controls"><Button type="button" aria-label="이전 달 조회" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="wf-btn"><ChevronLeft size={16} /></Button><strong>{format(currentMonth, 'yyyy. MM')}</strong><Button type="button" aria-label="다음 달 조회" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="wf-btn"><ChevronRight size={16} /></Button></div>
             </div>
           </div>
           <div className="attendance-calendar-weekdays" aria-hidden="true">{['일', '월', '화', '수', '목', '금', '토'].map(day => <span key={day}>{day}</span>)}</div>
@@ -321,9 +322,9 @@ export const AttendanceDashboard: React.FC = () => {
             })}
           </div>
           <p className="attendance-calendar-legend"><span><i className="attendance-dot-in" />출근</span><span><i className="attendance-dot-out" />퇴근</span><span>기록이 있는 날짜에 표시합니다.</span></p>
-        </section>
+        </Panel>
 
-        <section className="wf-panel attendance-month-summary" aria-label="월별 근태 요약">
+        <Panel as="section" className="wf-panel attendance-month-summary" aria-label="월별 근태 요약">
           <div className="wf-panel-head"><h2>근무 요약</h2><span className="attendance-muted">{format(currentMonth, 'yyyy년 M월')}</span></div>
           <dl>
             <div className="attendance-worked-total"><dt>출근한 날</dt><dd><strong>{new Set(monthlyRecords.filter(record => record.type === 'IN').map(record => format(new Date(record.timestamp), 'yyyy-MM-dd'))).size}</strong><span>일</span></dd></div>
@@ -331,7 +332,7 @@ export const AttendanceDashboard: React.FC = () => {
             <div><dt>사용 연차</dt><dd>{usedLeave}일</dd></div>
           </dl>
           <p className="attendance-summary-note">월별 근태와 승인된 휴가 내역을 확인하세요.</p>
-        </section>
+        </Panel>
       </div>
     </div>
   );

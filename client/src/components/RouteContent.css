@@ -1,0 +1,10 @@
+.route-state { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; min-height:260px; padding:28px 20px; color:var(--wf-muted,#606567); font:inherit; text-align:center; }
+.route-state-full { min-height:100dvh; background:#F5F6F6; }
+.route-state h1 { margin:0; color:var(--wf-strong,#121212); font-size:20px; font-weight:600; line-height:1.5; }
+.route-state p { margin:0; font-size:14px; line-height:1.7; }
+.route-state button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:9px 14px; border:1px solid #8F357C; border-radius:8px; background:#8F357C; color:#fff; font:inherit; cursor:pointer; }
+.route-state button:hover { background:#4F1D45; }
+.route-state button:focus-visible { outline:2px solid #6E52FF; outline-offset:3px; }
+.route-state-spinner { color:#8F357C; animation:route-spin .8s linear infinite; }
+@keyframes route-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .route-state-spinner { animation:none; } }

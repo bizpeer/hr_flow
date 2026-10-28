@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel, Select, StatusBadge, Textarea } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { 
   Megaphone, Plus, Search, ChevronDown, Bell, Clock, User,
@@ -162,7 +163,7 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
           <div>
             <div className="nb-heading">
               <Megaphone className="nb-heading-icon" aria-hidden="true" />
-              <h1 className="wf-title">전사 알림 및 공지</h1>
+              <PageTitle className="wf-title">전사 알림 및 공지</PageTitle>
             </div>
             <p className="nb-description">조직의 최신 뉴스와 중요한 업데이트를 확인하세요.</p>
           </div>
@@ -170,7 +171,7 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
             <label className="nb-search">
               <span className="nb-sr-only">공지 제목 및 내용 검색</span>
               <Search aria-hidden="true" />
-              <input
+              <Input
                 type="search"
                 placeholder="공지 검색..."
                 value={searchQuery}
@@ -179,14 +180,14 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
               />
             </label>
             {isManager && (
-              <button
+              <Button
                 type="button"
                 onClick={() => handleOpenModal()}
                 className="wf-btn wf-btn-primary nb-create-button"
               >
                 <Plus aria-hidden="true" />
                 새 공지
-              </button>
+              </Button>
             )}
           </div>
         </header>
@@ -198,10 +199,10 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
             { label: '행사 / 워크샵', count: notices.filter(n => n.category === '행사/워크샵').length },
             { label: '규정 / 절차', count: notices.filter(n => n.category === '규정/절차').length }
           ].map((stat, i) => (
-            <div key={i} className={`wf-panel nb-stat ${i === 0 ? 'nb-stat-highlight' : ''}`}>
+            <Panel key={i} className={`wf-panel nb-stat ${i === 0 ? 'nb-stat-highlight' : ''}`}>
               <span>{stat.label}</span>
               <strong>{stat.count}<small>건</small></strong>
-            </div>
+            </Panel>
           ))}
         </section>
 
@@ -216,7 +217,7 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
               const isExpanded = expandedNoticeId === notice.id;
 
               return (
-                <article key={notice.id} className={`wf-panel nb-notice ${isExpanded ? 'is-expanded' : ''}`}>
+                <Panel as="article" key={notice.id} className={`wf-panel nb-notice ${isExpanded ? 'is-expanded' : ''}`}>
                   <div className="nb-notice-header">
                     <button
                       type="button"
@@ -231,7 +232,7 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
                       </span>
                       <span className="nb-notice-summary">
                         <span className="nb-badges">
-                          <span className={`wf-status nb-category ${isUnread ? 'is-unread' : ''}`}>{notice.category}</span>
+                          <StatusBadge className={`wf-status nb-category ${isUnread ? 'is-unread' : ''}`}>{notice.category}</StatusBadge>
                           {isUnread && (
                             <span className="nb-unread"><Bell aria-hidden="true" />새 공지</span>
                           )}
@@ -275,15 +276,15 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
                       </div>
                     )}
                   </div>
-                </article>
+                </Panel>
               );
             })}
             {filteredNotices.length === 0 && (
-              <div className="wf-panel nb-empty" role="status">
+              <Panel className="wf-panel nb-empty" role="status">
                 <Search aria-hidden="true" />
                 <p>검색 결과가 없습니다.</p>
                 <span>검색어를 변경하거나 새로운 공지를 확인해 보세요.</span>
-              </div>
+              </Panel>
             )}
           </div>
         </section>
@@ -310,24 +311,24 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
               <div className="nb-form-row">
                 <label className="wf-field" htmlFor="nb-title">
                   제목
-                  <input
+                  <Input
                     id="nb-title" type="text" required value={title} onChange={(e) => setTitle(e.target.value)}
                     placeholder="공지 제목을 입력하세요" className="wf-input"
                   />
                 </label>
                 <label className="wf-field" htmlFor="nb-category">
                   카테고리
-                  <select id="nb-category" value={category} onChange={(e) => setCategory(e.target.value)} className="wf-input">
+                  <Select id="nb-category" value={category} onChange={(e) => setCategory(e.target.value)} className="wf-input">
                     <option value="공지">일반 공지</option>
                     <option value="행사/워크샵">행사 / 워크샵</option>
                     <option value="규정/절차">규정 / 절차</option>
                     <option value="복리후생">복리후생</option>
-                  </select>
+                  </Select>
                 </label>
               </div>
               <label className="wf-field" htmlFor="nb-content">
                 상세 내용
-                <textarea
+                <Textarea
                   id="nb-content" required value={content} onChange={(e) => setContent(e.target.value)}
                   rows={6} placeholder="공지 내용을 상세히 작성하세요..." className="wf-input"
                 />
@@ -357,10 +358,10 @@ export const NoticeBoard: React.FC<NoticeBoardProps> = ({ userRole, currentUserI
                 </div>
               </div>
               <div className="nb-form-actions">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="wf-btn">취소</button>
-                <button type="submit" disabled={isSubmitting} className="wf-btn wf-btn-primary" aria-busy={isSubmitting}>
+                <Button type="button" onClick={() => setIsModalOpen(false)} className="wf-btn">취소</Button>
+                <Button type="submit" disabled={isSubmitting} className="wf-btn wf-btn-primary" aria-busy={isSubmitting}>
                   {isSubmitting ? <><Loader2 className="animate-spin" aria-hidden="true" />처리 중...</> : (editingNotice ? '수정 완료' : '공지 게시')}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

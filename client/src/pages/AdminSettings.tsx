@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel, StatusBadge } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { Settings, Lock, AlertCircle, CheckCircle2, ShieldCheck, Key, Globe, Layout, Fingerprint, ShieldAlert, Users, Database, Clock, CloudDownload } from 'lucide-react';
 import { auth, db, functions } from '../firebase';
@@ -298,14 +299,14 @@ export const AdminSettings: React.FC = () => {
             <div className="settings-heading-icon">
               <Settings className="w-6 h-6" />
             </div>
-            <h1 className="wf-title">시스템 환경 설정</h1>
+            <PageTitle className="wf-title">시스템 환경 설정</PageTitle>
           </div>
           <p className="settings-description">인사 시스템 기본 정보 및 관리자 보안 옵션을 구성합니다.</p>
         </div>
 
         {/* Status Message */}
         {message.text && (
-          <div role="status" aria-live="polite" className={`settings-message wf-panel ${
+          <Panel role="status" aria-live="polite" className={`settings-message wf-panel ${
             message.type === 'success' ? 'settings-message-success' : 'settings-message-error'
           }`}>
             <div className="settings-message-icon">
@@ -317,13 +318,13 @@ export const AdminSettings: React.FC = () => {
               </p>
               <p className="settings-message-text">{message.text}</p>
             </div>
-          </div>
+          </Panel>
         )}
 
         <div className="settings-grid">
           
           {/* System Default Domain Section - Replacing External DB per user request */}
-          <div className="settings-section wf-panel">
+          <Panel className="settings-section wf-panel">
              <div className="settings-section-head wf-panel-head">
                 <div className="flex items-center gap-3">
                   <div className="settings-section-icon">
@@ -345,7 +346,7 @@ export const AdminSettings: React.FC = () => {
                       </label>
                       <div className="settings-domain-input">
                          <span className="settings-domain-prefix">@</span>
-                         <input
+                         <Input
                            id="settings-domain"
                            type="text"
                            value={tempDomain}
@@ -361,7 +362,7 @@ export const AdminSettings: React.FC = () => {
                       <label htmlFor="settings-domain-password" className="settings-label">
                         <Key className="w-4 h-4" /> 정보 변경 승인 (관리자 암호)
                       </label>
-                      <input
+                      <Input
                            id="settings-domain-password"
                            type="password"
                         required
@@ -386,17 +387,17 @@ export const AdminSettings: React.FC = () => {
                    </div>
                 </div>
 
-                <button 
+                <Button
                   type="submit"
                   disabled={loading}
                   className="wf-btn wf-btn-primary settings-action"
                 >
                    {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <ShieldCheck className="w-5 h-5" />}
                    <span>시스템 도메인 변경 적용</span>
-                </button>
+                </Button>
 
                 <div className="settings-secondary-actions">
-                  <button 
+                  <Button
                     type="button"
                     onClick={handleSyncAllUsersDomain}
                     disabled={loading}
@@ -404,13 +405,13 @@ export const AdminSettings: React.FC = () => {
                   >
                     <Users className="w-4 h-4" />
                     <span>기존 사용자 도메인 일체화 수행</span>
-                  </button>
+                  </Button>
                 </div>
              </form>
-          </div>
+          </Panel>
 
           {/* Security & Access Protection Section */}
-          <div className="settings-section wf-panel">
+          <Panel className="settings-section wf-panel">
             <div className="settings-section-head wf-panel-head">
               <div className="flex items-center gap-3">
                 <div className="settings-section-icon">
@@ -418,9 +419,9 @@ export const AdminSettings: React.FC = () => {
                 </div>
                 <h2 className="wf-section-title">코어 보안 프로토콜</h2>
               </div>
-              <span className="wf-status settings-section-badge">
+              <StatusBadge className="wf-status settings-section-badge">
                 Protected
-              </span>
+              </StatusBadge>
             </div>
 
             <form onSubmit={handleChangePassword} className="settings-section-body settings-form">
@@ -429,7 +430,7 @@ export const AdminSettings: React.FC = () => {
                   <label htmlFor="settings-new-password" className="settings-label">
                     <Fingerprint className="w-4 h-4 text-emerald-500" /> 신규 마스터 비밀번호
                   </label>
-                  <input
+                  <Input
                            id="settings-new-password"
                            type="password"
                     required
@@ -443,7 +444,7 @@ export const AdminSettings: React.FC = () => {
                   <label htmlFor="settings-confirm-password" className="settings-label">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" /> 비밀번호 재검증
                   </label>
-                  <input
+                  <Input
                            id="settings-confirm-password"
                            type="password"
                     required
@@ -455,19 +456,19 @@ export const AdminSettings: React.FC = () => {
                 </div>
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={loading}
                 className="wf-btn wf-btn-primary settings-action"
               >
                 {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Lock className="w-5 h-5" />}
                 <span>보안 키 업데이트 적용</span>
-              </button>
+              </Button>
             </form>
-          </div>
+          </Panel>
 
           {/* Data Backup & Recovery Section */}
-          <div className="settings-section wf-panel">
+          <Panel className="settings-section wf-panel">
             <div className="settings-section-head wf-panel-head">
               <div className="flex items-center gap-3">
                 <div className="settings-section-icon">
@@ -504,7 +505,7 @@ export const AdminSettings: React.FC = () => {
                   <label htmlFor="settings-backup-password" className="settings-label">
                     <Lock className="w-4 h-4 text-indigo-500" /> 백업 실행 승인 (관리자 암호)
                   </label>
-                  <input
+                  <Input
                            id="settings-backup-password"
                            type="password"
                     required
@@ -523,7 +524,7 @@ export const AdminSettings: React.FC = () => {
                   </p>
                 </div>
 
-                <button
+                <Button
                   type="submit"
                   disabled={loading}
                   className="wf-btn wf-btn-primary settings-action"
@@ -534,13 +535,13 @@ export const AdminSettings: React.FC = () => {
                     <CloudDownload className="w-5 h-5" />
                   )}
                   <span>전체 데이터 로컬 백업 다운로드</span>
-                </button>
+                </Button>
               </form>
             </div>
-          </div>
+          </Panel>
 
           {/* System Infrastructure Info - Added to replace/restore previous External DB info */}
-          <div className="settings-infrastructure wf-panel">
+          <Panel className="settings-infrastructure wf-panel">
             <div className="settings-section-head wf-panel-head">
                <div className="flex items-center gap-3">
                  <div className="settings-section-icon">
@@ -589,7 +590,7 @@ export const AdminSettings: React.FC = () => {
                   </div>
                </div>
             </div>
-          </div>
+          </Panel>
 
         </div>
 

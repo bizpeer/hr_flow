@@ -1,3 +1,4 @@
+import { Button, Input, PageTitle, Panel, Select, Textarea } from '../components/ui';
 import React, { useState, useEffect } from 'react';
 import { 
   Users, Search, Building, Filter, Trash2, UserX, UserCheck, Key, 
@@ -310,7 +311,7 @@ export const EmployeeManagement: React.FC = () => {
               <div className="personnel-heading-icon">
                 <Users className="w-6 h-6" />
               </div>
-              <h1 className="wf-title">전체 구성원 관리</h1>
+              <PageTitle className="wf-title">전체 구성원 관리</PageTitle>
             </div>
             <p className="personnel-description">직원의 근태 조회, 퇴사 처리 및 보안 설정을 통합 관리합니다.</p>
           </div>
@@ -324,7 +325,7 @@ export const EmployeeManagement: React.FC = () => {
             )}
             <div className="personnel-search">
             <Search className="personnel-search-icon" />
-            <input 
+            <Input
               type="text" 
               placeholder="이름 또는 로그인 ID(이메일)로 검색..."
               value={searchTerm}
@@ -336,22 +337,22 @@ export const EmployeeManagement: React.FC = () => {
         </div>
 
         {/* Filters */}
-        <div className="wf-panel personnel-filters">
+        <Panel className="wf-panel personnel-filters">
           <div className="personnel-filter">
             <div className="personnel-filter-icon"><Building className="w-5 h-5" /></div>
-            <select 
+            <Select
               value={selectedDivision}
               onChange={(e) => { setSelectedDivision(e.target.value); setSelectedTeam('ALL'); }}
               className="wf-input" aria-label="본부 필터"
             >
               <option value="ALL">전체 본부</option>
               {divisions.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-            </select>
+            </Select>
           </div>
 
           <div className="personnel-filter">
             <div className="personnel-filter-icon"><Filter className="w-5 h-5" /></div>
-            <select 
+            <Select
               value={selectedTeam}
               onChange={(e) => setSelectedTeam(e.target.value)}
               disabled={selectedDivision === 'ALL'}
@@ -361,20 +362,20 @@ export const EmployeeManagement: React.FC = () => {
               {teams.filter(t => t.divisionId === selectedDivision).map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div className="personnel-total">
              <span className="text-[10px] font-black uppercase tracking-widest opacity-70">조회된 구성원</span>
              <span className="text-2xl font-black">{filteredEmployees.length} 명</span>
           </div>
-        </div>
+        </Panel>
 
         {/* List Section - Responsive Container */}
         <div className="space-y-4">
           
           {/* Desktop Table: Hidden on small screens */}
-          <div className="wf-panel personnel-desktop">
+          <Panel className="wf-panel personnel-desktop">
             <div className="personnel-table-scroll">
               <table className="personnel-table">
                 <thead>
@@ -437,19 +438,19 @@ export const EmployeeManagement: React.FC = () => {
                         </td>
                         <td className="px-8 py-6 relative">
                           <div className="flex items-center justify-end gap-3">
-                            <button 
+                            <Button
                               onClick={() => handleOpenDetail(emp)}
                               className="wf-btn personnel-detail-button"
                             >
                               상세보기
-                            </button>
-                            <button 
+                            </Button>
+                            <Button
                               onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
                               aria-label={`${emp.name} 관리 메뉴`}
                               className={`wf-btn personnel-menu-toggle ${activeMenuId === emp.uid ? 'bg-indigo-600 text-white' : 'hover:bg-slate-100 text-slate-400'}`}
                             >
                               <MoreVertical className="w-4 h-4" />
-                            </button>
+                            </Button>
                             
                             {/* Contextual Menu */}
                             {activeMenuId === emp.uid && (
@@ -475,7 +476,7 @@ export const EmployeeManagement: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          </div>
+          </Panel>
 
           {/* Mobile Card View: Visible on small screens */}
           <div className="personnel-cards">
@@ -485,7 +486,7 @@ export const EmployeeManagement: React.FC = () => {
               const isResigned = emp.status === 'RESIGNED';
               
               return (
-                <div key={emp.uid} className="wf-panel personnel-card">
+                <Panel key={emp.uid} className="wf-panel personnel-card">
                   {isResigned && <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-bl-full flex items-start justify-end p-2"><UserX className="w-4 h-4 text-rose-400" /></div>}
                   
                   <div className="flex items-start justify-between">
@@ -507,12 +508,12 @@ export const EmployeeManagement: React.FC = () => {
                         <p className="text-[11px] font-bold text-slate-400 mt-0.5">{getRoleDisplayName({ ...emp, companyId: userData?.companyId || '' }, companyData ?? undefined)}</p>
                       </div>
                     </div>
-                    <button 
+                    <Button
                       onClick={(event) => { event.stopPropagation(); setActiveMenuId(activeMenuId === emp.uid ? null : emp.uid); }}
                       className="wf-btn personnel-menu-toggle" aria-label={`${emp.name} 관리 메뉴`}
                     >
                       <MoreVertical className="w-5 h-5" />
-                    </button>
+                    </Button>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 text-[10px] font-black uppercase tracking-wider">
@@ -526,12 +527,12 @@ export const EmployeeManagement: React.FC = () => {
                      </div>
                   </div>
 
-                  <button 
+                  <Button
                     onClick={() => handleOpenDetail(emp)}
                     className="wf-btn personnel-card-detail"
                   >
                     상세 정보 및 인사 수정
-                  </button>
+                  </Button>
 
                   {/* Mobile Context Menu */}
                   {activeMenuId === emp.uid && (
@@ -549,7 +550,7 @@ export const EmployeeManagement: React.FC = () => {
                        <button onClick={() => setActiveMenuId(null)} className="mt-4 p-4 text-slate-400 font-bold text-xs uppercase tracking-widest">창 닫기</button>
                     </div>
                   )}
-                </div>
+                </Panel>
               );
             })}
           </div>
@@ -611,7 +612,7 @@ export const EmployeeManagement: React.FC = () => {
                  })()}
               </div>
 
-              <button onClick={() => setSelectedEmpRecords(null)} className="wf-btn personnel-modal-close" aria-label="인사 상세 닫기"><X className="w-6 h-6" /></button>
+              <Button onClick={() => setSelectedEmpRecords(null)} className="wf-btn personnel-modal-close" aria-label="인사 상세 닫기"><X className="w-6 h-6" /></Button>
             </div>
 
             <div className="personnel-modal-body">
@@ -619,7 +620,7 @@ export const EmployeeManagement: React.FC = () => {
                   <div className="personnel-form-grid">
                     <div className="space-y-2">
                         <label htmlFor="personnel-rrn" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">주민등록번호</label>
-                        <input 
+                        <Input
                           type="text"
                           id="personnel-rrn"
                           value={editingInfo.rrn}
@@ -631,7 +632,7 @@ export const EmployeeManagement: React.FC = () => {
                     </div>
                     <div className="space-y-2">
                         <label htmlFor="personnel-personalEmail" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">개인 이메일</label>
-                        <input 
+                        <Input
                           type="email"
                           id="personnel-personalEmail"
                           value={editingInfo.personalEmail}
@@ -643,7 +644,7 @@ export const EmployeeManagement: React.FC = () => {
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <label htmlFor="personnel-phone" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">비상 연락처 (전화번호)</label>
-                        <input 
+                        <Input
                           type="text"
                           id="personnel-phone"
                           value={editingInfo.phone}
@@ -655,7 +656,7 @@ export const EmployeeManagement: React.FC = () => {
                     </div>
                     <div className="space-y-2 md:col-span-2">
                         <label htmlFor="personnel-address" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">상세 주소</label>
-                        <textarea 
+                        <Textarea
                           rows={2}
                           id="personnel-address"
                           value={editingInfo.address}
@@ -669,7 +670,7 @@ export const EmployeeManagement: React.FC = () => {
                       <div className="space-y-2 md:col-span-2">
                         <label htmlFor="personnel-additionalLeave" className="text-[10px] font-black text-indigo-500 uppercase tracking-widest ml-1">추가 연차 부여 (일수)</label>
                         <div className="personnel-leave-addition">
-                          <input 
+                          <Input
                             type="number"
                             id="personnel-additionalLeave"
                           value={editingInfo.additionalLeave}
@@ -687,14 +688,14 @@ export const EmployeeManagement: React.FC = () => {
                   </div>
 
                   {isAdmin && (
-                    <button 
+                    <Button
                       onClick={handleSavePersonalInfo}
                       disabled={isSaving}
                       className="wf-btn wf-btn-primary personnel-save"
                     >
                       {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ShieldAlert className="w-5 h-5" />}
                       인사 정보 저장하기
-                    </button>
+                    </Button>
                   )}
                   
                   {!isAdmin && (
@@ -727,7 +728,7 @@ export const EmployeeManagement: React.FC = () => {
              <div className="space-y-4">
                 <div className="relative">
                   <Key className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input 
+                  <Input
                     type="password"
                     placeholder="관리자 비밀번호를 입력하세요"
                     value={adminPassword}
@@ -737,20 +738,20 @@ export const EmployeeManagement: React.FC = () => {
                 </div>
                 
                 <div className="flex gap-3">
-                   <button 
+                   <Button
                     onClick={() => { setDeleteConfirmEmp(null); setAdminPassword(''); }}
                     className="wf-btn"
                    >
                      취소
-                   </button>
-                   <button 
+                   </Button>
+                   <Button
                     onClick={handleDeleteAll}
                     disabled={!adminPassword || isProcessing}
                     className="wf-btn wf-btn-danger"
                    >
                      {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                      데이터 삭제 승인
-                   </button>
+                   </Button>
                 </div>
              </div>
           </div>

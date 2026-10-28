@@ -19,7 +19,25 @@ function fixture({ fail = false, defer = false, component = 'HostedPayPalCheckou
     useRef(initial) { const i = index++; return hooks[i] ||= { current: initial }; },
   };
   react.default = react;
-  const element = (type, props, key) => ({ type, props: props || {}, key });
+  const primitiveComponents = new Set();
+  const element = (type, props, key) => primitiveComponents.has(type)
+    ? type(props || {})
+    : { type, props: props || {}, key };
+  react.createElement = element;
+  const primitivesPath = path.join(root, 'client/src/components/ui/index.tsx');
+  const primitivesCode = ts.transpileModule(fs.readFileSync(primitivesPath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText;
+  const primitives = { exports: {} };
+  vm.runInNewContext(primitivesCode, {
+    module: primitives, exports: primitives.exports,
+    require(name) {
+      if (name === 'react') return react;
+      if (name === 'react/jsx-runtime') return { jsx: element, jsxs: element };
+      throw new Error('unexpected UI module ' + name);
+    },
+  }, { filename: primitivesPath });
+  Object.values(primitives.exports).forEach(component => primitiveComponents.add(component));
   const useAuthStore = () => store; useAuthStore.getState = () => store;
   const module = { exports: {} };
   vm.runInNewContext(compiled, { module, exports: module.exports, Set, Date, Error,
@@ -27,6 +45,7 @@ function fixture({ fail = false, defer = false, component = 'HostedPayPalCheckou
       if (name === 'react') return react;
       if (name === 'react/jsx-runtime') return { jsx: element, jsxs: element };
       if (name === 'lucide-react') return {};
+      if (name === '../components/ui') return primitives.exports;
       if (name === './SubscriptionManagement.css') return {};
       if (name === '../firebase') return { functions: {} };
       if (name === '../store/authStore') return { useAuthStore };
